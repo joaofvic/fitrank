@@ -1,0 +1,121 @@
+---
+alwaysApply: true
+---
+
+Nosso Guia: Este documento estabelece as regras e melhores práticas para o desenvolvimento do FitRank. Ele é a sua referência para manter a consistência, segurança e performance, trabalhando em harmonia com a IA (Cursor).
+
+Você é um expert em TypeScript, Node.js, Vite/React, Supabase, Shadcn UI, Radix UI e Tailwind.
+
+1. Organização & Arquitetura do Projeto
+Use uma estrutura de diretórios lógica, agrupando arquivos por domínio (src/features/auth, src/features/dashboard).
+
+Utilize o diretório src/lib/ para lógica de baixo nível, como a instância do cliente Supabase e utilitários de terceiros.
+
+Coloque as Migrations do banco de dados e as Edge Functions do Supabase dentro do diretório supabase/ na raiz do projeto.
+
+Para componentes globais ou muito reutilizáveis, use src/components/.
+
+2. Integração Supabase
+Separe as configurações do cliente Supabase para diferentes ambientes (ex: src/lib/supabase/client.ts).
+
+Nunca acesse o Supabase diretamente em componentes React para lógica complexa ou sensível; utilize APIs de Backend (como Edge Functions do Supabase) para isso.
+
+Habilite o Row Level Security (RLS) e o Supabase Auth desde o primeiro dia.
+
+Armazene todas as chaves secretas em variáveis de ambiente e use o arquivo .env ou .env.local para segredos de desenvolvimento.
+
+3. Estilo e Estrutura do Código
+Escreva TypeScript conciso e técnico, com exemplos claros para a IA (Cursor).
+
+Use comentários para explicar conceitos técnicos complexos e funções, facilitando o entendimento da IA.
+
+Prefira padrões funcionais e declarativos em React.
+
+Evite duplicação de código usando funções auxiliares e componentes modulares.
+
+Use nomes de variáveis descritivos, com verbos auxiliares (ex: isLoading, hasError).
+
+A estrutura de arquivos de um componente deve seguir: componente exportado principal → subcomponentes → helpers → estáticos → tipos.
+
+4. Convenções de Nomenclatura
+Use letras minúsculas com hífens para diretórios (ex: src/components/auth-wizard).
+
+Use named exports para componentes React e funções.
+
+Prefira interfaces para a definição de tipos de objetos e props.
+
+Evite enums; use objetos literais ou uniões de strings quando possível.
+
+5. Uso de TypeScript
+Todo o código deve ser escrito em TypeScript.
+
+Prefira interfaces para props de componentes e modelos de dados.
+
+Use componentes funcionais com props claramente tipadas.
+
+Evite o uso de any; utilize unknown ou tipos explícitos quando a tipagem não for óbvia.
+
+6. UI e Estilização
+Utilize Shadcn UI (baseado em Radix UI) para componentes de interface.
+
+Tailwind CSS para layout, espaçamento e estilos utilitários.
+
+Desenvolva Mobile-first e garanta que o design seja responsivo por padrão.
+
+Use variantes dark: do Tailwind CSS para suportar o modo escuro.
+
+7. Otimização de Performance
+Minimize o uso de useEffect e useState desnecessários para reduzir re-renderizações.
+
+Faça lazy loading de componentes não críticos para melhorar o tempo de carregamento inicial.
+
+Otimize imagens: prefira formatos modernos como WebP/AVIF, inclua width/height e use lazy-load.
+
+8. Gerenciamento de Estado
+Prefira o estado local de componentes (via useState, useReducer) para a maioria dos casos.
+
+Para estados globais (autenticação, temas), considere soluções leves ou o Context API do React.
+
+Evite bibliotecas de gerenciamento de estado complexas a menos que haja uma necessidade comprovada.
+
+9. Linting e Qualidade do Código
+Utilize ESLint, Prettier e TypeScript em modo strict.
+
+Valide todas as entradas de dados (formulários, APIs) com zod ou similar.
+
+10. Experiência do Desenvolvedor (DX)
+O comando pnpm dev deve iniciar o ambiente de desenvolvimento sem erros de TypeScript ou linter.
+
+Documente decisões importantes de arquitetura e código no README.md ou em diretórios docs/.
+
+11. Acessibilidade e UX
+Utilize primitivos acessíveis do Radix UI e componentes do Shadcn UI.
+
+Garanta o uso correto de atributos aria-*, o tratamento de foco e o suporte total a teclado.
+
+Mantenha um espaçamento e tipografia consistentes para uma boa experiência do usuário.
+
+12. Segurança
+Variáveis de Ambiente: Nunca exponha segredos no navegador. Use .env para chaves privadas e acesse-as apenas em ambientes controlados (build time ou Edge Functions).
+
+Supabase Row Level Security (RLS): Sempre ative o RLS em todas as tabelas. Escreva regras que validem a identidade do usuário via auth.uid() ou request.auth.
+
+Auth Guards: Sempre use validação no lado do servidor (Edge Functions/APIs) para toda a lógica sensível. Nunca confie apenas em verificações no lado do cliente.
+
+Acesso ao Supabase Client: Use a chave anon do Supabase apenas no client-side para consultas públicas e seguras. A chave service_role deve ser usada apenas em Edge Functions ou ambientes seguros.
+
+Edge Functions: Valide todas as entradas com zod. Armazene segredos em variáveis de ambiente das funções do Supabase, não no código.
+
+Limitação de Exposição de Dados: Retorne apenas os campos estritamente necessários do banco de dados.
+
+Gerenciamento de Sessão: Utilize as verificações de sessão do Supabase Auth em rotas protegidas.
+
+Principais Mudanças:
+
+Remoção de referências ao app/ router do Next.js e conceitos de Server Components/Server Actions.
+
+Adaptação de server.ts/client.ts para o modelo de frontend (Vite/React) e backend (Supabase Edge Functions).
+
+Ajustes nos tópicos de Performance e State Management para focar nas práticas do React tradicional, sem a complexidade do App Router.
+
+Ênfase ainda maior na segurança via Supabase e Edge Functions para o contexto Client-Side.
