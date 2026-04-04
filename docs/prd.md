@@ -34,7 +34,7 @@ Criar uma plataforma fitness gamificada onde usuários competem entre si atravé
     * Pontuação: **+10 pontos**.
     * Extras: Foto opcional e tipo de treino.
 * **📅 Histórico:** Log visual das atividades e pontos acumulados.
-* **🎯 Desafio Mensal:** Competição paralela (ex: "30 dias de foco") com ranking próprio.
+* **🎯 Desafio Mensal:** Competição phjaralela (ex: "30 dias de foco") com ranking próprio.
 
 ### 💰 3.2 MONETIZAÇÃO
 1.  **Desafios Pagos:** Inscrição via Pix para acesso a premiações.
