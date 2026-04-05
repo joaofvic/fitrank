@@ -10,14 +10,17 @@ export function Button({
   onClick,
   className = '',
   variant = 'primary',
-  disabled = false
+  disabled = false,
+  type = 'button',
+  ...rest
 }) {
   return (
     <button
-      type="button"
+      type={type}
       disabled={disabled}
       onClick={onClick}
       className={`px-4 py-3 rounded-xl transition-all active:scale-95 disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-2 ${variants[variant]} ${className}`}
+      {...rest}
     >
       {children}
     </button>

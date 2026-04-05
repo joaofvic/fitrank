@@ -1,130 +1,172 @@
 import { useState } from 'react';
+import { useAuth } from './AuthProvider.jsx';
 import { Button } from '../ui/Button.jsx';
-import { Card } from '../ui/Card.jsx';
 
-export function AuthScreen({ supabase, defaultTenantSlug = 'demo', onAuthed }) {
-  const [mode, setMode] = useState('login');
+export function AuthScreen() {
+  const { supabase } = useAuth();
+  const [mode, setMode] = useState('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [tenantSlug, setTenantSlug] = useState(defaultTenantSlug);
+  const [tenantSlug, setTenantSlug] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [academia, setAcademia] = useState('');
   const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [info, setInfo] = useState(null);
+  const [busy, setBusy] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
-    setLoading(true);
+    setInfo(null);
+    setBusy(true);
     try {
       if (mode === 'signup') {
-        const { error: err } = await supabase.auth.signUp({
-          email,
+        const { data, error: err } = await supabase.auth.signUp({
+          email: email.trim(),
           password,
           options: {
             data: {
-              tenant_slug: tenantSlug.trim() || defaultTenantSlug,
-              display_name: displayName.trim() || email.split('@')[0]
+              tenant_slug: tenantSlug.trim() || undefined,
+              display_name: displayName.trim() || undefined,
+              academia: academia.trim() || undefined
             }
           }
         });
         if (err) throw err;
+        if (data?.user && !data.session) {
+          setInfo(
+            'Conta criada. Se o projeto exigir confirmação por e-mail, abra o link enviado antes de entrar.'
+          );
+        }
       } else {
-        const { error: err } = await supabase.auth.signInWithPassword({ email, password });
+        const { error: err } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password
+        });
         if (err) throw err;
       }
-      onAuthed?.();
     } catch (err) {
-      setError(err.message ?? 'Erro de autenticação');
+      setError(err.message ?? 'Falha na autenticação');
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-black text-white flex items-center justify-center px-4 py-12">
-      <Card className="w-full max-w-md border-zinc-800 bg-zinc-900/80 p-8 space-y-6">
-        <div className="text-center space-y-1">
+    <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center px-4">
+      <div className="w-full max-w-sm space-y-6">
+        <div className="text-center">
           <h1 className="text-3xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-green-600 uppercase">
             FitRank
           </h1>
-          <p className="text-zinc-500 text-sm">{mode === 'login' ? 'Entrar' : 'Criar conta'}</p>
-        </div>
-
-        <div className="flex rounded-xl bg-zinc-950 p-1 border border-zinc-800">
-          <button
-            type="button"
-            className={`flex-1 py-2 rounded-lg text-sm font-bold transition-colors ${
-              mode === 'login' ? 'bg-green-500 text-black' : 'text-zinc-500'
-            }`}
-            onClick={() => setMode('login')}
-          >
-            Login
-          </button>
-          <button
-            type="button"
-            className={`flex-1 py-2 rounded-lg text-sm font-bold transition-colors ${
-              mode === 'signup' ? 'bg-green-500 text-black' : 'text-zinc-500'
-            }`}
-            onClick={() => setMode('signup')}
-          >
-            Cadastro
-          </button>
+          <p className="text-zinc-500 text-sm mt-2">
+            {mode === 'signin' ? 'Entre na sua conta' : 'Crie sua conta'}
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {mode === 'signup' && (
             <>
               <div>
-                <label className="text-xs text-zinc-500 uppercase font-bold block mb-1">Nome</label>
+                <label htmlFor="displayName" className="block text-xs font-bold text-zinc-500 uppercase mb-1">
+                  Nome (opcional)
+                </label>
                 <input
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white"
+                  id="displayName"
+                  type="text"
+                  autoComplete="name"
                   value={displayName}
                   onChange={(ev) => setDisplayName(ev.target.value)}
-                  placeholder="Como quer aparecer no ranking"
-                  autoComplete="name"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/50"
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-500 uppercase font-bold block mb-1">Código da academia (slug)</label>
+                <label htmlFor="academia" className="block text-xs font-bold text-zinc-500 uppercase mb-1">
+                  Academia (opcional)
+                </label>
                 <input
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white"
+                  id="academia"
+                  type="text"
+                  autoComplete="organization"
+                  placeholder="Nome da sua academia"
+                  value={academia}
+                  onChange={(ev) => setAcademia(ev.target.value)}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/50"
+                />
+              </div>
+              <div>
+                <label htmlFor="tenantSlug" className="block text-xs font-bold text-zinc-500 uppercase mb-1">
+                  Código da academia (slug)
+                </label>
+                <input
+                  id="tenantSlug"
+                  type="text"
+                  autoComplete="off"
+                  placeholder="ex.: minha-academia (vazio = padrão)"
                   value={tenantSlug}
                   onChange={(ev) => setTenantSlug(ev.target.value)}
-                  placeholder="demo"
-                  autoComplete="off"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/50"
                 />
               </div>
             </>
           )}
           <div>
-            <label className="text-xs text-zinc-500 uppercase font-bold block mb-1">E-mail</label>
+            <label htmlFor="email" className="block text-xs font-bold text-zinc-500 uppercase mb-1">
+              E-mail
+            </label>
             <input
+              id="email"
               type="email"
               required
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white"
+              autoComplete="email"
               value={email}
               onChange={(ev) => setEmail(ev.target.value)}
-              autoComplete="email"
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/50"
             />
           </div>
           <div>
-            <label className="text-xs text-zinc-500 uppercase font-bold block mb-1">Senha</label>
+            <label htmlFor="password" className="block text-xs font-bold text-zinc-500 uppercase mb-1">
+              Senha
+            </label>
             <input
+              id="password"
               type="password"
               required
               minLength={6}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white"
+              autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
               value={password}
               onChange={(ev) => setPassword(ev.target.value)}
-              autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/50"
             />
           </div>
-          {error && <p className="text-red-400 text-sm">{error}</p>}
-          <Button type="submit" className="w-full h-12" disabled={loading}>
-            {loading ? 'Aguarde…' : mode === 'login' ? 'Entrar' : 'Cadastrar'}
+
+          {info && (
+            <p className="text-green-400/90 text-sm" role="status">
+              {info}
+            </p>
+          )}
+          {error && (
+            <p className="text-red-400 text-sm" role="alert">
+              {error}
+            </p>
+          )}
+
+          <Button type="submit" disabled={busy} className="w-full py-3 rounded-xl font-bold">
+            {busy ? 'Aguarde…' : mode === 'signin' ? 'Entrar' : 'Cadastrar'}
           </Button>
         </form>
-      </Card>
+
+        <button
+          type="button"
+          onClick={() => {
+            setMode(mode === 'signin' ? 'signup' : 'signin');
+            setError(null);
+          }}
+          className="w-full text-center text-sm text-zinc-500 hover:text-green-400 transition-colors"
+        >
+          {mode === 'signin' ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Entrar'}
+        </button>
+      </div>
     </div>
   );
 }

@@ -1,8 +1,17 @@
-import { User, Camera, Flame, Zap, Calendar, CheckCircle2, Crown, LogOut } from 'lucide-react';
+import { User, Camera, Flame, Zap, Calendar, CheckCircle2, Crown } from 'lucide-react';
 import { Card } from '../ui/Card.jsx';
 import { Button } from '../ui/Button.jsx';
 
-export function ProfileView({ userData, checkins, onLogout, onUpgradePro, onOpenPortal, hasStripePrice }) {
+export function ProfileView({
+  userData,
+  checkins,
+  cloudTenant = null,
+  cloudDisplayName = null,
+  isPlatformMaster = false,
+  onOpenAdmin,
+  onSignOut
+}) {
+  const displayNome = cloudDisplayName || userData?.nome;
   const created = userData?.created_at
     ? new Date(userData.created_at).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
     : '—';
@@ -19,10 +28,31 @@ export function ProfileView({ userData, checkins, onLogout, onUpgradePro, onOpen
           </div>
         </div>
         <div>
-          <h2 className="text-2xl font-black">{userData?.nome}</h2>
+          <h2 className="text-2xl font-black">{displayNome}</h2>
           <p className="text-zinc-500">Desde {created}</p>
+          {cloudTenant && (
+            <p className="text-xs text-zinc-600 mt-1">
+              Academia: <span className="text-zinc-400 font-mono">{cloudTenant.slug}</span>
+              {cloudTenant.name ? ` · ${cloudTenant.name}` : ''}
+            </p>
+          )}
         </div>
       </div>
+
+      {(isPlatformMaster || onSignOut) && (
+        <div className="flex flex-col gap-2">
+          {isPlatformMaster && onOpenAdmin && (
+            <Button variant="secondary" className="w-full py-2 text-sm" onClick={onOpenAdmin}>
+              Admin · Tenants
+            </Button>
+          )}
+          {onSignOut && (
+            <Button variant="ghost" className="w-full py-2 text-sm" onClick={onSignOut}>
+              Sair da conta
+            </Button>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <Card className="flex flex-col items-center justify-center py-6 border-orange-500/20">
@@ -79,29 +109,11 @@ export function ProfileView({ userData, checkins, onLogout, onUpgradePro, onOpen
           <Crown className="w-4 h-4 text-yellow-500" />
           Seja um Membro PRO
         </h4>
-        <p className="text-sm text-zinc-500 mb-4">Badges exclusivos, estatísticas avançadas e portal de cobrança.</p>
-        <div className="flex flex-col gap-2">
-          {hasStripePrice && (
-            <Button variant="outline" className="w-full py-2" onClick={() => onUpgradePro?.()}>
-              Assinar PRO (Stripe)
-            </Button>
-          )}
-          {userData?.is_pro && (
-            <Button variant="ghost" className="w-full py-2 text-zinc-400" onClick={() => onOpenPortal?.()}>
-              Gerenciar assinatura
-            </Button>
-          )}
-        </div>
+        <p className="text-sm text-zinc-500 mb-4">Desbloqueie badges exclusivos e acesso a ligas premium.</p>
+        <Button variant="outline" className="w-full py-2">
+          Ver Benefícios
+        </Button>
       </Card>
-
-      <Button
-        variant="ghost"
-        className="w-full text-zinc-500 flex items-center justify-center gap-2"
-        onClick={() => onLogout?.()}
-      >
-        <LogOut size={18} />
-        Sair
-      </Button>
     </div>
   );
 }

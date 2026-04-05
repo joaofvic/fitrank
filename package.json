@@ -6,10 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview",
-    "lint": "eslint src",
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.101.1",
@@ -18,11 +15,11 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@eslint/js": "^9.16.0",
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.59.1",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.21",
-    "eslint": "^9.16.0",
+    "eslint": "^10.2.0",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
     "globals": "^17.4.0",
