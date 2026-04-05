@@ -1,8 +1,8 @@
-import { User, Camera, Flame, Zap, Calendar, CheckCircle2, Crown } from 'lucide-react';
+import { User, Camera, Flame, Zap, Calendar, CheckCircle2, Crown, LogOut } from 'lucide-react';
 import { Card } from '../ui/Card.jsx';
 import { Button } from '../ui/Button.jsx';
 
-export function ProfileView({ userData, checkins }) {
+export function ProfileView({ userData, checkins, onLogout, onUpgradePro, onOpenPortal, hasStripePrice }) {
   const created = userData?.created_at
     ? new Date(userData.created_at).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
     : '—';
@@ -79,11 +79,29 @@ export function ProfileView({ userData, checkins }) {
           <Crown className="w-4 h-4 text-yellow-500" />
           Seja um Membro PRO
         </h4>
-        <p className="text-sm text-zinc-500 mb-4">Desbloqueie badges exclusivos e acesso a ligas premium.</p>
-        <Button variant="outline" className="w-full py-2">
-          Ver Benefícios
-        </Button>
+        <p className="text-sm text-zinc-500 mb-4">Badges exclusivos, estatísticas avançadas e portal de cobrança.</p>
+        <div className="flex flex-col gap-2">
+          {hasStripePrice && (
+            <Button variant="outline" className="w-full py-2" onClick={() => onUpgradePro?.()}>
+              Assinar PRO (Stripe)
+            </Button>
+          )}
+          {userData?.is_pro && (
+            <Button variant="ghost" className="w-full py-2 text-zinc-400" onClick={() => onOpenPortal?.()}>
+              Gerenciar assinatura
+            </Button>
+          )}
+        </div>
       </Card>
+
+      <Button
+        variant="ghost"
+        className="w-full text-zinc-500 flex items-center justify-center gap-2"
+        onClick={() => onLogout?.()}
+      >
+        <LogOut size={18} />
+        Sair
+      </Button>
     </div>
   );
 }
