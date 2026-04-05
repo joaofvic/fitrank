@@ -4,15 +4,18 @@ import { Button } from '../ui/Button.jsx';
 
 export function AuthScreen() {
   const { supabase } = useAuth();
+  /** signin | signup | forgot */
   const [mode, setMode] = useState('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [tenantSlug, setTenantSlug] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [academia, setAcademia] = useState('');
   const [error, setError] = useState(null);
   const [info, setInfo] = useState(null);
   const [busy, setBusy] = useState(false);
+
+  const recoveryRedirectTo = () =>
+    typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname || '/'}` : undefined;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -20,14 +23,27 @@ export function AuthScreen() {
     setInfo(null);
     setBusy(true);
     try {
-      if (mode === 'signup') {
+      if (mode === 'forgot') {
+        const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+          redirectTo: recoveryRedirectTo()
+        });
+        if (err) throw err;
+        setInfo(
+          'Se existir uma conta com este e-mail, você receberá um link para redefinir a senha. Verifique a caixa de entrada e o spam.'
+        );
+      } else if (mode === 'signup') {
+        const nome = displayName.trim();
+        if (!nome) {
+          setError('Informe seu nome.');
+          setBusy(false);
+          return;
+        }
         const { data, error: err } = await supabase.auth.signUp({
           email: email.trim(),
           password,
           options: {
             data: {
-              tenant_slug: tenantSlug.trim() || undefined,
-              display_name: displayName.trim() || undefined,
+              display_name: nome,
               academia: academia.trim() || undefined
             }
           }
@@ -60,7 +76,9 @@ export function AuthScreen() {
             FitRank
           </h1>
           <p className="text-zinc-500 text-sm mt-2">
-            {mode === 'signin' ? 'Entre na sua conta' : 'Crie sua conta'}
+            {mode === 'signin' && 'Entre na sua conta'}
+            {mode === 'signup' && 'Crie sua conta'}
+            {mode === 'forgot' && 'Recuperar senha'}
           </p>
         </div>
 
@@ -69,11 +87,12 @@ export function AuthScreen() {
             <>
               <div>
                 <label htmlFor="displayName" className="block text-xs font-bold text-zinc-500 uppercase mb-1">
-                  Nome (opcional)
+                  Nome <span className="text-red-400">*</span>
                 </label>
                 <input
                   id="displayName"
                   type="text"
+                  required
                   autoComplete="name"
                   value={displayName}
                   onChange={(ev) => setDisplayName(ev.target.value)}
@@ -94,20 +113,6 @@ export function AuthScreen() {
                   className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/50"
                 />
               </div>
-              <div>
-                <label htmlFor="tenantSlug" className="block text-xs font-bold text-zinc-500 uppercase mb-1">
-                  Código da academia (slug)
-                </label>
-                <input
-                  id="tenantSlug"
-                  type="text"
-                  autoComplete="off"
-                  placeholder="ex.: minha-academia (vazio = padrão)"
-                  value={tenantSlug}
-                  onChange={(ev) => setTenantSlug(ev.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/50"
-                />
-              </div>
             </>
           )}
           <div>
@@ -124,21 +129,23 @@ export function AuthScreen() {
               className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/50"
             />
           </div>
-          <div>
-            <label htmlFor="password" className="block text-xs font-bold text-zinc-500 uppercase mb-1">
-              Senha
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              minLength={6}
-              autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-              value={password}
-              onChange={(ev) => setPassword(ev.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/50"
-            />
-          </div>
+          {mode !== 'forgot' && (
+            <div>
+              <label htmlFor="password" className="block text-xs font-bold text-zinc-500 uppercase mb-1">
+                Senha
+              </label>
+              <input
+                id="password"
+                type="password"
+                required
+                minLength={6}
+                autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+                value={password}
+                onChange={(ev) => setPassword(ev.target.value)}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/50"
+              />
+            </div>
+          )}
 
           {info && (
             <p className="text-green-400/90 text-sm" role="status">
@@ -152,20 +159,56 @@ export function AuthScreen() {
           )}
 
           <Button type="submit" disabled={busy} className="w-full py-3 rounded-xl font-bold">
-            {busy ? 'Aguarde…' : mode === 'signin' ? 'Entrar' : 'Cadastrar'}
+            {busy
+              ? 'Aguarde…'
+              : mode === 'forgot'
+                ? 'Enviar link'
+                : mode === 'signin'
+                  ? 'Entrar'
+                  : 'Cadastrar'}
           </Button>
         </form>
 
-        <button
-          type="button"
-          onClick={() => {
-            setMode(mode === 'signin' ? 'signup' : 'signin');
-            setError(null);
-          }}
-          className="w-full text-center text-sm text-zinc-500 hover:text-green-400 transition-colors"
-        >
-          {mode === 'signin' ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Entrar'}
-        </button>
+        {mode === 'signin' && (
+          <button
+            type="button"
+            onClick={() => {
+              setMode('forgot');
+              setError(null);
+              setInfo(null);
+              setPassword('');
+            }}
+            className="w-full text-center text-sm text-zinc-500 hover:text-green-400 transition-colors"
+          >
+            Esqueci minha senha
+          </button>
+        )}
+
+        {mode === 'forgot' ? (
+          <button
+            type="button"
+            onClick={() => {
+              setMode('signin');
+              setError(null);
+              setInfo(null);
+            }}
+            className="w-full text-center text-sm text-zinc-500 hover:text-green-400 transition-colors"
+          >
+            Voltar ao login
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              setMode(mode === 'signin' ? 'signup' : 'signin');
+              setError(null);
+              setInfo(null);
+            }}
+            className="w-full text-center text-sm text-zinc-500 hover:text-green-400 transition-colors"
+          >
+            {mode === 'signin' ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Entrar'}
+          </button>
+        )}
       </div>
     </div>
   );

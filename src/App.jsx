@@ -3,6 +3,7 @@ import { Trophy, TrendingUp, Plus, User, Zap } from 'lucide-react';
 
 import { useAuth } from './components/auth/AuthProvider.jsx';
 import { AuthScreen } from './components/auth/AuthScreen.jsx';
+import { ResetPasswordScreen } from './components/auth/ResetPasswordScreen.jsx';
 import { defaultUserData, loadFitRankState, saveFitRankState } from './lib/persist.js';
 import { HomeView } from './components/views/HomeView.jsx';
 import { ProfileView } from './components/views/ProfileView.jsx';
@@ -11,23 +12,19 @@ import { CheckinModal } from './components/views/CheckinModal.jsx';
 import { AdminTenantsView } from './components/views/AdminTenantsView.jsx';
 
 export default function App() {
-  const { configured, loading: authLoading, session, profile, tenant, signOut } = useAuth();
+  const {
+    configured,
+    loading: authLoading,
+    session,
+    profile,
+    tenant,
+    signOut,
+    isPasswordRecovery
+  } = useAuth();
   const [userData, setUserData] = useState(() => loadFitRankState()?.userData ?? defaultUserData());
   const [checkins, setCheckins] = useState(() => loadFitRankState()?.checkins ?? []);
   const [view, setView] = useState('home');
   const [message, setMessage] = useState(null);
-
-  if (configured && authLoading) {
-    return (
-      <div className="min-h-screen bg-black text-zinc-500 flex items-center justify-center text-sm">
-        Carregando sessão…
-      </div>
-    );
-  }
-
-  if (configured && !session) {
-    return <AuthScreen />;
-  }
 
   useEffect(() => {
     saveFitRankState({ userData, checkins });
@@ -92,6 +89,22 @@ export default function App() {
     showToast('Check-in realizado! +10 pontos ⚡');
     setView('home');
   };
+
+  if (configured && authLoading) {
+    return (
+      <div className="min-h-screen bg-black text-zinc-500 flex items-center justify-center text-sm">
+        Carregando sessão…
+      </div>
+    );
+  }
+
+  if (configured && session && isPasswordRecovery) {
+    return <ResetPasswordScreen />;
+  }
+
+  if (configured && !session) {
+    return <AuthScreen />;
+  }
 
   return (
     <div className="min-h-screen bg-black text-white font-sans selection:bg-green-500/30 overflow-x-hidden">
