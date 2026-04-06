@@ -85,8 +85,12 @@ export function ProfileView({
                 className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 flex items-center justify-between"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-zinc-800 flex items-center justify-center">
-                    <CheckCircle2 className="w-6 h-6 text-green-500" />
+                  <div className="w-10 h-10 rounded-lg bg-zinc-800 flex items-center justify-center overflow-hidden shrink-0">
+                    {c.foto_url ? (
+                      <img src={c.foto_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <CheckCircle2 className="w-6 h-6 text-green-500" />
+                    )}
                   </div>
                   <div>
                     <p className="font-bold text-white">{c.type}</p>

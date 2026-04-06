@@ -1,15 +1,46 @@
+import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Camera, Plus } from 'lucide-react';
 import { Button } from '../ui/Button.jsx';
 
 const WORKOUT_TYPES = ['Musculação', 'Cárdio', 'Funcional', 'Luta', 'Crossfit', 'Outro'];
 
 export function CheckinModal({ onClose, onCheckin }) {
+  const [foto, setFoto] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (!foto) {
+      setPreviewUrl(null);
+      return;
+    }
+    const u = URL.createObjectURL(foto);
+    setPreviewUrl(u);
+    return () => URL.revokeObjectURL(u);
+  }, [foto]);
+
+  const handleType = async (type) => {
+    try {
+      await Promise.resolve(onCheckin(type, foto));
+    } finally {
+      setFoto(null);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-black/90 flex flex-col justify-end p-4 animate-in-slide-modal">
       <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 w-full max-w-lg mx-auto space-y-6">
         <div className="flex justify-between items-center">
           <h2 className="text-xl font-bold italic uppercase tracking-wider">Registrar Treino</h2>
-          <Button variant="ghost" onClick={onClose} className="p-1 px-2 h-auto">
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setFoto(null);
+              onClose();
+            }}
+            className="p-1 px-2 h-auto"
+          >
             Fechar
           </Button>
         </div>
@@ -21,7 +52,7 @@ export function CheckinModal({ onClose, onCheckin }) {
               <button
                 key={type}
                 type="button"
-                onClick={() => onCheckin(type)}
+                onClick={() => handleType(type)}
                 className="bg-zinc-800 hover:bg-green-500/10 border border-zinc-700 hover:border-green-500/50 p-4 rounded-2xl text-left transition-all group"
               >
                 <CheckCircle2 size={18} className="text-zinc-600 group-hover:text-green-500 mb-2 transition-colors" />
@@ -32,16 +63,33 @@ export function CheckinModal({ onClose, onCheckin }) {
         </div>
 
         <div className="border-t border-zinc-800 pt-6">
-          <div className="bg-zinc-800/50 p-4 rounded-2xl flex items-center gap-4">
-            <div className="w-12 h-12 bg-zinc-700 rounded-xl flex items-center justify-center border-2 border-dashed border-zinc-600">
-              <Camera size={20} className="text-zinc-500" />
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(ev) => setFoto(ev.target.files?.[0] ?? null)}
+          />
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className="w-full bg-zinc-800/50 p-4 rounded-2xl flex items-center gap-4 text-left border border-zinc-800 hover:border-zinc-600 transition-colors"
+          >
+            <div className="w-12 h-12 bg-zinc-700 rounded-xl flex items-center justify-center border-2 border-dashed border-zinc-600 overflow-hidden shrink-0">
+              {previewUrl ? (
+                <img src={previewUrl} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <Camera size={20} className="text-zinc-500" />
+              )}
             </div>
-            <div className="flex-1">
-              <p className="text-sm font-bold text-zinc-300">Adicionar foto (Opcional)</p>
-              <p className="text-[10px] text-zinc-500 uppercase">Ganhe moral extra no ranking</p>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-zinc-300">Foto (opcional)</p>
+              <p className="text-[10px] text-zinc-500 uppercase truncate">
+                {foto ? foto.name : 'Enviada com o próximo check-in'}
+              </p>
             </div>
-            <Plus size={20} className="text-zinc-500" />
-          </div>
+            <Plus size={20} className="text-zinc-500 shrink-0" />
+          </button>
         </div>
       </div>
     </div>

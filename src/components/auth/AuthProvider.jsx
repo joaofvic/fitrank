@@ -20,7 +20,9 @@ export function AuthProvider({ children }) {
       }
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, display_name, is_platform_master, tenant_id, tenants (slug, name, status)')
+        .select(
+          'id, display_name, nome, academia, pontos, streak, is_pro, last_checkin_date, created_at, is_platform_master, tenant_id, tenants (slug, name, status)'
+        )
         .eq('id', userId)
         .maybeSingle();
 
@@ -94,6 +96,11 @@ export function AuthProvider({ children }) {
     setIsPasswordRecovery(false);
   }, []);
 
+  const refreshProfile = useCallback(() => {
+    const uid = session?.user?.id;
+    if (uid) loadProfile(uid);
+  }, [session?.user?.id, loadProfile]);
+
   const value = useMemo(
     () => ({
       supabase,
@@ -104,7 +111,7 @@ export function AuthProvider({ children }) {
       loading,
       isPasswordRecovery,
       completePasswordRecovery,
-      refreshProfile: () => loadProfile(session?.user?.id),
+      refreshProfile,
       signOut
     }),
     [
@@ -115,7 +122,7 @@ export function AuthProvider({ children }) {
       loading,
       isPasswordRecovery,
       completePasswordRecovery,
-      loadProfile,
+      refreshProfile,
       signOut
     ]
   );

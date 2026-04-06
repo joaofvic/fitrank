@@ -5,6 +5,8 @@ import { useAuth } from './components/auth/AuthProvider.jsx';
 import { AuthScreen } from './components/auth/AuthScreen.jsx';
 import { ResetPasswordScreen } from './components/auth/ResetPasswordScreen.jsx';
 import { defaultUserData, loadFitRankState, saveFitRankState } from './lib/persist.js';
+import { profileToUserData } from './lib/profile-map.js';
+import { useFitCloudData } from './hooks/useFitCloudData.js';
 import { HomeView } from './components/views/HomeView.jsx';
 import { ProfileView } from './components/views/ProfileView.jsx';
 import { ChallengesView } from './components/views/ChallengesView.jsx';
@@ -19,29 +21,64 @@ export default function App() {
     profile,
     tenant,
     signOut,
-    isPasswordRecovery
+    isPasswordRecovery,
+    supabase,
+    refreshProfile
   } = useAuth();
+
+  const useCloud = Boolean(configured && session);
+
+  const cloud = useFitCloudData({
+    supabase: useCloud ? supabase : null,
+    session: useCloud ? session : null,
+    profile: useCloud ? profile : null,
+    refreshProfile: useCloud ? refreshProfile : undefined
+  });
+
   const [userData, setUserData] = useState(() => loadFitRankState()?.userData ?? defaultUserData());
   const [checkins, setCheckins] = useState(() => loadFitRankState()?.checkins ?? []);
   const [view, setView] = useState('home');
   const [message, setMessage] = useState(null);
 
   useEffect(() => {
-    saveFitRankState({ userData, checkins });
-  }, [userData, checkins]);
+    if (!useCloud) {
+      saveFitRankState({ userData, checkins });
+    }
+  }, [useCloud, userData, checkins]);
 
-  const localUser = useMemo(() => ({ uid: userData.uid }), [userData.uid]);
-
-  const allUsers = useMemo(() => {
+  const localLeaderboard = useMemo(() => {
     return [{ ...userData }].sort((a, b) => (b.pontos || 0) - (a.pontos || 0));
   }, [userData]);
+
+  const displayUserData = useMemo(() => {
+    if (useCloud && profile && session?.user?.id) {
+      return profileToUserData(profile, session.user.id);
+    }
+    return userData;
+  }, [useCloud, profile, session?.user?.id, userData]);
+
+  const displayCheckins = useCloud ? cloud.checkins : checkins;
+  const displayLeaderboard = useCloud ? cloud.leaderboard : localLeaderboard;
+
+  const localUser = useMemo(() => ({ uid: displayUserData.uid }), [displayUserData.uid]);
 
   const showToast = (msg) => {
     setMessage(msg);
     setTimeout(() => setMessage(null), 3000);
   };
 
-  const handleCheckin = (workoutType = 'Treino Geral') => {
+  const handleCheckin = async (workoutType = 'Treino Geral', fotoFile = null) => {
+    if (useCloud) {
+      try {
+        await cloud.insertCheckin(workoutType, fotoFile);
+        showToast('Check-in realizado! +10 pontos ⚡');
+        setView('home');
+      } catch (err) {
+        showToast(err.message ?? 'Falha no check-in');
+      }
+      return;
+    }
+
     const todayStr = new Date().toISOString().split('T')[0];
 
     if (userData.last_checkin === todayStr) {
@@ -124,16 +161,21 @@ export default function App() {
         {view === 'home' && (
           <HomeView
             user={localUser}
-            userData={userData}
-            allUsers={allUsers}
+            userData={displayUserData}
+            allUsers={displayLeaderboard}
+            rankingLoading={useCloud && (cloud.leaderboardLoading || cloud.loading)}
+            rankingFilterEnabled={useCloud}
+            rankingPeriod={cloud.rankingPeriod}
+            onRankingPeriodChange={cloud.setRankingPeriod}
+            rankingPeriodLabel={cloud.rankingPeriodLabel}
             onOpenCheckin={() => setView('checkin-modal')}
           />
         )}
         {view === 'challenges' && <ChallengesView />}
         {view === 'profile' && (
           <ProfileView
-            userData={userData}
-            checkins={checkins}
+            userData={displayUserData}
+            checkins={displayCheckins}
             cloudTenant={tenant}
             cloudDisplayName={profile?.display_name}
             isPlatformMaster={profile?.is_platform_master}

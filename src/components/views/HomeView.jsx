@@ -2,7 +2,23 @@ import { Trophy, Flame, User, Dumbbell, Crown, TrendingUp, Zap } from 'lucide-re
 import { Card } from '../ui/Card.jsx';
 import { Button } from '../ui/Button.jsx';
 
-export function HomeView({ user, userData, allUsers, onOpenCheckin }) {
+const RANKING_PERIODS = [
+  { id: 'day', label: 'Dia' },
+  { id: 'week', label: 'Semana' },
+  { id: 'month', label: 'Mês' }
+];
+
+export function HomeView({
+  user,
+  userData,
+  allUsers,
+  onOpenCheckin,
+  rankingLoading = false,
+  rankingFilterEnabled = false,
+  rankingPeriod = 'month',
+  onRankingPeriodChange,
+  rankingPeriodLabel = ''
+}) {
   return (
     <div className="space-y-6 animate-in-fade">
       <div className="flex items-center justify-between">
@@ -46,17 +62,52 @@ export function HomeView({ user, userData, allUsers, onOpenCheckin }) {
       </Card>
 
       <div className="space-y-4">
-        <div className="flex items-center justify-between px-1">
-          <h3 className="font-bold flex items-center gap-2">
-            <Trophy className="w-5 h-5 text-yellow-500" />
-            Ranking Global
-          </h3>
-          <span className="text-xs text-zinc-500">{allUsers.length} atletas ativos</span>
+        <div className="space-y-2 px-1">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h3 className="font-bold flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-yellow-500 shrink-0" />
+                Ranking de usuários
+              </h3>
+              {rankingFilterEnabled && rankingPeriodLabel ? (
+                <p className="text-xs text-zinc-500 mt-0.5 capitalize">{rankingPeriodLabel}</p>
+              ) : null}
+            </div>
+            <span className="text-xs text-zinc-500 shrink-0 pt-0.5">
+              {rankingLoading ? '…' : `${allUsers.length} atletas`}
+            </span>
+          </div>
+          {rankingFilterEnabled && typeof onRankingPeriodChange === 'function' ? (
+            <div
+              className="flex rounded-xl bg-zinc-900/80 border border-zinc-800 p-1 gap-1"
+              role="tablist"
+              aria-label="Período do ranking"
+            >
+              {RANKING_PERIODS.map(({ id, label }) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={rankingPeriod === id}
+                  onClick={() => onRankingPeriodChange(id)}
+                  className={`flex-1 py-2 px-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-colors ${
+                    rankingPeriod === id
+                      ? 'bg-green-500/20 text-green-400 border border-green-500/40'
+                      : 'text-zinc-500 border border-transparent hover:text-zinc-300'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         <div className="space-y-2">
-          {allUsers.length === 0 ? (
-            <div className="text-center py-10 text-zinc-600">Carregando ranking...</div>
+          {rankingLoading && allUsers.length === 0 ? (
+            <div className="text-center py-10 text-zinc-600">Carregando ranking…</div>
+          ) : allUsers.length === 0 ? (
+            <div className="text-center py-10 text-zinc-600">Nenhum atleta no ranking ainda.</div>
           ) : (
             allUsers.map((u, idx) => (
               <div
@@ -90,7 +141,9 @@ export function HomeView({ user, userData, allUsers, onOpenCheckin }) {
                 </div>
                 <div className="text-right">
                   <p className="text-lg font-black text-white">{u.pontos || 0}</p>
-                  <p className="text-[10px] text-zinc-500 uppercase">Pontos</p>
+                  <p className="text-[10px] text-zinc-500 uppercase">
+                    {rankingFilterEnabled ? 'Pts período' : 'Pontos'}
+                  </p>
                 </div>
               </div>
             ))
