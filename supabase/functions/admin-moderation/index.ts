@@ -30,6 +30,13 @@ const reviewSchema = z.object({
   rejection_note: z.string().min(1).max(500).optional()
 });
 
+const batchReviewSchema = z.object({
+  checkin_ids: z.array(z.string().uuid()).min(1).max(100),
+  action: z.enum(['approve', 'reject']),
+  rejection_reason_code: z.string().min(1).max(64).optional(),
+  rejection_note: z.string().min(1).max(500).optional()
+});
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -80,12 +87,24 @@ Deno.serve(async (req) => {
   try {
     if (req.method === 'PATCH') {
       const raw = await req.json().catch(() => null);
-      const parsed = reviewSchema.safeParse(raw);
-      if (!parsed.success) {
-        return jsonResponse({ error: 'Payload inválido', details: parsed.error.flatten() }, 400);
+      const parsedSingle = reviewSchema.safeParse(raw);
+      const parsedBatch = batchReviewSchema.safeParse(raw);
+
+      if (!parsedSingle.success && !parsedBatch.success) {
+        return jsonResponse(
+          {
+            error: 'Payload inválido',
+            details: {
+              single: parsedSingle.error.flatten(),
+              batch: parsedBatch.error.flatten()
+            }
+          },
+          400
+        );
       }
 
-      const { checkin_id, action, rejection_reason_code, rejection_note } = parsed.data;
+      const payload = parsedSingle.success ? parsedSingle.data : parsedBatch.data;
+      const { action, rejection_reason_code, rejection_note } = payload;
       const nextStatus = action === 'approve' ? 'approved' : 'rejected';
       const patch: Record<string, unknown> = {
         photo_review_status: nextStatus,
@@ -101,39 +120,66 @@ Deno.serve(async (req) => {
         patch.photo_rejection_note = null;
       }
 
+      if ('checkin_id' in payload) {
+        const { data, error } = await admin
+          .from('checkins')
+          .update(patch)
+          .eq('id', payload.checkin_id)
+          // trava otimista: só revisa se ainda está pending
+          .eq('photo_review_status', 'pending')
+          .select(
+            `
+              id,
+              tenant_id,
+              user_id,
+              checkin_local_date,
+              tipo_treino,
+              points_awarded,
+              foto_url,
+              created_at,
+              photo_review_status,
+              photo_reviewed_at,
+              photo_reviewed_by,
+              photo_rejection_reason_code,
+              photo_rejection_note,
+              profiles:profiles!checkins_user_profile_fkey ( id, display_name, nome, academia ),
+              tenants:tenants!checkins_tenant_id_fkey ( id, slug, name )
+            `
+          )
+          .maybeSingle();
+
+        if (error) throw error;
+        if (!data) {
+          return jsonResponse({ error: 'Item já foi revisado por outro admin.' }, 409);
+        }
+
+        return jsonResponse({ item: data }, 200);
+      }
+
+      const ids = payload.checkin_ids;
       const { data, error } = await admin
         .from('checkins')
         .update(patch)
-        .eq('id', checkin_id)
-        // trava otimista: só revisa se ainda está pending
+        .in('id', ids)
         .eq('photo_review_status', 'pending')
-        .select(
-          `
-            id,
-            tenant_id,
-            user_id,
-            checkin_local_date,
-            tipo_treino,
-            points_awarded,
-            foto_url,
-            created_at,
-            photo_review_status,
-            photo_reviewed_at,
-            photo_reviewed_by,
-            photo_rejection_reason_code,
-            photo_rejection_note,
-            profiles:profiles!checkins_user_profile_fkey ( id, display_name, nome, academia ),
-            tenants:tenants!checkins_tenant_id_fkey ( id, slug, name )
-          `
-        )
-        .maybeSingle();
+        .select('id');
 
       if (error) throw error;
-      if (!data) {
-        return jsonResponse({ error: 'Item já foi revisado por outro admin.' }, 409);
+
+      const updatedIds = (data ?? []).map((r) => r.id);
+      if (updatedIds.length !== ids.length) {
+        return jsonResponse(
+          {
+            error: 'Alguns itens já foram revisados por outro admin.',
+            updated: updatedIds.length,
+            requested: ids.length,
+            updated_ids: updatedIds
+          },
+          409
+        );
       }
 
-      return jsonResponse({ item: data }, 200);
+      return jsonResponse({ updated: updatedIds.length, updated_ids: updatedIds }, 200);
     }
 
     if (req.method !== 'GET') {

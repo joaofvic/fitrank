@@ -19,6 +19,10 @@ export function AdminModerationView({ onBack }) {
   const [busy, setBusy] = useState(false);
   const [zoom, setZoom] = useState(false);
   const [rejectConfirmOpen, setRejectConfirmOpen] = useState(false);
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'grid'
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [lastSelectedIdx, setLastSelectedIdx] = useState(null);
+  const [batchRejectConfirmOpen, setBatchRejectConfirmOpen] = useState(false);
   const [shortcutsEnabled, setShortcutsEnabled] = useState(() => {
     try {
       const v = localStorage.getItem('fitrank.admin.shortcuts');
@@ -67,6 +71,7 @@ export function AdminModerationView({ onBack }) {
     if (!supabase || !profile?.is_platform_master) return;
     setLoading(true);
     setError(null);
+    setBatchRejectConfirmOpen(false);
 
     const params = new URLSearchParams();
     params.set('status', status);
@@ -99,6 +104,8 @@ export function AdminModerationView({ onBack }) {
     }
 
     setItems(Array.isArray(data?.items) ? data.items : []);
+    setSelectedIds(new Set());
+    setLastSelectedIdx(null);
     setFocusIdx((prev) => {
       const next = Array.isArray(data?.items) && data.items.length > 0 ? Math.min(prev, data.items.length - 1) : -1;
       return Number.isFinite(next) ? next : -1;
@@ -172,6 +179,66 @@ export function AdminModerationView({ onBack }) {
       setItems((prev) => prev.filter((x) => x.id !== focused.id));
       setFocusIdx((prev) => Math.max(0, Math.min(prev, items.length - 2)));
       nextItem();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const selectedCount = selectedIds.size;
+
+  const toggleSelect = (id, idx, isRange) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      const isSelected = next.has(id);
+
+      if (isRange && lastSelectedIdx !== null) {
+        const a = Math.min(lastSelectedIdx, idx);
+        const b = Math.max(lastSelectedIdx, idx);
+        for (let i = a; i <= b; i++) {
+          const cid = items[i]?.id;
+          if (cid) next.add(cid);
+        }
+        return next;
+      }
+
+      if (isSelected) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    setLastSelectedIdx(idx);
+  };
+
+  const selectAll = () => {
+    setSelectedIds(new Set(items.map((x) => x.id).filter(Boolean)));
+    setLastSelectedIdx(items.length > 0 ? 0 : null);
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+    setLastSelectedIdx(null);
+  };
+
+  const batchReview = async (action) => {
+    if (!supabase) return;
+    if (selectedIds.size === 0) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { data: sData } = await supabase.auth.getSession();
+      const token = sData?.session?.access_token ?? session?.access_token ?? null;
+      const ids = Array.from(selectedIds);
+      const { data, error: fnError } = await invokeEdge('admin-moderation', token, {
+        method: 'PATCH',
+        body: { checkin_ids: ids, action }
+      });
+      if (fnError) {
+        setError(fnError.message);
+        return;
+      }
+      const updatedIds = Array.isArray(data?.updated_ids) ? data.updated_ids : ids;
+      setItems((prev) => prev.filter((x) => !updatedIds.includes(x.id)));
+      clearSelection();
+      setBatchRejectConfirmOpen(false);
     } finally {
       setBusy(false);
     }
@@ -293,6 +360,18 @@ export function AdminModerationView({ onBack }) {
           <div className="flex items-center gap-2">
             <button
               type="button"
+              onClick={() => {
+                setViewMode((m) => (m === 'grid' ? 'list' : 'grid'));
+                clearSelection();
+              }}
+              className="text-[10px] font-bold uppercase px-2 py-2 rounded-lg border border-zinc-800 text-zinc-400 hover:text-zinc-200"
+              aria-pressed={viewMode === 'grid'}
+              title="Alternar visualização"
+            >
+              {viewMode === 'grid' ? 'Lista' : 'Grid'}
+            </button>
+            <button
+              type="button"
               onClick={toggleShortcuts}
               className="text-[10px] font-bold uppercase px-2 py-2 rounded-lg border border-zinc-800 text-zinc-400 hover:text-zinc-200"
               aria-pressed={shortcutsEnabled}
@@ -359,18 +438,150 @@ export function AdminModerationView({ onBack }) {
         </div>
 
         <div className="flex items-center justify-between">
-          <p className="text-xs text-zinc-500">{loading ? 'Carregando…' : `${items.length} itens`}</p>
+          <p className="text-xs text-zinc-500">
+            {loading ? 'Carregando…' : `${items.length} itens`}
+            {viewMode === 'grid' ? ` · ${selectedCount} selecionados` : ''}
+          </p>
           <Button type="button" onClick={loadQueue} className="text-xs py-2 px-3">
             Atualizar
           </Button>
         </div>
       </div>
 
+      {viewMode === 'grid' && items.length > 0 ? (
+        <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-zinc-500">
+              Seleção: <span className="text-zinc-200 font-bold">{selectedCount}</span>
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={busy || items.length === 0}
+                onClick={selectAll}
+                className="text-xs py-2 px-3"
+              >
+                Selecionar todos
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={busy || selectedCount === 0}
+                onClick={clearSelection}
+                className="text-xs py-2 px-3"
+              >
+                Limpar
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              disabled={busy || selectedCount === 0}
+              onClick={() => batchReview('approve')}
+              className="text-xs py-3"
+            >
+              Aprovar selecionados
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy || selectedCount === 0}
+              onClick={() => setBatchRejectConfirmOpen(true)}
+              className="text-xs py-3 border-red-500/40 text-red-300 hover:bg-red-500/10"
+            >
+              Rejeitar selecionados
+            </Button>
+          </div>
+
+          {batchRejectConfirmOpen ? (
+            <div className="border border-zinc-800 rounded-2xl p-4 bg-zinc-950/40 space-y-3">
+              <p className="text-sm text-white font-bold">Rejeitar {selectedCount} itens?</p>
+              <p className="text-xs text-zinc-500">
+                (Motivos padronizados entram no US-ADM-07. Por enquanto, isso apenas marca como rejeitado.)
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => setBatchRejectConfirmOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => batchReview('reject')}
+                  className="bg-red-500/90 hover:bg-red-500 text-black font-bold"
+                >
+                  Rejeitar
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       {loading ? (
         <p className="text-zinc-500 text-sm">Carregando fila…</p>
       ) : items.length === 0 ? (
         <div className="text-center py-10 text-zinc-600 border border-dashed border-zinc-800 rounded-2xl">
           Nenhum item encontrado.
+        </div>
+      ) : viewMode === 'grid' ? (
+        <div className="grid grid-cols-2 gap-3">
+          {items.map((it, idx) => {
+            const isSelected = selectedIds.has(it.id);
+            const nome =
+              it?.profiles?.display_name?.trim() ||
+              it?.profiles?.nome?.trim() ||
+              'Atleta';
+            const tenantLabel = it?.tenants?.slug || it.tenant_id;
+            return (
+              <button
+                key={it.id}
+                type="button"
+                onClick={(e) => toggleSelect(it.id, idx, e.shiftKey)}
+                className={`text-left rounded-2xl border overflow-hidden transition-colors ${
+                  isSelected
+                    ? 'border-green-500/60 bg-green-500/10'
+                    : 'border-zinc-800 bg-zinc-900/80 hover:border-zinc-700'
+                }`}
+                title="Clique para selecionar (Shift para intervalo)"
+              >
+                <div className="relative">
+                  {it.foto_url ? (
+                    <img src={it.foto_url} alt="" className="w-full h-40 object-cover" loading="lazy" />
+                  ) : (
+                    <div className="w-full h-40 bg-black flex items-center justify-center text-zinc-700 text-xs">
+                      Sem foto
+                    </div>
+                  )}
+                  <div className="absolute top-2 left-2">
+                    <span
+                      className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full border ${
+                        isSelected
+                          ? 'border-green-500/60 text-green-300 bg-black/50'
+                          : 'border-zinc-700 text-zinc-300 bg-black/40'
+                      }`}
+                    >
+                      {isSelected ? 'Selecionado' : 'Selecionar'}
+                    </span>
+                  </div>
+                </div>
+                <div className="p-3 space-y-1">
+                  <p className="font-bold text-white truncate">{nome}</p>
+                  <p className="text-xs text-zinc-500 font-mono truncate">{tenantLabel}</p>
+                  <p className="text-[11px] text-zinc-500 truncate">
+                    {it.tipo_treino} · {it.checkin_local_date}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
         </div>
       ) : (
         <ul className="space-y-3">
