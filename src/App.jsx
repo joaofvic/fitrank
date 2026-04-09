@@ -181,6 +181,16 @@ export default function App() {
           <ProfileView
             userData={displayUserData}
             checkins={displayCheckins}
+            notifications={useCloud ? cloud.notifications : []}
+            onMarkNotificationRead={
+              useCloud
+                ? async (id) => {
+                    if (!id) return;
+                    await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', id);
+                    await cloud.refreshNotifications?.();
+                  }
+                : undefined
+            }
             cloudTenant={tenant}
             cloudDisplayName={profile?.display_name}
             isPlatformMaster={profile?.is_platform_master}

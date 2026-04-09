@@ -29,20 +29,37 @@ const reviewSchema = z.object({
   checkin_id: z.string().uuid(),
   action: z.enum(['approve', 'reject']),
   rejection_reason_code: z.string().min(1).max(64).optional(),
-  rejection_note: z.string().min(1).max(500).optional()
+  rejection_note: z.string().min(1).max(500).optional(),
+  is_suspected: z.coerce.boolean().optional()
 });
 
 const batchReviewSchema = z.object({
   checkin_ids: z.array(z.string().uuid()).min(1).max(100),
   action: z.enum(['approve', 'reject']),
   rejection_reason_code: z.string().min(1).max(64).optional(),
-  rejection_note: z.string().min(1).max(500).optional()
+  rejection_note: z.string().min(1).max(500).optional(),
+  is_suspected: z.coerce.boolean().optional()
 });
+
+function validateRejectPayload(action: 'approve' | 'reject', payload: { rejection_reason_code?: string; rejection_note?: string }) {
+  if (action !== 'reject') return null;
+  const code = payload.rejection_reason_code?.trim();
+  if (!code) return 'Motivo obrigatório para rejeitar.';
+  if (code === 'other') {
+    const note = payload.rejection_note?.trim();
+    if (!note) return 'Observação obrigatória quando motivo = Outro.';
+  }
+  return null;
+}
 
 const userContextQuerySchema = z.object({
   mode: z.literal('user-context'),
   user_id: z.string().uuid(),
   tenant_id: z.string().uuid().optional()
+});
+
+const rejectionReasonsQuerySchema = z.object({
+  mode: z.literal('rejection-reasons')
 });
 
 Deno.serve(async (req) => {
@@ -112,7 +129,29 @@ Deno.serve(async (req) => {
       }
 
       const payload = parsedSingle.success ? parsedSingle.data : parsedBatch.data;
-      const { action, rejection_reason_code, rejection_note } = payload;
+      const { action, rejection_reason_code, rejection_note, is_suspected } = payload;
+      const rejectValidationError = validateRejectPayload(action, { rejection_reason_code, rejection_note });
+      if (rejectValidationError) {
+        return jsonResponse({ error: rejectValidationError }, 400);
+      }
+
+      // Valida motivo contra catálogo (quando rejeita)
+      if (action === 'reject') {
+        const code = (rejection_reason_code ?? '').trim();
+        const { data: reasonRow, error: reasonErr } = await admin
+          .from('photo_rejection_reasons')
+          .select('code, requires_note')
+          .eq('code', code)
+          .eq('is_active', true)
+          .maybeSingle();
+        if (reasonErr) throw reasonErr;
+        if (!reasonRow) {
+          return jsonResponse({ error: 'Motivo inválido.' }, 400);
+        }
+        if (reasonRow.requires_note && !(rejection_note ?? '').trim()) {
+          return jsonResponse({ error: 'Observação obrigatória para este motivo.' }, 400);
+        }
+      }
       const nextStatus = action === 'approve' ? 'approved' : 'rejected';
       const patch: Record<string, unknown> = {
         photo_review_status: nextStatus,
@@ -123,9 +162,11 @@ Deno.serve(async (req) => {
       if (nextStatus === 'rejected') {
         patch.photo_rejection_reason_code = rejection_reason_code ?? null;
         patch.photo_rejection_note = rejection_note ?? null;
+        patch.photo_is_suspected = Boolean(is_suspected);
       } else {
         patch.photo_rejection_reason_code = null;
         patch.photo_rejection_note = null;
+        patch.photo_is_suspected = false;
       }
 
       if ('checkin_id' in payload) {
@@ -161,6 +202,36 @@ Deno.serve(async (req) => {
           return jsonResponse({ error: 'Item já foi revisado por outro admin.' }, 409);
         }
 
+        // US-ADM-07: notificação in-app quando rejeitar (best-effort)
+        if (nextStatus === 'rejected') {
+          const reasonCode = (rejection_reason_code ?? '').trim();
+          const { data: reasonMeta } = await admin
+            .from('photo_rejection_reasons')
+            .select('label')
+            .eq('code', reasonCode)
+            .maybeSingle();
+          const reasonLabel = reasonMeta?.label ?? reasonCode;
+          const note = (rejection_note ?? '').trim();
+          const body = note
+            ? `Seu check-in foi rejeitado. Motivo: ${reasonLabel}. Observação: ${note}`
+            : `Seu check-in foi rejeitado. Motivo: ${reasonLabel}.`;
+
+          await admin.from('notifications').insert({
+            user_id: data.user_id,
+            tenant_id: data.tenant_id,
+            type: 'checkin_photo_rejected',
+            title: 'Foto do check-in rejeitada',
+            body,
+            data: {
+              checkin_id: data.id,
+              reason_code: reasonCode || null,
+              reason_label: reasonLabel || null,
+              note: note || null,
+              is_suspected: Boolean(is_suspected)
+            }
+          });
+        }
+
         return jsonResponse({ item: data }, 200);
       }
 
@@ -170,11 +241,12 @@ Deno.serve(async (req) => {
         .update(patch)
         .in('id', ids)
         .eq('photo_review_status', 'pending')
-        .select('id');
+        .select('id, user_id, tenant_id');
 
       if (error) throw error;
 
-      const updatedIds = (data ?? []).map((r) => r.id);
+      const updatedRows = data ?? [];
+      const updatedIds = updatedRows.map((r) => r.id);
       if (updatedIds.length !== ids.length) {
         return jsonResponse(
           {
@@ -187,6 +259,39 @@ Deno.serve(async (req) => {
         );
       }
 
+      // US-ADM-07: notificação in-app no lote (best-effort)
+      if (nextStatus === 'rejected') {
+        const reasonCode = (rejection_reason_code ?? '').trim();
+        const { data: reasonMeta } = await admin
+          .from('photo_rejection_reasons')
+          .select('label')
+          .eq('code', reasonCode)
+          .maybeSingle();
+        const reasonLabel = reasonMeta?.label ?? reasonCode;
+        const note = (rejection_note ?? '').trim();
+        const body = note
+          ? `Seu check-in foi rejeitado. Motivo: ${reasonLabel}. Observação: ${note}`
+          : `Seu check-in foi rejeitado. Motivo: ${reasonLabel}.`;
+
+        const notifRows = updatedRows.map((r) => ({
+          user_id: r.user_id,
+          tenant_id: r.tenant_id,
+          type: 'checkin_photo_rejected',
+          title: 'Foto do check-in rejeitada',
+          body,
+          data: {
+            checkin_id: r.id,
+            reason_code: reasonCode || null,
+            reason_label: reasonLabel || null,
+            note: note || null,
+            is_suspected: Boolean(is_suspected)
+          }
+        }));
+        if (notifRows.length > 0) {
+          await admin.from('notifications').insert(notifRows);
+        }
+      }
+
       return jsonResponse({ updated: updatedIds.length, updated_ids: updatedIds }, 200);
     }
 
@@ -195,6 +300,23 @@ Deno.serve(async (req) => {
     }
 
     const raw = Object.fromEntries(url.searchParams.entries());
+
+    // US-ADM-07: lista de motivos padronizados (centralizados no DB)
+    if (raw.mode === 'rejection-reasons') {
+      const parsedReasons = rejectionReasonsQuerySchema.safeParse(raw);
+      if (!parsedReasons.success) {
+        return jsonResponse({ error: 'Query inválida', details: parsedReasons.error.flatten() }, 400);
+      }
+
+      const { data, error } = await admin
+        .from('photo_rejection_reasons')
+        .select('code, label, requires_note, sort_order')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
+      if (error) throw error;
+
+      return jsonResponse({ reasons: data ?? [] }, 200);
+    }
 
     // US-ADM-06: contexto do usuário (mini-histórico + métricas)
     if (raw.mode === 'user-context') {

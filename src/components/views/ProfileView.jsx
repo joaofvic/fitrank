@@ -5,6 +5,8 @@ import { Button } from '../ui/Button.jsx';
 export function ProfileView({
   userData,
   checkins,
+  notifications = [],
+  onMarkNotificationRead,
   cloudTenant = null,
   cloudDisplayName = null,
   isPlatformMaster = false,
@@ -17,8 +19,56 @@ export function ProfileView({
     ? new Date(userData.created_at).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
     : '—';
 
+  const rejectionReasonLabel = (code) => {
+    const c = (code ?? '').trim();
+    if (!c) return null;
+    const map = {
+      illegible_dark: 'Foto ilegível/escura',
+      not_proof: 'Não comprova atividade',
+      duplicate_reused: 'Foto duplicada/reutilizada',
+      inappropriate: 'Conteúdo impróprio',
+      screenshot: 'Foto de tela/print',
+      workout_mismatch: 'Tipo de treino não condizente',
+      other: 'Outro'
+    };
+    return map[c] ?? c;
+  };
+
   return (
     <div className="space-y-6 animate-in-fade">
+      {Array.isArray(notifications) && notifications.length > 0 ? (
+        <Card className="bg-zinc-900/50 border border-zinc-800">
+          <h4 className="font-bold mb-3 flex items-center gap-2">
+            <span className="text-xs uppercase text-zinc-500 font-black">Notificações</span>
+            <span className="text-[10px] px-2 py-1 rounded-full bg-red-500/10 text-red-300 border border-red-900/40">
+              {notifications.length} nova(s)
+            </span>
+          </h4>
+          <div className="space-y-3">
+            {notifications.map((n) => (
+              <div key={n.id} className="rounded-xl border border-zinc-800 bg-black/20 p-4 space-y-2">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-white truncate">{n.title}</p>
+                    {n.body ? <p className="text-xs text-zinc-400 mt-1">{n.body}</p> : null}
+                  </div>
+                  {onMarkNotificationRead ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="text-[10px] px-2 py-1 h-auto"
+                      onClick={() => onMarkNotificationRead(n.id)}
+                    >
+                      Marcar como lida
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : null}
+
       <div className="text-center space-y-4">
         <div className="relative inline-block">
           <div className="w-24 h-24 rounded-full bg-zinc-800 border-4 border-zinc-700 flex items-center justify-center mx-auto shadow-2xl shadow-green-500/10">
@@ -103,10 +153,30 @@ export function ProfileView({
                     <p className="text-xs text-zinc-500">
                       {new Date(c.date + 'T12:00:00').toLocaleDateString('pt-BR')}
                     </p>
+                    {c.photo_review_status === 'rejected' ? (
+                      <div className="mt-2 space-y-1">
+                        <p className="text-[11px] text-red-300 font-bold">Foto rejeitada</p>
+                        {c.photo_rejection_reason_code ? (
+                          <p className="text-[11px] text-zinc-400">
+                            Motivo:{' '}
+                            <span className="text-zinc-200">
+                              {rejectionReasonLabel(c.photo_rejection_reason_code)}
+                            </span>
+                          </p>
+                        ) : null}
+                        {c.photo_rejection_note ? (
+                          <p className="text-[11px] text-zinc-400">
+                            Observação: <span className="text-zinc-200">{c.photo_rejection_note}</span>
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : c.photo_review_status === 'pending' ? (
+                      <p className="text-[11px] text-yellow-300 mt-1">Aguardando revisão da foto</p>
+                    ) : null}
                   </div>
                 </div>
                 <div className="bg-green-500/10 text-green-500 px-2 py-1 rounded text-xs font-bold">
-                  +10 PTS
+                  +{c.points_earned ?? 0} PTS
                 </div>
               </div>
             ))}

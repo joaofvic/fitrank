@@ -9,6 +9,16 @@ const STATUSES = [
   { id: 'rejected', label: 'Rejeitados' }
 ];
 
+const DEFAULT_REJECTION_REASONS = [
+  { code: 'illegible_dark', label: 'Foto ilegível/escura', requires_note: false },
+  { code: 'not_proof', label: 'Não comprova atividade', requires_note: false },
+  { code: 'duplicate_reused', label: 'Foto duplicada/reutilizada', requires_note: false },
+  { code: 'inappropriate', label: 'Conteúdo impróprio', requires_note: false },
+  { code: 'screenshot', label: 'Foto de tela/print', requires_note: false },
+  { code: 'workout_mismatch', label: 'Tipo de treino não condizente', requires_note: false },
+  { code: 'other', label: 'Outro (exige observação)', requires_note: true }
+];
+
 export function AdminModerationView({ onBack }) {
   const { supabase, profile, session } = useAuth();
 
@@ -19,10 +29,19 @@ export function AdminModerationView({ onBack }) {
   const [busy, setBusy] = useState(false);
   const [zoom, setZoom] = useState(false);
   const [rejectConfirmOpen, setRejectConfirmOpen] = useState(false);
+  const [rejectReasonCode, setRejectReasonCode] = useState('');
+  const [rejectNote, setRejectNote] = useState('');
+  const [rejectSuspected, setRejectSuspected] = useState(false);
+  const [rejectFormError, setRejectFormError] = useState(null);
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'grid'
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [lastSelectedIdx, setLastSelectedIdx] = useState(null);
   const [batchRejectConfirmOpen, setBatchRejectConfirmOpen] = useState(false);
+  const [batchRejectReasonCode, setBatchRejectReasonCode] = useState('');
+  const [batchRejectNote, setBatchRejectNote] = useState('');
+  const [batchRejectSuspected, setBatchRejectSuspected] = useState(false);
+  const [batchRejectFormError, setBatchRejectFormError] = useState(null);
+  const [rejectionReasons, setRejectionReasons] = useState(DEFAULT_REJECTION_REASONS);
   const [shortcutsEnabled, setShortcutsEnabled] = useState(() => {
     try {
       const v = localStorage.getItem('fitrank.admin.shortcuts');
@@ -154,6 +173,38 @@ export function AdminModerationView({ onBack }) {
     loadQueue();
   }, [loadQueue]);
 
+  useEffect(() => {
+    if (!supabase || !profile?.is_platform_master) return;
+    let cancelled = false;
+    (async () => {
+      const { data: sData } = await supabase.auth.getSession();
+      const token = sData?.session?.access_token ?? session?.access_token ?? null;
+      const { data, error: fnError } = await invokeEdge('admin-moderation?mode=rejection-reasons', token, {
+        method: 'GET'
+      });
+      if (cancelled) return;
+      if (fnError || data?.error) {
+        setRejectionReasons(DEFAULT_REJECTION_REASONS);
+        return;
+      }
+      const rows = Array.isArray(data?.reasons) ? data.reasons : [];
+      if (rows.length === 0) {
+        setRejectionReasons(DEFAULT_REJECTION_REASONS);
+        return;
+      }
+      setRejectionReasons(
+        rows.map((r) => ({
+          code: r.code,
+          label: r.label,
+          requires_note: Boolean(r.requires_note)
+        }))
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, profile?.is_platform_master, session?.access_token]);
+
   const focused = focusIdx >= 0 && focusIdx < items.length ? items[focusIdx] : null;
 
   useEffect(() => {
@@ -238,6 +289,10 @@ export function AdminModerationView({ onBack }) {
     setQuickOpen(true);
     setZoom(false);
     setRejectConfirmOpen(false);
+    setRejectReasonCode('');
+    setRejectNote('');
+    setRejectSuspected(false);
+    setRejectFormError(null);
   };
 
   const nextItem = () => {
@@ -246,6 +301,10 @@ export function AdminModerationView({ onBack }) {
       setFocusIdx(next);
       setZoom(false);
       setRejectConfirmOpen(false);
+      setRejectReasonCode('');
+      setRejectNote('');
+      setRejectSuspected(false);
+      setRejectFormError(null);
       return;
     }
     // fim da lista atual
@@ -259,10 +318,14 @@ export function AdminModerationView({ onBack }) {
       setFocusIdx(prev);
       setZoom(false);
       setRejectConfirmOpen(false);
+      setRejectReasonCode('');
+      setRejectNote('');
+      setRejectSuspected(false);
+      setRejectFormError(null);
     }
   };
 
-  const review = async (action) => {
+  const review = async (action, extras = null) => {
     if (!focused?.id) return;
     if (!supabase) return;
     setBusy(true);
@@ -272,7 +335,7 @@ export function AdminModerationView({ onBack }) {
       const token = sData?.session?.access_token ?? session?.access_token ?? null;
       const { error: fnError } = await invokeEdge('admin-moderation', token, {
         method: 'PATCH',
-        body: { checkin_id: focused.id, action }
+        body: { checkin_id: focused.id, action, ...(extras ?? {}) }
       });
       if (fnError) {
         setError(fnError.message);
@@ -321,7 +384,7 @@ export function AdminModerationView({ onBack }) {
     setLastSelectedIdx(null);
   };
 
-  const batchReview = async (action) => {
+  const batchReview = async (action, extras = null) => {
     if (!supabase) return;
     if (selectedIds.size === 0) return;
     setBusy(true);
@@ -332,7 +395,7 @@ export function AdminModerationView({ onBack }) {
       const ids = Array.from(selectedIds);
       const { data, error: fnError } = await invokeEdge('admin-moderation', token, {
         method: 'PATCH',
-        body: { checkin_ids: ids, action }
+        body: { checkin_ids: ids, action, ...(extras ?? {}) }
       });
       if (fnError) {
         setError(fnError.message);
@@ -346,6 +409,62 @@ export function AdminModerationView({ onBack }) {
       setBusy(false);
     }
   };
+
+  const openRejectModal = useCallback(() => {
+    setRejectConfirmOpen(true);
+    setRejectReasonCode('');
+    setRejectNote('');
+    setRejectSuspected(false);
+    setRejectFormError(null);
+  }, []);
+
+  const submitReject = useCallback(async () => {
+    const code = rejectReasonCode?.trim();
+    const note = rejectNote?.trim();
+    if (!code) {
+      setRejectFormError('Selecione um motivo.');
+      return;
+    }
+    if (code === 'other' && !note) {
+      setRejectFormError('Informe uma observação (obrigatório para “Outro”).');
+      return;
+    }
+    setRejectFormError(null);
+    setRejectConfirmOpen(false);
+    await review('reject', {
+      rejection_reason_code: code,
+      rejection_note: note || undefined,
+      is_suspected: rejectSuspected
+    });
+  }, [rejectReasonCode, rejectNote, rejectSuspected, review]);
+
+  const openBatchRejectModal = useCallback(() => {
+    setBatchRejectConfirmOpen(true);
+    setBatchRejectReasonCode('');
+    setBatchRejectNote('');
+    setBatchRejectSuspected(false);
+    setBatchRejectFormError(null);
+  }, []);
+
+  const submitBatchReject = useCallback(async () => {
+    const code = batchRejectReasonCode?.trim();
+    const note = batchRejectNote?.trim();
+    if (!code) {
+      setBatchRejectFormError('Selecione um motivo.');
+      return;
+    }
+    if (code === 'other' && !note) {
+      setBatchRejectFormError('Informe uma observação (obrigatório para “Outro”).');
+      return;
+    }
+    setBatchRejectFormError(null);
+    setBatchRejectConfirmOpen(false);
+    await batchReview('reject', {
+      rejection_reason_code: code,
+      rejection_note: note || undefined,
+      is_suspected: batchRejectSuspected
+    });
+  }, [batchRejectReasonCode, batchRejectNote, batchRejectSuspected, batchReview]);
 
   const toggleShortcuts = () => {
     setShortcutsEnabled((prev) => {
@@ -414,13 +533,13 @@ export function AdminModerationView({ onBack }) {
       }
       if (key === 'r') {
         e.preventDefault();
-        setRejectConfirmOpen(true);
+        openRejectModal();
       }
     };
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [quickOpen, focused?.id, shortcutsEnabled, busy, rejectConfirmOpen]);
+  }, [quickOpen, focused?.id, shortcutsEnabled, busy, rejectConfirmOpen, openRejectModal]);
 
   useEffect(() => {
     if (quickOpen) return;
@@ -695,10 +814,64 @@ export function AdminModerationView({ onBack }) {
 
           {batchRejectConfirmOpen ? (
             <div className="border border-zinc-800 rounded-2xl p-4 bg-zinc-950/40 space-y-3">
-              <p className="text-sm text-white font-bold">Rejeitar {selectedCount} itens?</p>
-              <p className="text-xs text-zinc-500">
-                (Motivos padronizados entram no US-ADM-07. Por enquanto, isso apenas marca como rejeitado.)
-              </p>
+              <p className="text-sm text-white font-bold">Rejeitar {selectedCount} itens</p>
+              <div className="space-y-2">
+                <label className="space-y-1 block">
+                  <span className="text-[10px] uppercase font-bold text-zinc-500">Motivo (obrigatório)</span>
+                  <select
+                    value={batchRejectReasonCode}
+                    onChange={(e) => {
+                      setBatchRejectReasonCode(e.target.value);
+                      setBatchRejectFormError(null);
+                    }}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white"
+                  >
+                    <option value="">Selecione…</option>
+                    {rejectionReasons.map((r) => (
+                      <option key={r.code} value={r.code}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="space-y-1 block">
+                    <span className="text-[10px] uppercase font-bold text-zinc-500">
+                      Observação {batchRejectReasonCode === 'other' ? '(obrigatória)' : '(opcional)'}
+                    </span>
+                  <textarea
+                    value={batchRejectNote}
+                    onChange={(e) => {
+                      setBatchRejectNote(e.target.value);
+                      setBatchRejectFormError(null);
+                    }}
+                    rows={3}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-600"
+                    placeholder={batchRejectReasonCode === 'other' ? 'Descreva o motivo…' : 'Opcional'}
+                  />
+                </label>
+
+                <label className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-black/20 px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-xs text-white font-bold truncate">Marcar como suspeito/fraude</p>
+                    <p className="text-[11px] text-zinc-500 truncate">Ajuda a priorizar e auditar.</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={batchRejectSuspected}
+                    onChange={(e) => setBatchRejectSuspected(e.target.checked)}
+                    className="h-4 w-4 accent-red-500"
+                    aria-label="Marcar como suspeito/fraude"
+                  />
+                </label>
+
+                {batchRejectFormError ? (
+                  <p className="text-xs text-red-400" role="alert">
+                    {batchRejectFormError}
+                  </p>
+                ) : null}
+              </div>
+
               <div className="grid grid-cols-2 gap-2">
                 <Button
                   type="button"
@@ -711,7 +884,7 @@ export function AdminModerationView({ onBack }) {
                 <Button
                   type="button"
                   disabled={busy}
-                  onClick={() => batchReview('reject')}
+                  onClick={submitBatchReject}
                   className="bg-red-500/90 hover:bg-red-500 text-black font-bold"
                 >
                   Rejeitar
@@ -1015,7 +1188,7 @@ export function AdminModerationView({ onBack }) {
               type="button"
               variant="outline"
               disabled={busy}
-              onClick={() => setRejectConfirmOpen(true)}
+              onClick={openRejectModal}
               className="w-full text-xs py-3 border-red-500/40 text-red-300 hover:bg-red-500/10"
             >
               Rejeitar
@@ -1023,10 +1196,65 @@ export function AdminModerationView({ onBack }) {
 
             {rejectConfirmOpen ? (
               <div className="border border-zinc-800 rounded-2xl p-4 bg-zinc-950/40 space-y-3">
-                <p className="text-sm text-white font-bold">Confirmar rejeição?</p>
-                <p className="text-xs text-zinc-500">
-                  (Motivos padronizados entram no US-ADM-07. Por enquanto, isso apenas marca como rejeitado.)
-                </p>
+                <p className="text-sm text-white font-bold">Rejeitar item</p>
+
+                <div className="space-y-2">
+                  <label className="space-y-1 block">
+                    <span className="text-[10px] uppercase font-bold text-zinc-500">Motivo (obrigatório)</span>
+                    <select
+                      value={rejectReasonCode}
+                      onChange={(e) => {
+                        setRejectReasonCode(e.target.value);
+                        setRejectFormError(null);
+                      }}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white"
+                    >
+                      <option value="">Selecione…</option>
+                    {rejectionReasons.map((r) => (
+                      <option key={r.code} value={r.code}>
+                        {r.label}
+                      </option>
+                    ))}
+                    </select>
+                  </label>
+
+                  <label className="space-y-1 block">
+                    <span className="text-[10px] uppercase font-bold text-zinc-500">
+                      Observação {rejectReasonCode === 'other' ? '(obrigatória)' : '(opcional)'}
+                    </span>
+                    <textarea
+                      value={rejectNote}
+                      onChange={(e) => {
+                        setRejectNote(e.target.value);
+                        setRejectFormError(null);
+                      }}
+                      rows={3}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-600"
+                      placeholder={rejectReasonCode === 'other' ? 'Descreva o motivo…' : 'Opcional'}
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-black/20 px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="text-xs text-white font-bold truncate">Marcar como suspeito/fraude</p>
+                      <p className="text-[11px] text-zinc-500 truncate">Ajuda a priorizar e auditar.</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={rejectSuspected}
+                      onChange={(e) => setRejectSuspected(e.target.checked)}
+                      className="h-4 w-4 accent-red-500"
+                      aria-label="Marcar como suspeito/fraude"
+                    />
+                  </label>
+
+                  {rejectFormError ? (
+                    <p className="text-xs text-red-400" role="alert">
+                      {rejectFormError}
+                    </p>
+                  ) : null}
+                </div>
+
                 <div className="grid grid-cols-2 gap-2">
                   <Button type="button" variant="secondary" disabled={busy} onClick={() => setRejectConfirmOpen(false)}>
                     Cancelar
@@ -1034,10 +1262,7 @@ export function AdminModerationView({ onBack }) {
                   <Button
                     type="button"
                     disabled={busy}
-                    onClick={() => {
-                      setRejectConfirmOpen(false);
-                      review('reject');
-                    }}
+                    onClick={submitReject}
                     className="bg-red-500/90 hover:bg-red-500 text-black font-bold"
                   >
                     Rejeitar

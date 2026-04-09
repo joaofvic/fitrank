@@ -24,6 +24,7 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
 
   const [leaderboard, setLeaderboard] = useState([]);
   const [checkins, setCheckins] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -60,7 +61,9 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
     if (!supabase || !userId) return;
     const { data, error: qError } = await supabase
       .from('checkins')
-      .select('id, checkin_local_date, tipo_treino, points_awarded, foto_url')
+      .select(
+        'id, checkin_local_date, tipo_treino, points_awarded, foto_url, photo_review_status, photo_rejection_reason_code, photo_rejection_note'
+      )
       .eq('user_id', userId)
       .order('checkin_local_date', { ascending: false })
       .order('created_at', { ascending: false });
@@ -74,22 +77,43 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
         date: c.checkin_local_date,
         type: c.tipo_treino,
         points_earned: c.points_awarded,
-        foto_url: c.foto_url
+        foto_url: c.foto_url,
+        photo_review_status: c.photo_review_status,
+        photo_rejection_reason_code: c.photo_rejection_reason_code,
+        photo_rejection_note: c.photo_rejection_note
       }))
     );
+  }, [supabase, userId]);
+
+  const refreshNotifications = useCallback(async () => {
+    if (!supabase || !userId) return;
+    const { data, error: nErr } = await supabase
+      .from('notifications')
+      .select('id, type, title, body, data, created_at, read_at')
+      .eq('user_id', userId)
+      .is('read_at', null)
+      .order('created_at', { ascending: false })
+      .limit(20);
+    if (nErr) {
+      console.error('FitRank: notifications', nErr.message);
+      return;
+    }
+    setNotifications(Array.isArray(data) ? data : []);
   }, [supabase, userId]);
 
   const refreshAll = useCallback(async () => {
     if (!supabase || !userId) return;
     setError(null);
-    await Promise.all([refreshLeaderboard(), refreshCheckins()]);
+    await Promise.all([refreshLeaderboard(), refreshCheckins(), refreshNotifications()]);
     if (refreshProfile) await refreshProfile();
-  }, [supabase, userId, refreshLeaderboard, refreshCheckins, refreshProfile]);
+  }, [supabase, userId, refreshLeaderboard, refreshCheckins, refreshNotifications, refreshProfile]);
 
   const refreshLeaderboardRef = useRef(refreshLeaderboard);
   refreshLeaderboardRef.current = refreshLeaderboard;
   const refreshCheckinsRef = useRef(refreshCheckins);
   refreshCheckinsRef.current = refreshCheckins;
+  const refreshNotificationsRef = useRef(refreshNotifications);
+  refreshNotificationsRef.current = refreshNotifications;
   const refreshProfileRef = useRef(refreshProfile);
   refreshProfileRef.current = refreshProfile;
 
@@ -106,6 +130,7 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
 
     (async () => {
       await refreshCheckins();
+      await refreshNotifications();
       if (refreshProfile) await refreshProfile();
       if (!cancelled) setLoading(false);
     })();
@@ -144,6 +169,7 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
         () => {
           refreshLeaderboardRef.current();
           refreshCheckinsRef.current();
+          refreshNotificationsRef.current();
           refreshProfileRef.current?.();
         }
       )
@@ -206,6 +232,7 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
   return {
     leaderboard,
     checkins,
+    notifications,
     loading,
     leaderboardLoading,
     error,
@@ -213,6 +240,7 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
     refreshAll,
     refreshLeaderboard,
     refreshCheckins,
+    refreshNotifications,
     insertCheckin,
     rankingPeriod,
     setRankingPeriod,
