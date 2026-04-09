@@ -4,5 +4,12 @@ project_id = "fitrank"
 [api]
 enabled = true
 
-[functions]
-enabled = true
+# Edge Functions: use [functions.nome] (verify_jwt, etc.). Não use [functions].enabled — a CLI espera mapas por função.
+[functions.admin-users]
+verify_jwt = true
+
+[functions.admin-moderation]
+verify_jwt = true
+
+[functions.admin-tenants]
+verify_jwt = true

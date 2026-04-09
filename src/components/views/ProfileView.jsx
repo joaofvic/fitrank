@@ -14,6 +14,7 @@ export function ProfileView({
   onOpenModeration,
   onOpenUsers,
   onOpenEngagement,
+  onOpenAudit,
   onSignOut
 }) {
   const displayNome = cloudDisplayName || userData?.nome;
@@ -112,6 +113,11 @@ export function ProfileView({
           {isPlatformMaster && onOpenEngagement && (
             <Button variant="secondary" className="w-full py-2 text-sm" onClick={onOpenEngagement}>
               Admin · Engajamento
+            </Button>
+          )}
+          {isPlatformMaster && onOpenAudit && (
+            <Button variant="secondary" className="w-full py-2 text-sm" onClick={onOpenAudit}>
+              Admin · Auditoria
             </Button>
           )}
           {onSignOut && (

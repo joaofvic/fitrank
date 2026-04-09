@@ -42,6 +42,28 @@ const batchReviewSchema = z.object({
   is_suspected: z.coerce.boolean().optional()
 });
 
+async function insertPlatformAudit(
+  admin: ReturnType<typeof createClient>,
+  row: {
+    actor_id: string;
+    action: string;
+    target_type: 'user' | 'checkin' | 'tenant' | 'none';
+    target_id: string | null;
+    tenant_id: string | null;
+    payload: Record<string, unknown>;
+  }
+) {
+  const { error } = await admin.from('platform_admin_audit_log').insert({
+    actor_id: row.actor_id,
+    action: row.action,
+    target_type: row.target_type,
+    target_id: row.target_id,
+    tenant_id: row.tenant_id,
+    payload: row.payload
+  });
+  if (error) console.error('platform_admin_audit_log', error);
+}
+
 function validateRejectPayload(action: 'approve' | 'reject', payload: { rejection_reason_code?: string; rejection_note?: string }) {
   if (action !== 'reject') return null;
   const code = payload.rejection_reason_code?.trim();
@@ -187,6 +209,18 @@ Deno.serve(async (req) => {
           body
         });
 
+        await insertPlatformAudit(admin, {
+          actor_id: user.id,
+          action: 'admin.message.send',
+          target_type: 'user',
+          target_id: user_id,
+          tenant_id: tenant_id ?? null,
+          payload: {
+            template_code: tpl.code,
+            checkin_id: checkin_id ?? null
+          }
+        });
+
         return jsonResponse({ ok: true }, 200);
       }
 
@@ -301,6 +335,29 @@ Deno.serve(async (req) => {
           });
         }
 
+        const modAction =
+          action === 'approve'
+            ? 'moderation.approve'
+            : action === 'reject'
+              ? 'moderation.reject'
+              : 'moderation.reapprove';
+        await insertPlatformAudit(admin, {
+          actor_id: user.id,
+          action: modAction,
+          target_type: 'checkin',
+          target_id: data.id,
+          tenant_id: data.tenant_id ?? null,
+          payload:
+            action === 'reject'
+              ? {
+                  user_id: data.user_id,
+                  reason_code: (rejection_reason_code ?? '').trim() || null,
+                  rejection_note: (rejection_note ?? '').trim() || null,
+                  is_suspected: Boolean(is_suspected)
+                }
+              : { user_id: data.user_id }
+        });
+
         return jsonResponse({ item: data }, 200);
       }
 
@@ -359,6 +416,25 @@ Deno.serve(async (req) => {
         if (notifRows.length > 0) {
           await admin.from('notifications').insert(notifRows);
         }
+      }
+
+      const batchAction = action === 'reject' ? 'moderation.batch_reject' : 'moderation.batch_approve';
+      for (const r of updatedRows) {
+        await insertPlatformAudit(admin, {
+          actor_id: user.id,
+          action: batchAction,
+          target_type: 'checkin',
+          target_id: r.id,
+          tenant_id: r.tenant_id ?? null,
+          payload:
+            action === 'reject'
+              ? {
+                  user_id: r.user_id,
+                  reason_code: (rejection_reason_code ?? '').trim() || null,
+                  is_suspected: Boolean(is_suspected)
+                }
+              : { user_id: r.user_id }
+        });
       }
 
       return jsonResponse({ updated: updatedIds.length, updated_ids: updatedIds }, 200);

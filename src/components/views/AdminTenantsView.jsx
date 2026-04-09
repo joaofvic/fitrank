@@ -4,7 +4,7 @@ import { Button } from '../ui/Button.jsx';
 import { invokeEdge } from '../../lib/supabase/invoke-edge.js';
 
 export function AdminTenantsView({ onBack }) {
-  const { supabase, profile, session } = useAuth();
+  const { supabase, profile } = useAuth();
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -14,9 +14,7 @@ export function AdminTenantsView({ onBack }) {
     if (!supabase || !profile?.is_platform_master) return;
     setLoading(true);
     setError(null);
-    const { data: sData } = await supabase.auth.getSession();
-    const token = sData?.session?.access_token ?? session?.access_token ?? null;
-    const { data, error: fnError } = await invokeEdge('admin-tenants', token, {
+    const { data, error: fnError } = await invokeEdge('admin-tenants', supabase, {
       method: 'GET'
     });
     if (fnError) {
@@ -29,7 +27,7 @@ export function AdminTenantsView({ onBack }) {
       setTenants(data?.tenants ?? []);
     }
     setLoading(false);
-  }, [supabase, profile?.is_platform_master, session?.access_token]);
+  }, [supabase, profile?.is_platform_master]);
 
   useEffect(() => {
     load();
@@ -38,9 +36,7 @@ export function AdminTenantsView({ onBack }) {
   const setStatus = async (tenantId, status) => {
     setUpdatingId(tenantId);
     setError(null);
-    const { data: sData } = await supabase.auth.getSession();
-    const token = sData?.session?.access_token ?? session?.access_token ?? null;
-    const { data, error: fnError } = await invokeEdge('admin-tenants', token, {
+    const { data, error: fnError } = await invokeEdge('admin-tenants', supabase, {
       method: 'PATCH',
       body: { tenant_id: tenantId, status }
     });

@@ -115,6 +115,29 @@ function jsonResponse(body: unknown, status: number) {
   });
 }
 
+/** US-ADM-15: log central (best-effort; não falha a operação principal). */
+async function insertPlatformAudit(
+  admin: ReturnType<typeof createClient>,
+  row: {
+    actor_id: string;
+    action: string;
+    target_type: 'user' | 'checkin' | 'tenant' | 'none';
+    target_id: string | null;
+    tenant_id: string | null;
+    payload: Record<string, unknown>;
+  }
+) {
+  const { error } = await admin.from('platform_admin_audit_log').insert({
+    actor_id: row.actor_id,
+    action: row.action,
+    target_type: row.target_type,
+    target_id: row.target_id,
+    tenant_id: row.tenant_id,
+    payload: row.payload
+  });
+  if (error) console.error('platform_admin_audit_log', error);
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -215,6 +238,15 @@ Deno.serve(async (req) => {
           acted_by: user.id
         });
 
+        await insertPlatformAudit(admin, {
+          actor_id: user.id,
+          action: 'users.reset_flags',
+          target_type: 'user',
+          target_id: user_id,
+          tenant_id: prof?.tenant_id ?? null,
+          payload: { reset_photo_suspected, reset_under_review }
+        });
+
         return jsonResponse({ ok: true }, 200);
       }
 
@@ -243,6 +275,15 @@ Deno.serve(async (req) => {
           reason: reason ?? null,
           metadata: { under_review },
           acted_by: user.id
+        });
+
+        await insertPlatformAudit(admin, {
+          actor_id: user.id,
+          action: 'users.set_under_review',
+          target_type: 'user',
+          target_id: user_id,
+          tenant_id: prof?.tenant_id ?? null,
+          payload: { under_review, reason: reason ?? null }
         });
 
         return jsonResponse({ ok: true }, 200);
@@ -274,6 +315,15 @@ Deno.serve(async (req) => {
           reason,
           metadata: {},
           acted_by: user.id
+        });
+
+        await insertPlatformAudit(admin, {
+          actor_id: user.id,
+          action: 'users.ban',
+          target_type: 'user',
+          target_id: user_id,
+          tenant_id: prof?.tenant_id ?? null,
+          payload: { reason }
         });
 
         return jsonResponse({ ok: true }, 200);
@@ -310,6 +360,21 @@ Deno.serve(async (req) => {
           acted_by: user.id
         });
 
+        await insertPlatformAudit(admin, {
+          actor_id: user.id,
+          action: 'users.adjust_points',
+          target_type: 'user',
+          target_id: user_id,
+          tenant_id: prof?.tenant_id ?? null,
+          payload: {
+            delta,
+            reason,
+            ledger_id: row?.id ?? null,
+            category: category ?? null,
+            effective_date: effective_date ?? null
+          }
+        });
+
         return jsonResponse({ ok: true, ledger: row ?? null }, 200);
       }
 
@@ -339,6 +404,15 @@ Deno.serve(async (req) => {
         reason: reason ?? null,
         metadata: {},
         acted_by: user.id
+      });
+
+      await insertPlatformAudit(admin, {
+        actor_id: user.id,
+        action: 'users.unban',
+        target_type: 'user',
+        target_id: user_id,
+        tenant_id: prof?.tenant_id ?? null,
+        payload: { reason: reason ?? null }
       });
 
       return jsonResponse({ ok: true }, 200);
@@ -516,6 +590,75 @@ Deno.serve(async (req) => {
         },
         200
       );
+    }
+
+    /** US-ADM-15: autocomplete de admins (platform master) para filtro de auditoria — nome, e-mail ou UUID. */
+    if (raw.mode === 'platform-masters') {
+      const platformMastersSchema = z.object({
+        mode: z.literal('platform-masters'),
+        q: z.string().max(200).optional()
+      });
+      const pmParsed = platformMastersSchema.safeParse(raw);
+      if (!pmParsed.success) {
+        return jsonResponse({ error: 'Query inválida', details: pmParsed.error.flatten() }, 400);
+      }
+      const qq = (pmParsed.data.q ?? '').trim();
+
+      let rows: Array<{ id: string; display_name: string | null; nome: string | null }> = [];
+
+      if (qq && looksLikeEmailSearch(qq)) {
+        const emailMap = await authAdminFilterUsersByEmailNeedle(supabaseUrl, serviceKey, qq);
+        const ids = [...emailMap.keys()].slice(0, 100);
+        if (ids.length === 0) {
+          rows = [];
+        } else {
+          const { data, error: pmErr } = await admin
+            .from('profiles')
+            .select('id, display_name, nome')
+            .in('id', ids)
+            .eq('is_platform_master', true)
+            .limit(50);
+          if (pmErr) throw pmErr;
+          rows = data ?? [];
+        }
+      } else {
+        let q = admin
+          .from('profiles')
+          .select('id, display_name, nome')
+          .eq('is_platform_master', true)
+          .order('created_at', { ascending: false })
+          .limit(50);
+        if (qq) {
+          const parts = [`display_name.ilike.%${qq}%`, `nome.ilike.%${qq}%`];
+          if (looksUuid(qq)) parts.unshift(`id.eq.${qq}`);
+          q = q.or(parts.join(','));
+        }
+        const { data, error: pmErr } = await q;
+        if (pmErr) throw pmErr;
+        rows = data ?? [];
+      }
+
+      const platform_masters = await Promise.all(
+        (rows ?? []).map(async (r) => {
+          let email: string | null = null;
+          try {
+            const { data: authUser, error: guErr } = await admin.auth.admin.getUserById(r.id);
+            if (!guErr) email = authUser?.user?.email ?? null;
+          } catch {
+            email = null;
+          }
+          const name = (r.display_name ?? r.nome ?? '').trim() || 'Admin';
+          return {
+            id: r.id,
+            display_name: r.display_name,
+            nome: r.nome,
+            email,
+            label: email ? `${name} (${email})` : name
+          };
+        })
+      );
+
+      return jsonResponse({ platform_masters }, 200);
     }
 
     const parsed = listQuerySchema.safeParse(raw);

@@ -1,6 +1,28 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { z } from 'npm:zod@3.24.2';
 
+async function insertPlatformAudit(
+  admin: ReturnType<typeof createClient>,
+  row: {
+    actor_id: string;
+    action: string;
+    target_type: 'user' | 'checkin' | 'tenant' | 'none';
+    target_id: string | null;
+    tenant_id: string | null;
+    payload: Record<string, unknown>;
+  }
+) {
+  const { error } = await admin.from('platform_admin_audit_log').insert({
+    actor_id: row.actor_id,
+    action: row.action,
+    target_type: row.target_type,
+    target_id: row.target_id,
+    tenant_id: row.tenant_id,
+    payload: row.payload
+  });
+  if (error) console.error('platform_admin_audit_log', error);
+}
+
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -83,6 +105,16 @@ Deno.serve(async (req) => {
       if (!data) {
         return jsonResponse({ error: 'Tenant não encontrado' }, 404);
       }
+
+      await insertPlatformAudit(admin, {
+        actor_id: user.id,
+        action: 'tenant.status_change',
+        target_type: 'tenant',
+        target_id: tenant_id,
+        tenant_id: tenant_id,
+        payload: { status: data.status, slug: data.slug ?? null }
+      });
+
       return jsonResponse({ tenant: data }, 200);
     }
 

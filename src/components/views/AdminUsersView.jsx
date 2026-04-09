@@ -28,7 +28,7 @@ function fmtDateTime(v) {
 }
 
 export function AdminUsersView({ onBack }) {
-  const { supabase, profile, session } = useAuth();
+  const { supabase, profile } = useAuth();
 
   const [q, setQ] = useState('');
   const [tenantId, setTenantId] = useState('');
@@ -66,9 +66,7 @@ export function AdminUsersView({ onBack }) {
       params.set('limit', '20');
       params.set('offset', '0');
 
-      const { data: sData } = await supabase.auth.getSession();
-      const token = sData?.session?.access_token ?? session?.access_token ?? null;
-      const { data, error: fnError } = await invokeEdge(`admin-users?${params.toString()}`, token, { method: 'GET' });
+      const { data, error: fnError } = await invokeEdge(`admin-users?${params.toString()}`, supabase, { method: 'GET' });
       if (fnError) {
         setUsers([]);
         setError(fnError.message);
@@ -83,7 +81,7 @@ export function AdminUsersView({ onBack }) {
     } finally {
       setLoading(false);
     }
-  }, [supabase, profile?.is_platform_master, q, tenantId, session?.access_token]);
+  }, [supabase, profile?.is_platform_master, q, tenantId]);
 
   useEffect(() => {
     loadUsers();
@@ -112,9 +110,7 @@ export function AdminUsersView({ onBack }) {
         params.set('mode', 'detail');
         params.set('user_id', userId);
 
-        const { data: sData } = await supabase.auth.getSession();
-        const token = sData?.session?.access_token ?? session?.access_token ?? null;
-        const { data, error: fnError } = await invokeEdge(`admin-users?${params.toString()}`, token, { method: 'GET' });
+        const { data, error: fnError } = await invokeEdge(`admin-users?${params.toString()}`, supabase, { method: 'GET' });
         if (fnError) {
           setDetail(null);
           setDetailError(fnError.message);
@@ -131,7 +127,7 @@ export function AdminUsersView({ onBack }) {
         setDetailLoading(false);
       }
     },
-    [supabase, profile?.is_platform_master, session?.access_token]
+    [supabase, profile?.is_platform_master]
   );
 
   const runAdminAction = useCallback(
@@ -144,9 +140,7 @@ export function AdminUsersView({ onBack }) {
       setActionLoading(true);
       setActionError(null);
       try {
-        const { data: sData } = await supabase.auth.getSession();
-        const token = sData?.session?.access_token ?? session?.access_token ?? null;
-        const { data, error: fnError } = await invokeEdge(`admin-users`, token, { method: 'PATCH', body: payload });
+        const { data, error: fnError } = await invokeEdge(`admin-users`, supabase, { method: 'PATCH', body: payload });
         if (fnError) {
           setActionError(fnError.message);
           return;
@@ -161,7 +155,7 @@ export function AdminUsersView({ onBack }) {
         setActionLoading(false);
       }
     },
-    [supabase, profile?.is_platform_master, session?.access_token, selectedUserId, loadDetail, loadUsers]
+    [supabase, profile?.is_platform_master, selectedUserId, loadDetail, loadUsers]
   );
 
   const selected = useMemo(() => users.find((u) => u.id === selectedUserId) ?? null, [users, selectedUserId]);

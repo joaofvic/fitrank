@@ -20,7 +20,7 @@ const DEFAULT_REJECTION_REASONS = [
 ];
 
 export function AdminModerationView({ onBack }) {
-  const { supabase, profile, session } = useAuth();
+  const { supabase, profile } = useAuth();
 
   const [items, setItems] = useState([]);
   const [tenants, setTenants] = useState([]);
@@ -83,9 +83,7 @@ export function AdminModerationView({ onBack }) {
 
   const loadTenants = useCallback(async () => {
     if (!supabase || !profile?.is_platform_master) return;
-    const { data: sData } = await supabase.auth.getSession();
-    const token = sData?.session?.access_token ?? session?.access_token ?? null;
-    const { data, error: fnError } = await invokeEdge('admin-tenants', token, {
+    const { data, error: fnError } = await invokeEdge('admin-tenants', supabase, {
       method: 'GET'
     });
     if (fnError) {
@@ -99,7 +97,7 @@ export function AdminModerationView({ onBack }) {
       return;
     }
     setTenants(data?.tenants ?? []);
-  }, [supabase, profile?.is_platform_master, session?.access_token]);
+  }, [supabase, profile?.is_platform_master]);
 
   const loadQueue = useCallback(async () => {
     if (!supabase || !profile?.is_platform_master) return;
@@ -119,11 +117,9 @@ export function AdminModerationView({ onBack }) {
     params.set('limit', '30');
     params.set('offset', '0');
 
-    const { data: sData } = await supabase.auth.getSession();
-    const token = sData?.session?.access_token ?? session?.access_token ?? null;
     const { data, error: fnError } = await invokeEdge(
       `admin-moderation?${params.toString()}`,
-      token,
+      supabase,
       { method: 'GET' }
     );
 
@@ -150,7 +146,7 @@ export function AdminModerationView({ onBack }) {
       return Number.isFinite(next) ? next : -1;
     });
     setLoading(false);
-  }, [supabase, profile?.is_platform_master, status, tenantId, from, to, tipo, search, sort, session?.access_token]);
+  }, [supabase, profile?.is_platform_master, status, tenantId, from, to, tipo, search, sort]);
 
   const formatPendingAge = useCallback((createdAt) => {
     const created = new Date(createdAt);
@@ -188,9 +184,7 @@ export function AdminModerationView({ onBack }) {
     if (!supabase || !profile?.is_platform_master) return;
     let cancelled = false;
     (async () => {
-      const { data: sData } = await supabase.auth.getSession();
-      const token = sData?.session?.access_token ?? session?.access_token ?? null;
-      const { data, error: fnError } = await invokeEdge('admin-moderation?mode=rejection-reasons', token, {
+      const { data, error: fnError } = await invokeEdge('admin-moderation?mode=rejection-reasons', supabase, {
         method: 'GET'
       });
       if (cancelled) return;
@@ -214,15 +208,13 @@ export function AdminModerationView({ onBack }) {
     return () => {
       cancelled = true;
     };
-  }, [supabase, profile?.is_platform_master, session?.access_token]);
+  }, [supabase, profile?.is_platform_master]);
 
   useEffect(() => {
     if (!supabase || !profile?.is_platform_master) return;
     let cancelled = false;
     (async () => {
-      const { data: sData } = await supabase.auth.getSession();
-      const token = sData?.session?.access_token ?? session?.access_token ?? null;
-      const { data, error: fnError } = await invokeEdge('admin-moderation?mode=message-templates', token, {
+      const { data, error: fnError } = await invokeEdge('admin-moderation?mode=message-templates', supabase, {
         method: 'GET'
       });
       if (cancelled) return;
@@ -239,7 +231,7 @@ export function AdminModerationView({ onBack }) {
     return () => {
       cancelled = true;
     };
-  }, [supabase, profile?.is_platform_master, session?.access_token, messageTemplateCode]);
+  }, [supabase, profile?.is_platform_master, messageTemplateCode]);
 
   const focused = focusIdx >= 0 && focusIdx < items.length ? items[focusIdx] : null;
 
@@ -266,9 +258,7 @@ export function AdminModerationView({ onBack }) {
         params.set('user_id', focused.user_id);
         if (focused?.tenant_id) params.set('tenant_id', focused.tenant_id);
 
-        const { data: sData } = await supabase.auth.getSession();
-        const token = sData?.session?.access_token ?? session?.access_token ?? null;
-        const { data, error: fnError } = await invokeEdge(`admin-moderation?${params.toString()}`, token, {
+        const { data, error: fnError } = await invokeEdge(`admin-moderation?${params.toString()}`, supabase, {
           method: 'GET'
         });
 
@@ -300,7 +290,7 @@ export function AdminModerationView({ onBack }) {
     return () => {
       cancelled = true;
     };
-  }, [quickOpen, focused?.user_id, focused?.tenant_id, supabase, profile?.is_platform_master, session?.access_token]);
+  }, [quickOpen, focused?.user_id, focused?.tenant_id, supabase, profile?.is_platform_master]);
 
   useEffect(() => {
     if (!quickOpen || !focused?.id) return;
@@ -314,9 +304,7 @@ export function AdminModerationView({ onBack }) {
         const params = new URLSearchParams();
         params.set('mode', 'checkin-audit');
         params.set('checkin_id', focused.id);
-        const { data: sData } = await supabase.auth.getSession();
-        const token = sData?.session?.access_token ?? session?.access_token ?? null;
-        const { data, error: fnError } = await invokeEdge(`admin-moderation?${params.toString()}`, token, {
+        const { data, error: fnError } = await invokeEdge(`admin-moderation?${params.toString()}`, supabase, {
           method: 'GET'
         });
         if (cancelled) return;
@@ -346,7 +334,7 @@ export function AdminModerationView({ onBack }) {
     return () => {
       cancelled = true;
     };
-  }, [quickOpen, focused?.id, supabase, profile?.is_platform_master, session?.access_token]);
+  }, [quickOpen, focused?.id, supabase, profile?.is_platform_master]);
 
   const pct = useCallback((value) => {
     if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
@@ -374,9 +362,7 @@ export function AdminModerationView({ onBack }) {
     setMessageError(null);
     setMessageSentAt(null);
     try {
-      const { data: sData } = await supabase.auth.getSession();
-      const token = sData?.session?.access_token ?? session?.access_token ?? null;
-      const { error: fnError } = await invokeEdge('admin-moderation', token, {
+      const { error: fnError } = await invokeEdge('admin-moderation', supabase, {
         method: 'PATCH',
         body: {
           action: 'send-message',
@@ -396,7 +382,7 @@ export function AdminModerationView({ onBack }) {
     } finally {
       setMessageSending(false);
     }
-  }, [supabase, focused?.id, focused?.user_id, focused?.tenant_id, messageTemplateCode, messageBodyOverride, session?.access_token]);
+  }, [supabase, focused?.id, focused?.user_id, focused?.tenant_id, messageTemplateCode, messageBodyOverride]);
 
   if (!profile?.is_platform_master) {
     return null;
@@ -452,9 +438,7 @@ export function AdminModerationView({ onBack }) {
     setBusy(true);
     setError(null);
     try {
-      const { data: sData } = await supabase.auth.getSession();
-      const token = sData?.session?.access_token ?? session?.access_token ?? null;
-      const { error: fnError } = await invokeEdge('admin-moderation', token, {
+      const { error: fnError } = await invokeEdge('admin-moderation', supabase, {
         method: 'PATCH',
         body: { checkin_id: focused.id, action, ...(extras ?? {}) }
       });
@@ -511,10 +495,8 @@ export function AdminModerationView({ onBack }) {
     setBusy(true);
     setError(null);
     try {
-      const { data: sData } = await supabase.auth.getSession();
-      const token = sData?.session?.access_token ?? session?.access_token ?? null;
       const ids = Array.from(selectedIds);
-      const { data, error: fnError } = await invokeEdge('admin-moderation', token, {
+      const { data, error: fnError } = await invokeEdge('admin-moderation', supabase, {
         method: 'PATCH',
         body: { checkin_ids: ids, action, ...(extras ?? {}) }
       });
