@@ -37,6 +37,8 @@ export function AdminModerationView({ onBack }) {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [tipo, setTipo] = useState('');
+  const [sort, setSort] = useState('oldest'); // oldest | newest | risk
+  const [stats, setStats] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -79,6 +81,8 @@ export function AdminModerationView({ onBack }) {
     if (from) params.set('from', from);
     if (to) params.set('to', to);
     if (tipo) params.set('tipo', tipo);
+    params.set('sort', sort);
+    params.set('include_stats', status === 'pending' ? '1' : '0');
     params.set('limit', '30');
     params.set('offset', '0');
 
@@ -99,11 +103,13 @@ export function AdminModerationView({ onBack }) {
     if (data?.error) {
       setError(data.error);
       setItems([]);
+      setStats(null);
       setLoading(false);
       return;
     }
 
     setItems(Array.isArray(data?.items) ? data.items : []);
+    setStats(data?.stats ?? null);
     setSelectedIds(new Set());
     setLastSelectedIdx(null);
     setFocusIdx((prev) => {
@@ -111,7 +117,31 @@ export function AdminModerationView({ onBack }) {
       return Number.isFinite(next) ? next : -1;
     });
     setLoading(false);
-  }, [supabase, profile?.is_platform_master, status, tenantId, from, to, tipo, session?.access_token]);
+  }, [supabase, profile?.is_platform_master, status, tenantId, from, to, tipo, sort, session?.access_token]);
+
+  const formatPendingAge = useCallback((createdAt) => {
+    const created = new Date(createdAt);
+    const now = new Date();
+    const ms = now.getTime() - created.getTime();
+    if (!Number.isFinite(ms) || ms < 0) return null;
+    const hours = Math.floor(ms / (1000 * 60 * 60));
+    if (hours < 1) return 'agora';
+    if (hours < 24) return `${hours}h`;
+    const days = Math.floor(hours / 24);
+    const rem = hours % 24;
+    return rem === 0 ? `${days}d` : `${days}d ${rem}h`;
+  }, []);
+
+  const pendingAgeTone = useCallback((createdAt) => {
+    const created = new Date(createdAt);
+    const now = new Date();
+    const ms = now.getTime() - created.getTime();
+    const hours = ms / (1000 * 60 * 60);
+    if (!Number.isFinite(hours) || hours < 0) return 'zinc';
+    if (hours >= 24) return 'red';
+    if (hours >= 12) return 'yellow';
+    return 'zinc';
+  }, []);
 
   useEffect(() => {
     loadTenants();
@@ -397,6 +427,20 @@ export function AdminModerationView({ onBack }) {
       )}
 
       <div className="space-y-3 bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4">
+        {status === 'pending' && stats ? (
+          <div className="flex items-center justify-between gap-3 bg-zinc-950/60 border border-zinc-800 rounded-xl px-3 py-2">
+            <div className="text-[10px] uppercase text-zinc-500 font-bold">
+              Pendentes: <span className="text-zinc-200">{stats.pending_total ?? 0}</span>
+            </div>
+            <div className="text-[10px] uppercase text-zinc-500 font-bold">
+              &gt;24h:{' '}
+              <span className={(stats.pending_over_24h ?? 0) > 0 ? 'text-red-300' : 'text-zinc-200'}>
+                {stats.pending_over_24h ?? 0}
+              </span>
+            </div>
+          </div>
+        ) : null}
+
         <div className="flex gap-2 flex-wrap">
           {STATUSES.map((s) => (
             <Button
@@ -473,6 +517,19 @@ export function AdminModerationView({ onBack }) {
               placeholder="Ex: Superior"
               className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-600"
             />
+          </label>
+
+          <label className="space-y-1">
+            <span className="text-[10px] uppercase font-bold text-zinc-500">Ordenação</span>
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white"
+            >
+              <option value="oldest">Mais antigos</option>
+              <option value="newest">Mais recentes</option>
+              <option value="risk">Maior risco</option>
+            </select>
           </label>
 
           <label className="space-y-1">
@@ -658,6 +715,8 @@ export function AdminModerationView({ onBack }) {
               it?.profiles?.nome?.trim() ||
               'Atleta';
             const tenantLabel = it?.tenants?.slug || it.tenant_id;
+            const age = status === 'pending' && it?.created_at ? formatPendingAge(it.created_at) : null;
+            const tone = status === 'pending' && it?.created_at ? pendingAgeTone(it.created_at) : 'zinc';
             return (
               <li
                 key={it.id}
@@ -679,6 +738,26 @@ export function AdminModerationView({ onBack }) {
                     <p className="text-xs text-zinc-500 mt-1">
                       {it.tipo_treino} · {it.checkin_local_date} · +{it.points_awarded} pts
                     </p>
+                    {age ? (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <span
+                          className={`text-[10px] uppercase font-bold rounded-full px-2 py-1 border ${
+                            tone === 'red'
+                              ? 'border-red-900/60 text-red-300 bg-red-950/30'
+                              : tone === 'yellow'
+                                ? 'border-yellow-900/60 text-yellow-300 bg-yellow-950/30'
+                                : 'border-zinc-800 text-zinc-400 bg-zinc-950/30'
+                          }`}
+                        >
+                          Pendente há {age}
+                        </span>
+                        {typeof it.user_rejections_30d === 'number' ? (
+                          <span className="text-[10px] uppercase font-bold rounded-full px-2 py-1 border border-zinc-800 text-zinc-400 bg-zinc-950/30">
+                            Rejeições 30d: {it.user_rejections_30d}
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
                   <span className="text-[10px] font-bold uppercase px-2 py-1 rounded-full bg-yellow-500/10 text-yellow-400">
                     {it.photo_review_status}

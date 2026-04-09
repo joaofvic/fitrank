@@ -19,6 +19,8 @@ const querySchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
   tipo: z.string().min(1).max(200).optional(),
+  sort: z.enum(['oldest', 'newest', 'risk']).default('oldest'),
+  include_stats: z.enum(['0', '1']).default('0'),
   limit: z.coerce.number().int().min(1).max(100).default(30),
   offset: z.coerce.number().int().min(0).max(10_000).default(0)
 });
@@ -192,43 +194,61 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'Query inválida', details: parsed.error.flatten() }, 400);
     }
 
-    const { status, tenant_id, from, to, tipo, limit, offset } = parsed.data;
+    const { status, tenant_id, from, to, tipo, sort, include_stats, limit, offset } = parsed.data;
 
-    let q = admin
-      .from('checkins')
-      .select(
-        `
-          id,
-          tenant_id,
-          user_id,
-          checkin_local_date,
-          tipo_treino,
-          points_awarded,
-          foto_url,
-          created_at,
-          photo_review_status,
-          photo_reviewed_at,
-          photo_reviewed_by,
-          photo_rejection_reason_code,
-          photo_rejection_note,
-          profiles:profiles!checkins_user_profile_fkey ( id, display_name, nome, academia ),
-          tenants:tenants!checkins_tenant_id_fkey ( id, slug, name )
-        `
-      )
-      .not('foto_url', 'is', null)
-      .eq('photo_review_status', status);
-
-    if (tenant_id) q = q.eq('tenant_id', tenant_id);
-    if (from) q = q.gte('checkin_local_date', from);
-    if (to) q = q.lte('checkin_local_date', to);
-    if (tipo) q = q.ilike('tipo_treino', `%${tipo}%`);
-
-    q = q.order('created_at', { ascending: true }).range(offset, offset + limit - 1);
-
-    const { data, error } = await q;
+    const { data, error } = await admin.rpc('admin_moderation_queue', {
+      p_status: status,
+      p_tenant_id: tenant_id ?? null,
+      p_from: from ?? null,
+      p_to: to ?? null,
+      p_tipo: tipo ?? null,
+      p_limit: limit,
+      p_offset: offset,
+      p_sort: sort
+    });
     if (error) throw error;
 
-    return jsonResponse({ items: data ?? [], limit, offset }, 200);
+    let stats = null;
+    if (include_stats === '1') {
+      const { data: s, error: sErr } = await admin.rpc('admin_moderation_pending_stats', {
+        p_tenant_id: tenant_id ?? null,
+        p_from: from ?? null,
+        p_to: to ?? null,
+        p_tipo: tipo ?? null
+      });
+      if (sErr) throw sErr;
+      stats = Array.isArray(s) && s.length > 0 ? s[0] : { pending_total: 0, pending_over_24h: 0 };
+    }
+
+    // Normaliza shape para o front (compatível com o que já renderiza)
+    const rows = Array.isArray(data) ? data : [];
+    const items = rows.map((r) => ({
+      id: r.id,
+      tenant_id: r.tenant_id,
+      user_id: r.user_id,
+      checkin_local_date: r.checkin_local_date,
+      tipo_treino: r.tipo_treino,
+      points_awarded: r.points_awarded,
+      foto_url: r.foto_url,
+      created_at: r.created_at,
+      photo_review_status: r.photo_review_status,
+      photo_reviewed_at: r.photo_reviewed_at,
+      photo_reviewed_by: r.photo_reviewed_by,
+      photo_rejection_reason_code: r.photo_rejection_reason_code,
+      photo_rejection_note: r.photo_rejection_note,
+      user_rejections_30d: r.user_rejections_30d,
+      profiles: {
+        display_name: r.profile_display_name,
+        nome: r.profile_nome,
+        academia: r.profile_academia
+      },
+      tenants: {
+        slug: r.tenant_slug,
+        name: r.tenant_name
+      }
+    }));
+
+    return jsonResponse({ items, stats, limit, offset, sort }, 200);
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Erro interno';
     console.error('admin-moderation:', message);
