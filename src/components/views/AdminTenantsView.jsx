@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { Button } from '../ui/Button.jsx';
+import { invokeEdge } from '../../lib/supabase/invoke-edge.js';
 
 export function AdminTenantsView({ onBack }) {
-  const { supabase, profile } = useAuth();
+  const { supabase, profile, session } = useAuth();
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -13,7 +14,11 @@ export function AdminTenantsView({ onBack }) {
     if (!supabase || !profile?.is_platform_master) return;
     setLoading(true);
     setError(null);
-    const { data, error: fnError } = await supabase.functions.invoke('admin-tenants', { method: 'GET' });
+    const { data: sData } = await supabase.auth.getSession();
+    const token = sData?.session?.access_token ?? session?.access_token ?? null;
+    const { data, error: fnError } = await invokeEdge('admin-tenants', token, {
+      method: 'GET'
+    });
     if (fnError) {
       setError(fnError.message);
       setTenants([]);
@@ -24,7 +29,7 @@ export function AdminTenantsView({ onBack }) {
       setTenants(data?.tenants ?? []);
     }
     setLoading(false);
-  }, [supabase, profile?.is_platform_master]);
+  }, [supabase, profile?.is_platform_master, session?.access_token]);
 
   useEffect(() => {
     load();
@@ -33,7 +38,9 @@ export function AdminTenantsView({ onBack }) {
   const setStatus = async (tenantId, status) => {
     setUpdatingId(tenantId);
     setError(null);
-    const { data, error: fnError } = await supabase.functions.invoke('admin-tenants', {
+    const { data: sData } = await supabase.auth.getSession();
+    const token = sData?.session?.access_token ?? session?.access_token ?? null;
+    const { data, error: fnError } = await invokeEdge('admin-tenants', token, {
       method: 'PATCH',
       body: { tenant_id: tenantId, status }
     });

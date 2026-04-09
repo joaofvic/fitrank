@@ -163,6 +163,9 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
       if (!supabase || !userId || !tenantId) {
         throw new Error('Sessão inválida');
       }
+      if (!fotoFile || !(fotoFile.size > 0)) {
+        throw new Error('Foto obrigatória para registrar o treino.');
+      }
       const today = todayLocalISODate();
       let foto_url = null;
 

@@ -12,6 +12,7 @@ import { ProfileView } from './components/views/ProfileView.jsx';
 import { ChallengesView } from './components/views/ChallengesView.jsx';
 import { CheckinModal } from './components/views/CheckinModal.jsx';
 import { AdminTenantsView } from './components/views/AdminTenantsView.jsx';
+import { AdminModerationView } from './components/views/AdminModerationView.jsx';
 
 export default function App() {
   const {
@@ -76,6 +77,10 @@ export default function App() {
       } catch (err) {
         showToast(err.message ?? 'Falha no check-in');
       }
+      return;
+    }
+    if (!fotoFile || !(fotoFile.size > 0)) {
+      showToast('Foto obrigatória para registrar o treino.');
       return;
     }
 
@@ -180,11 +185,15 @@ export default function App() {
             cloudDisplayName={profile?.display_name}
             isPlatformMaster={profile?.is_platform_master}
             onOpenAdmin={profile?.is_platform_master ? () => setView('admin-tenants') : undefined}
+            onOpenModeration={profile?.is_platform_master ? () => setView('admin-moderation') : undefined}
             onSignOut={configured ? signOut : undefined}
           />
         )}
         {view === 'admin-tenants' && profile?.is_platform_master && (
           <AdminTenantsView onBack={() => setView('profile')} />
+        )}
+        {view === 'admin-moderation' && profile?.is_platform_master && (
+          <AdminModerationView onBack={() => setView('profile')} />
         )}
 
         {view === 'checkin-modal' && (

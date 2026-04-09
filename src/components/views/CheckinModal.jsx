@@ -7,6 +7,7 @@ const WORKOUT_TYPES = ['Musculação', 'Cárdio', 'Funcional', 'Luta', 'Crossfit
 export function CheckinModal({ onClose, onCheckin }) {
   const [foto, setFoto] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
+  const [error, setError] = useState(null);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -20,7 +21,13 @@ export function CheckinModal({ onClose, onCheckin }) {
   }, [foto]);
 
   const handleType = async (type) => {
+    if (!foto) {
+      setError('Adicione uma foto para comprovar o treino.');
+      inputRef.current?.focus?.();
+      return;
+    }
     try {
+      setError(null);
       await Promise.resolve(onCheckin(type, foto));
     } finally {
       setFoto(null);
@@ -68,7 +75,10 @@ export function CheckinModal({ onClose, onCheckin }) {
             type="file"
             accept="image/*"
             className="hidden"
-            onChange={(ev) => setFoto(ev.target.files?.[0] ?? null)}
+            onChange={(ev) => {
+              setFoto(ev.target.files?.[0] ?? null);
+              setError(null);
+            }}
           />
           <button
             type="button"
@@ -83,13 +93,18 @@ export function CheckinModal({ onClose, onCheckin }) {
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-zinc-300">Foto (opcional)</p>
+              <p className="text-sm font-bold text-zinc-300">Foto (obrigatória)</p>
               <p className="text-[10px] text-zinc-500 uppercase truncate">
                 {foto ? foto.name : 'Enviada com o próximo check-in'}
               </p>
             </div>
             <Plus size={20} className="text-zinc-500 shrink-0" />
           </button>
+          {error && (
+            <p className="text-xs text-red-400 mt-3" role="alert">
+              {error}
+            </p>
+          )}
         </div>
       </div>
     </div>
