@@ -76,7 +76,7 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
         id: c.id,
         date: c.checkin_local_date,
         type: c.tipo_treino,
-        points_earned: c.points_awarded,
+        points_earned: c.photo_review_status === 'rejected' ? 0 : c.points_awarded,
         foto_url: c.foto_url,
         photo_review_status: c.photo_review_status,
         photo_rejection_reason_code: c.photo_rejection_reason_code,
@@ -173,6 +173,22 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
           refreshProfileRef.current?.();
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'checkins',
+          filter: `tenant_id=eq.${tenantId}`
+        },
+        () => {
+          // rejeição/ajustes podem atualizar pontos/streak e ranking
+          refreshLeaderboardRef.current();
+          refreshCheckinsRef.current();
+          refreshNotificationsRef.current();
+          refreshProfileRef.current?.();
+        }
+      )
       .subscribe((status) => {
         if (status === 'CHANNEL_ERROR') {
           console.warn('FitRank: Realtime indisponível; use atualização manual ou habilite a publicação no Supabase.');
@@ -181,6 +197,37 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
 
     return () => {
       supabase.removeChannel(channel);
+    };
+  }, [supabase, userId, tenantId]);
+
+  useEffect(() => {
+    if (!supabase || !userId || !tenantId) return;
+
+    // Fallback para ambientes onde Realtime de UPDATE não esteja publicado:
+    // mantém pontos/streak/ranking sincronizados após moderação.
+    let alive = true;
+    const tick = async () => {
+      if (!alive) return;
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      refreshLeaderboardRef.current();
+      refreshCheckinsRef.current();
+      refreshNotificationsRef.current();
+      refreshProfileRef.current?.();
+    };
+
+    const id = setInterval(() => tick(), 15_000);
+    const onFocus = () => tick();
+    window.addEventListener('focus', onFocus);
+    document.addEventListener?.('visibilitychange', tick);
+
+    // roda 1x ao montar
+    tick();
+
+    return () => {
+      alive = false;
+      clearInterval(id);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener?.('visibilitychange', tick);
     };
   }, [supabase, userId, tenantId]);
 

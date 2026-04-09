@@ -175,8 +175,14 @@ export function ProfileView({
                     ) : null}
                   </div>
                 </div>
-                <div className="bg-green-500/10 text-green-500 px-2 py-1 rounded text-xs font-bold">
-                  +{c.points_earned ?? 0} PTS
+                <div
+                  className={`px-2 py-1 rounded text-xs font-bold ${
+                    c.photo_review_status === 'rejected'
+                      ? 'bg-zinc-700/30 text-zinc-300 border border-zinc-700/40'
+                      : 'bg-green-500/10 text-green-500'
+                  }`}
+                >
+                  +{c.photo_review_status === 'rejected' ? 0 : c.points_earned ?? 0} PTS
                 </div>
               </div>
             ))}
