@@ -56,11 +56,15 @@ export function AdminModerationView({ onBack }) {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [tipo, setTipo] = useState('');
+  const [search, setSearch] = useState('');
   const [sort, setSort] = useState('oldest'); // oldest | newest | risk
   const [stats, setStats] = useState(null);
   const [userContext, setUserContext] = useState(null);
   const [userContextLoading, setUserContextLoading] = useState(false);
   const [userContextError, setUserContextError] = useState(null);
+  const [audit, setAudit] = useState([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditError, setAuditError] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -103,6 +107,7 @@ export function AdminModerationView({ onBack }) {
     if (from) params.set('from', from);
     if (to) params.set('to', to);
     if (tipo) params.set('tipo', tipo);
+    if (search) params.set('search', search);
     params.set('sort', sort);
     params.set('include_stats', status === 'pending' ? '1' : '0');
     params.set('limit', '30');
@@ -139,7 +144,7 @@ export function AdminModerationView({ onBack }) {
       return Number.isFinite(next) ? next : -1;
     });
     setLoading(false);
-  }, [supabase, profile?.is_platform_master, status, tenantId, from, to, tipo, sort, session?.access_token]);
+  }, [supabase, profile?.is_platform_master, status, tenantId, from, to, tipo, search, sort, session?.access_token]);
 
   const formatPendingAge = useCallback((createdAt) => {
     const created = new Date(createdAt);
@@ -212,6 +217,9 @@ export function AdminModerationView({ onBack }) {
       setUserContext(null);
       setUserContextLoading(false);
       setUserContextError(null);
+      setAudit([]);
+      setAuditLoading(false);
+      setAuditError(null);
       return;
     }
     if (!supabase || !profile?.is_platform_master) return;
@@ -262,6 +270,52 @@ export function AdminModerationView({ onBack }) {
       cancelled = true;
     };
   }, [quickOpen, focused?.user_id, focused?.tenant_id, supabase, profile?.is_platform_master, session?.access_token]);
+
+  useEffect(() => {
+    if (!quickOpen || !focused?.id) return;
+    if (!supabase || !profile?.is_platform_master) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        setAuditLoading(true);
+        setAuditError(null);
+        const params = new URLSearchParams();
+        params.set('mode', 'checkin-audit');
+        params.set('checkin_id', focused.id);
+        const { data: sData } = await supabase.auth.getSession();
+        const token = sData?.session?.access_token ?? session?.access_token ?? null;
+        const { data, error: fnError } = await invokeEdge(`admin-moderation?${params.toString()}`, token, {
+          method: 'GET'
+        });
+        if (cancelled) return;
+        if (fnError) {
+          setAudit([]);
+          setAuditError(fnError.message);
+          setAuditLoading(false);
+          return;
+        }
+        if (data?.error) {
+          setAudit([]);
+          setAuditError(data.error);
+          setAuditLoading(false);
+          return;
+        }
+        setAudit(Array.isArray(data?.audit) ? data.audit : []);
+        setAuditLoading(false);
+      } catch (e) {
+        if (cancelled) return;
+        const msg = e instanceof Error ? e.message : 'Erro ao carregar histórico';
+        setAudit([]);
+        setAuditError(msg);
+        setAuditLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [quickOpen, focused?.id, supabase, profile?.is_platform_master, session?.access_token]);
 
   const pct = useCallback((value) => {
     if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
@@ -707,6 +761,16 @@ export function AdminModerationView({ onBack }) {
               value={tipo}
               onChange={(e) => setTipo(e.target.value)}
               placeholder="Ex: Superior"
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-600"
+            />
+          </label>
+
+          <label className="space-y-1">
+            <span className="text-[10px] uppercase font-bold text-zinc-500">Buscar usuário</span>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Nome ou user_id"
               className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-600"
             />
           </label>
@@ -1160,39 +1224,84 @@ export function AdminModerationView({ onBack }) {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={busy}
-                onClick={prevItem}
-                className="text-xs py-3"
-              >
-                Anterior
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={busy}
-                onClick={nextItem}
-                className="text-xs py-3"
-              >
-                Pular
-              </Button>
-              <Button type="button" disabled={busy} onClick={() => review('approve')} className="text-xs py-3">
-                Aprovar
-              </Button>
-            </div>
+            {focused.photo_review_status === 'rejected' ? (
+              <div className="grid grid-cols-2 gap-2">
+                <Button type="button" variant="secondary" disabled={busy} onClick={prevItem} className="text-xs py-3">
+                  Anterior
+                </Button>
+                <Button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => review('reapprove')}
+                  className="text-xs py-3 bg-green-500/90 hover:bg-green-500 text-black font-bold"
+                >
+                  Reaprovar
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={prevItem}
+                  className="text-xs py-3"
+                >
+                  Anterior
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={nextItem}
+                  className="text-xs py-3"
+                >
+                  Pular
+                </Button>
+                <Button type="button" disabled={busy} onClick={() => review('approve')} className="text-xs py-3">
+                  Aprovar
+                </Button>
+              </div>
+            )}
 
-            <Button
-              type="button"
-              variant="outline"
-              disabled={busy}
-              onClick={openRejectModal}
-              className="w-full text-xs py-3 border-red-500/40 text-red-300 hover:bg-red-500/10"
-            >
-              Rejeitar
-            </Button>
+            {focused.photo_review_status !== 'rejected' ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy}
+                onClick={openRejectModal}
+                className="w-full text-xs py-3 border-red-500/40 text-red-300 hover:bg-red-500/10"
+              >
+                Rejeitar
+              </Button>
+            ) : null}
+
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-950/40 p-4 space-y-2">
+              <p className="text-[10px] uppercase font-bold text-zinc-500">Histórico de decisões</p>
+              {auditLoading ? <p className="text-xs text-zinc-500">Carregando…</p> : null}
+              {auditError ? (
+                <p className="text-xs text-red-400" role="alert">
+                  {auditError}
+                </p>
+              ) : null}
+              {!auditLoading && !auditError ? (
+                <div className="space-y-2 max-h-40 overflow-auto pr-1">
+                  {(audit ?? []).map((a) => (
+                    <div key={a.id} className="text-xs text-zinc-400 border border-zinc-800 rounded-xl p-2">
+                      <p className="font-mono text-[10px] text-zinc-500">{a.action}</p>
+                      <p className="text-zinc-300">
+                        Δ {a.points_delta ?? 0} pts · {new Date(a.decided_at).toLocaleString('pt-BR')}
+                      </p>
+                      {a.reason_code ? <p>Motivo: {a.reason_code}</p> : null}
+                      {a.note ? <p>Obs: {a.note}</p> : null}
+                    </div>
+                  ))}
+                  {Array.isArray(audit) && audit.length === 0 ? (
+                    <p className="text-xs text-zinc-600">Sem histórico.</p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
 
             {rejectConfirmOpen ? (
               <div className="border border-zinc-800 rounded-2xl p-4 bg-zinc-950/40 space-y-3">

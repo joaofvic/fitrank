@@ -19,6 +19,7 @@ const querySchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
   tipo: z.string().min(1).max(200).optional(),
+  search: z.string().min(1).max(200).optional(),
   sort: z.enum(['oldest', 'newest', 'risk']).default('oldest'),
   include_stats: z.enum(['0', '1']).default('0'),
   limit: z.coerce.number().int().min(1).max(100).default(30),
@@ -27,7 +28,7 @@ const querySchema = z.object({
 
 const reviewSchema = z.object({
   checkin_id: z.string().uuid(),
-  action: z.enum(['approve', 'reject']),
+  action: z.enum(['approve', 'reject', 'reapprove']),
   rejection_reason_code: z.string().min(1).max(64).optional(),
   rejection_note: z.string().min(1).max(500).optional(),
   is_suspected: z.coerce.boolean().optional()
@@ -60,6 +61,11 @@ const userContextQuerySchema = z.object({
 
 const rejectionReasonsQuerySchema = z.object({
   mode: z.literal('rejection-reasons')
+});
+
+const checkinAuditQuerySchema = z.object({
+  mode: z.literal('checkin-audit'),
+  checkin_id: z.string().uuid()
 });
 
 Deno.serve(async (req) => {
@@ -152,7 +158,7 @@ Deno.serve(async (req) => {
           return jsonResponse({ error: 'Observação obrigatória para este motivo.' }, 400);
         }
       }
-      const nextStatus = action === 'approve' ? 'approved' : 'rejected';
+      const nextStatus = action === 'reject' ? 'rejected' : 'approved';
       const patch: Record<string, unknown> = {
         photo_review_status: nextStatus,
         photo_reviewed_at: new Date().toISOString(),
@@ -170,12 +176,19 @@ Deno.serve(async (req) => {
       }
 
       if ('checkin_id' in payload) {
-        const { data, error } = await admin
-          .from('checkins')
-          .update(patch)
-          .eq('id', payload.checkin_id)
-          // trava otimista: só revisa se ainda está pending
-          .eq('photo_review_status', 'pending')
+        // Lock otimista:
+        // - approve: pending -> approved
+        // - reapprove: rejected -> approved
+        // - reject: pending/approved -> rejected
+        const q = admin.from('checkins').update(patch).eq('id', payload.checkin_id);
+        const locked =
+          action === 'reapprove'
+            ? q.eq('photo_review_status', 'rejected')
+            : action === 'reject'
+              ? q.in('photo_review_status', ['pending', 'approved'])
+              : q.eq('photo_review_status', 'pending');
+
+        const { data, error } = await locked
           .select(
             `
               id,
@@ -318,6 +331,25 @@ Deno.serve(async (req) => {
       return jsonResponse({ reasons: data ?? [] }, 200);
     }
 
+    // US-ADM-09: histórico de decisões/auditoria por check-in
+    if (raw.mode === 'checkin-audit') {
+      const parsedAudit = checkinAuditQuerySchema.safeParse(raw);
+      if (!parsedAudit.success) {
+        return jsonResponse({ error: 'Query inválida', details: parsedAudit.error.flatten() }, 400);
+      }
+      const { checkin_id } = parsedAudit.data;
+      const { data, error } = await admin
+        .from('checkin_moderation_audit')
+        .select(
+          'id, action, decided_by, decided_at, reason_code, note, is_suspected, points_delta, points_before, points_after, streak_before, streak_after'
+        )
+        .eq('checkin_id', checkin_id)
+        .order('decided_at', { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return jsonResponse({ audit: data ?? [] }, 200);
+    }
+
     // US-ADM-06: contexto do usuário (mini-histórico + métricas)
     if (raw.mode === 'user-context') {
       const parsedCtx = userContextQuerySchema.safeParse(raw);
@@ -398,7 +430,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'Query inválida', details: parsed.error.flatten() }, 400);
     }
 
-    const { status, tenant_id, from, to, tipo, sort, include_stats, limit, offset } = parsed.data;
+    const { status, tenant_id, from, to, tipo, search, sort, include_stats, limit, offset } = parsed.data;
 
     const { data, error } = await admin.rpc('admin_moderation_queue', {
       p_status: status,
@@ -406,6 +438,7 @@ Deno.serve(async (req) => {
       p_from: from ?? null,
       p_to: to ?? null,
       p_tipo: tipo ?? null,
+      p_search: search ?? null,
       p_limit: limit,
       p_offset: offset,
       p_sort: sort
