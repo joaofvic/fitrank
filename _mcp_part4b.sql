@@ -1,0 +1,4 @@
+comment on function public.admin_engagement_alerts(uuid, text, text, text) is
+  'Alertas operacionais (24h vs 24h anteriores); janelas em instantes alinhados a America/Sao_Paulo; apenas is_platform_master.';
+
+grant execute on function public.admin_engagement_alerts(uuid, text, text, text) to authenticated;
