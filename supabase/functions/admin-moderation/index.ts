@@ -39,6 +39,12 @@ const batchReviewSchema = z.object({
   rejection_note: z.string().min(1).max(500).optional()
 });
 
+const userContextQuerySchema = z.object({
+  mode: z.literal('user-context'),
+  user_id: z.string().uuid(),
+  tenant_id: z.string().uuid().optional()
+});
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -189,6 +195,82 @@ Deno.serve(async (req) => {
     }
 
     const raw = Object.fromEntries(url.searchParams.entries());
+
+    // US-ADM-06: contexto do usuário (mini-histórico + métricas)
+    if (raw.mode === 'user-context') {
+      const parsedCtx = userContextQuerySchema.safeParse(raw);
+      if (!parsedCtx.success) {
+        return jsonResponse({ error: 'Query inválida', details: parsedCtx.error.flatten() }, 400);
+      }
+
+      const { user_id, tenant_id } = parsedCtx.data;
+      const now = new Date();
+      const since30d = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+      const { data: profileRow, error: pErr } = await admin
+        .from('profiles')
+        .select('id, display_name, nome, academia, tenant_id')
+        .eq('id', user_id)
+        .maybeSingle();
+      if (pErr) throw pErr;
+
+      const base = admin
+        .from('checkins')
+        .select(
+          'id, tenant_id, created_at, checkin_local_date, tipo_treino, points_awarded, foto_url, photo_review_status'
+        )
+        .eq('user_id', user_id);
+
+      const recentQ = tenant_id ? base.eq('tenant_id', tenant_id) : base;
+      const { data: recent, error: rErr } = await recentQ.order('created_at', { ascending: false }).limit(10);
+      if (rErr) throw rErr;
+
+      const countBase = admin
+        .from('checkins')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user_id)
+        .gte('created_at', since30d);
+      const countScoped = tenant_id ? countBase.eq('tenant_id', tenant_id) : countBase;
+
+      const [{ count: total30d, error: c1 }, { count: rej30d, error: c2 }, { count: pend30d, error: c3 }] =
+        await Promise.all([
+          countScoped,
+          (tenant_id ? countBase.eq('tenant_id', tenant_id) : countBase).eq('photo_review_status', 'rejected'),
+          (tenant_id ? countBase.eq('tenant_id', tenant_id) : countBase).eq('photo_review_status', 'pending')
+        ]);
+      if (c1) throw c1;
+      if (c2) throw c2;
+      if (c3) throw c3;
+
+      const { count: appr30d, error: c4 } = await (tenant_id ? countBase.eq('tenant_id', tenant_id) : countBase).eq(
+        'photo_review_status',
+        'approved'
+      );
+      if (c4) throw c4;
+
+      const total = total30d ?? 0;
+      const rejected = rej30d ?? 0;
+      const rejection_rate_30d = total > 0 ? rejected / total : 0;
+
+      return jsonResponse(
+        {
+          context: {
+            profile: profileRow ?? null,
+            stats: {
+              total_30d: total,
+              approved_30d: appr30d ?? 0,
+              rejected_30d: rejected,
+              pending_30d: pend30d ?? 0,
+              rejection_rate_30d,
+              denuncias_30d: null
+            },
+            recent_checkins: Array.isArray(recent) ? recent : []
+          }
+        },
+        200
+      );
+    }
+
     const parsed = querySchema.safeParse(raw);
     if (!parsed.success) {
       return jsonResponse({ error: 'Query inválida', details: parsed.error.flatten() }, 400);

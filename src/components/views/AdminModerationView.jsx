@@ -39,6 +39,9 @@ export function AdminModerationView({ onBack }) {
   const [tipo, setTipo] = useState('');
   const [sort, setSort] = useState('oldest'); // oldest | newest | risk
   const [stats, setStats] = useState(null);
+  const [userContext, setUserContext] = useState(null);
+  const [userContextLoading, setUserContextLoading] = useState(false);
+  const [userContextError, setUserContextError] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -151,11 +154,81 @@ export function AdminModerationView({ onBack }) {
     loadQueue();
   }, [loadQueue]);
 
+  const focused = focusIdx >= 0 && focusIdx < items.length ? items[focusIdx] : null;
+
+  useEffect(() => {
+    if (!quickOpen || !focused?.user_id) {
+      setUserContext(null);
+      setUserContextLoading(false);
+      setUserContextError(null);
+      return;
+    }
+    if (!supabase || !profile?.is_platform_master) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        setUserContextLoading(true);
+        setUserContextError(null);
+
+        const params = new URLSearchParams();
+        params.set('mode', 'user-context');
+        params.set('user_id', focused.user_id);
+        if (focused?.tenant_id) params.set('tenant_id', focused.tenant_id);
+
+        const { data: sData } = await supabase.auth.getSession();
+        const token = sData?.session?.access_token ?? session?.access_token ?? null;
+        const { data, error: fnError } = await invokeEdge(`admin-moderation?${params.toString()}`, token, {
+          method: 'GET'
+        });
+
+        if (cancelled) return;
+        if (fnError) {
+          setUserContext(null);
+          setUserContextError(fnError.message);
+          setUserContextLoading(false);
+          return;
+        }
+        if (data?.error) {
+          setUserContext(null);
+          setUserContextError(data.error);
+          setUserContextLoading(false);
+          return;
+        }
+
+        setUserContext(data?.context ?? null);
+        setUserContextLoading(false);
+      } catch (e) {
+        if (cancelled) return;
+        const msg = e instanceof Error ? e.message : 'Erro ao carregar contexto';
+        setUserContext(null);
+        setUserContextError(msg);
+        setUserContextLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [quickOpen, focused?.user_id, focused?.tenant_id, supabase, profile?.is_platform_master, session?.access_token]);
+
+  const pct = useCallback((value) => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
+    return `${Math.round(value * 100)}%`;
+  }, []);
+
+  const copyText = useCallback(async (text) => {
+    try {
+      if (!text) return;
+      await navigator.clipboard.writeText(String(text));
+    } catch {
+      // ignore
+    }
+  }, []);
+
   if (!profile?.is_platform_master) {
     return null;
   }
-
-  const focused = focusIdx >= 0 && focusIdx < items.length ? items[focusIdx] : null;
   const focusedName =
     focused?.profiles?.display_name?.trim() || focused?.profiles?.nome?.trim() || 'Atleta';
   const focusedTenant = focused?.tenants?.slug || focused?.tenant_id || '—';
@@ -809,17 +882,109 @@ export function AdminModerationView({ onBack }) {
               <span className="border border-zinc-800 rounded-full px-2 py-1">Esc fechar</span>
             </div>
 
-            <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-black">
-              {focused.foto_url ? (
-                <img
-                  src={focused.foto_url}
-                  alt=""
-                  className={`w-full h-80 object-contain transition-transform ${zoom ? 'scale-150 cursor-zoom-out' : 'cursor-zoom-in'}`}
-                  onClick={() => setZoom((z) => !z)}
-                />
-              ) : (
-                <div className="h-80 flex items-center justify-center text-zinc-600 text-sm">Sem foto</div>
-              )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-black">
+                {focused.foto_url ? (
+                  <img
+                    src={focused.foto_url}
+                    alt=""
+                    className={`w-full h-80 object-contain transition-transform ${zoom ? 'scale-150 cursor-zoom-out' : 'cursor-zoom-in'}`}
+                    onClick={() => setZoom((z) => !z)}
+                  />
+                ) : (
+                  <div className="h-80 flex items-center justify-center text-zinc-600 text-sm">Sem foto</div>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-zinc-800 bg-zinc-950/40 p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-xs font-bold uppercase text-zinc-500">Contexto do usuário</p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => copyText(focused.user_id)}
+                      className="text-[10px] font-bold uppercase px-2 py-1 rounded-lg border border-zinc-800 text-zinc-400 hover:text-zinc-200"
+                      title="Copiar user_id"
+                    >
+                      Copiar user_id
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => copyText(focused.tenant_id)}
+                      className="text-[10px] font-bold uppercase px-2 py-1 rounded-lg border border-zinc-800 text-zinc-400 hover:text-zinc-200"
+                      title="Copiar tenant_id"
+                    >
+                      Copiar tenant_id
+                    </button>
+                  </div>
+                </div>
+
+                {userContextLoading ? (
+                  <p className="text-xs text-zinc-500">Carregando contexto…</p>
+                ) : userContextError ? (
+                  <p className="text-xs text-red-400" role="alert">
+                    {userContextError}
+                  </p>
+                ) : userContext ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-xl border border-zinc-800 bg-black/20 p-3">
+                        <p className="text-[10px] uppercase text-zinc-500 font-bold">Rejeição (30d)</p>
+                        <p className="text-sm text-white font-black">
+                          {pct(userContext?.stats?.rejection_rate_30d)}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-zinc-800 bg-black/20 p-3">
+                        <p className="text-[10px] uppercase text-zinc-500 font-bold">Check-ins (30d)</p>
+                        <p className="text-sm text-white font-black">{userContext?.stats?.total_30d ?? 0}</p>
+                      </div>
+                      <div className="rounded-xl border border-zinc-800 bg-black/20 p-3">
+                        <p className="text-[10px] uppercase text-zinc-500 font-bold">Rejeitados (30d)</p>
+                        <p className="text-sm text-white font-black">{userContext?.stats?.rejected_30d ?? 0}</p>
+                      </div>
+                      <div className="rounded-xl border border-zinc-800 bg-black/20 p-3">
+                        <p className="text-[10px] uppercase text-zinc-500 font-bold">Pendentes (30d)</p>
+                        <p className="text-sm text-white font-black">{userContext?.stats?.pending_30d ?? 0}</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-[10px] uppercase text-zinc-500 font-bold">Últimos check-ins</p>
+                      <div className="space-y-2 max-h-56 overflow-auto pr-1">
+                        {(userContext?.recent_checkins ?? []).map((c) => (
+                          <div
+                            key={c.id}
+                            className="flex items-start justify-between gap-2 rounded-xl border border-zinc-800 bg-black/20 p-3"
+                          >
+                            <div className="min-w-0">
+                              <p className="text-xs text-white font-bold truncate">{c.tipo_treino || 'Treino'}</p>
+                              <p className="text-[11px] text-zinc-500 truncate">
+                                {c.checkin_local_date} · +{c.points_awarded} pts
+                              </p>
+                            </div>
+                            <span
+                              className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${
+                                c.photo_review_status === 'rejected'
+                                  ? 'bg-red-500/10 text-red-300'
+                                  : c.photo_review_status === 'approved'
+                                    ? 'bg-green-500/10 text-green-300'
+                                    : 'bg-yellow-500/10 text-yellow-300'
+                              }`}
+                            >
+                              {c.photo_review_status}
+                            </span>
+                          </div>
+                        ))}
+                        {Array.isArray(userContext?.recent_checkins) && userContext.recent_checkins.length === 0 ? (
+                          <p className="text-xs text-zinc-600">Sem histórico recente.</p>
+                        ) : null}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-xs text-zinc-600">Sem dados.</p>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-3 gap-2">
