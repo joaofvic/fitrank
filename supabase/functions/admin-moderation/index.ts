@@ -68,6 +68,19 @@ const checkinAuditQuerySchema = z.object({
   checkin_id: z.string().uuid()
 });
 
+const messageTemplatesQuerySchema = z.object({
+  mode: z.literal('message-templates')
+});
+
+const sendMessageSchema = z.object({
+  action: z.literal('send-message'),
+  user_id: z.string().uuid(),
+  tenant_id: z.string().uuid().optional(),
+  checkin_id: z.string().uuid().optional(),
+  template_code: z.string().min(1).max(64),
+  body_override: z.string().min(1).max(500).optional()
+});
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -118,20 +131,63 @@ Deno.serve(async (req) => {
   try {
     if (req.method === 'PATCH') {
       const raw = await req.json().catch(() => null);
+      const parsedMsg = sendMessageSchema.safeParse(raw);
       const parsedSingle = reviewSchema.safeParse(raw);
       const parsedBatch = batchReviewSchema.safeParse(raw);
 
-      if (!parsedSingle.success && !parsedBatch.success) {
+      if (!parsedMsg.success && !parsedSingle.success && !parsedBatch.success) {
         return jsonResponse(
           {
             error: 'Payload inválido',
             details: {
+              message: parsedMsg.success ? null : parsedMsg.error.flatten(),
               single: parsedSingle.error.flatten(),
               batch: parsedBatch.error.flatten()
             }
           },
           400
         );
+      }
+
+      if (parsedMsg.success) {
+        const { user_id, tenant_id, checkin_id, template_code, body_override } = parsedMsg.data;
+
+        const { data: tpl, error: tplErr } = await admin
+          .from('admin_message_templates')
+          .select('code, title, body')
+          .eq('code', template_code)
+          .eq('is_active', true)
+          .maybeSingle();
+        if (tplErr) throw tplErr;
+        if (!tpl) return jsonResponse({ error: 'Template inválido.' }, 400);
+
+        const body = (body_override ?? '').trim() ? body_override.trim() : tpl.body;
+
+        // Notificação in-app para o usuário
+        await admin.from('notifications').insert({
+          user_id,
+          tenant_id: tenant_id ?? null,
+          type: 'admin_message',
+          title: tpl.title,
+          body,
+          data: {
+            template_code: tpl.code,
+            checkin_id: checkin_id ?? null
+          }
+        });
+
+        // Log/auditoria de mensagem enviada
+        await admin.from('admin_messages').insert({
+          user_id,
+          tenant_id: tenant_id ?? null,
+          checkin_id: checkin_id ?? null,
+          sent_by: user.id,
+          template_code: tpl.code,
+          title: tpl.title,
+          body
+        });
+
+        return jsonResponse({ ok: true }, 200);
       }
 
       const payload = parsedSingle.success ? parsedSingle.data : parsedBatch.data;
@@ -313,6 +369,21 @@ Deno.serve(async (req) => {
     }
 
     const raw = Object.fromEntries(url.searchParams.entries());
+
+    // US-ADM-10: templates de mensagem
+    if (raw.mode === 'message-templates') {
+      const parsedTpl = messageTemplatesQuerySchema.safeParse(raw);
+      if (!parsedTpl.success) {
+        return jsonResponse({ error: 'Query inválida', details: parsedTpl.error.flatten() }, 400);
+      }
+      const { data, error } = await admin
+        .from('admin_message_templates')
+        .select('code, title, body, sort_order')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
+      if (error) throw error;
+      return jsonResponse({ templates: data ?? [] }, 200);
+    }
 
     // US-ADM-07: lista de motivos padronizados (centralizados no DB)
     if (raw.mode === 'rejection-reasons') {

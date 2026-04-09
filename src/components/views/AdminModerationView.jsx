@@ -65,6 +65,12 @@ export function AdminModerationView({ onBack }) {
   const [audit, setAudit] = useState([]);
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditError, setAuditError] = useState(null);
+  const [messageTemplates, setMessageTemplates] = useState([]);
+  const [messageTemplateCode, setMessageTemplateCode] = useState('');
+  const [messageBodyOverride, setMessageBodyOverride] = useState('');
+  const [messageSending, setMessageSending] = useState(false);
+  const [messageError, setMessageError] = useState(null);
+  const [messageSentAt, setMessageSentAt] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -210,6 +216,31 @@ export function AdminModerationView({ onBack }) {
     };
   }, [supabase, profile?.is_platform_master, session?.access_token]);
 
+  useEffect(() => {
+    if (!supabase || !profile?.is_platform_master) return;
+    let cancelled = false;
+    (async () => {
+      const { data: sData } = await supabase.auth.getSession();
+      const token = sData?.session?.access_token ?? session?.access_token ?? null;
+      const { data, error: fnError } = await invokeEdge('admin-moderation?mode=message-templates', token, {
+        method: 'GET'
+      });
+      if (cancelled) return;
+      if (fnError || data?.error) {
+        setMessageTemplates([]);
+        return;
+      }
+      const rows = Array.isArray(data?.templates) ? data.templates : [];
+      setMessageTemplates(rows);
+      if (rows.length > 0 && !messageTemplateCode) {
+        setMessageTemplateCode(rows[0].code);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, profile?.is_platform_master, session?.access_token, messageTemplateCode]);
+
   const focused = focusIdx >= 0 && focusIdx < items.length ? items[focusIdx] : null;
 
   useEffect(() => {
@@ -330,6 +361,42 @@ export function AdminModerationView({ onBack }) {
       // ignore
     }
   }, []);
+
+  const sendMessage = useCallback(async () => {
+    if (!supabase) return;
+    if (!focused?.user_id) return;
+    const code = (messageTemplateCode ?? '').trim();
+    if (!code) {
+      setMessageError('Selecione um template.');
+      return;
+    }
+    setMessageSending(true);
+    setMessageError(null);
+    setMessageSentAt(null);
+    try {
+      const { data: sData } = await supabase.auth.getSession();
+      const token = sData?.session?.access_token ?? session?.access_token ?? null;
+      const { error: fnError } = await invokeEdge('admin-moderation', token, {
+        method: 'PATCH',
+        body: {
+          action: 'send-message',
+          user_id: focused.user_id,
+          tenant_id: focused.tenant_id,
+          checkin_id: focused.id,
+          template_code: code,
+          body_override: (messageBodyOverride ?? '').trim() ? messageBodyOverride.trim() : undefined
+        }
+      });
+      if (fnError) {
+        setMessageError(fnError.message);
+        return;
+      }
+      setMessageSentAt(Date.now());
+      setMessageBodyOverride('');
+    } finally {
+      setMessageSending(false);
+    }
+  }, [supabase, focused?.id, focused?.user_id, focused?.tenant_id, messageTemplateCode, messageBodyOverride, session?.access_token]);
 
   if (!profile?.is_platform_master) {
     return null;
@@ -1221,6 +1288,54 @@ export function AdminModerationView({ onBack }) {
                 ) : (
                   <p className="text-xs text-zinc-600">Sem dados.</p>
                 )}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-950/40 p-4 space-y-3">
+              <p className="text-[10px] uppercase font-bold text-zinc-500">Mensagem ao usuário</p>
+              <div className="grid grid-cols-1 gap-2">
+                <label className="space-y-1 block">
+                  <span className="text-[10px] uppercase font-bold text-zinc-500">Template</span>
+                  <select
+                    value={messageTemplateCode}
+                    onChange={(e) => setMessageTemplateCode(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white"
+                  >
+                    {messageTemplates.length === 0 ? <option value="">(sem templates)</option> : null}
+                    {messageTemplates.map((t) => (
+                      <option key={t.code} value={t.code}>
+                        {t.code}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="space-y-1 block">
+                  <span className="text-[10px] uppercase font-bold text-zinc-500">Editar mensagem (opcional)</span>
+                  <textarea
+                    value={messageBodyOverride}
+                    onChange={(e) => setMessageBodyOverride(e.target.value)}
+                    rows={3}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-600"
+                    placeholder="Se vazio, usa o texto padrão do template."
+                  />
+                </label>
+
+                {messageError ? (
+                  <p className="text-xs text-red-400" role="alert">
+                    {messageError}
+                  </p>
+                ) : null}
+                {messageSentAt ? <p className="text-xs text-green-400">Mensagem enviada.</p> : null}
+
+                <Button
+                  type="button"
+                  disabled={messageSending || messageTemplates.length === 0}
+                  onClick={sendMessage}
+                  className="text-xs py-2 px-3 bg-zinc-800 text-zinc-200 hover:bg-zinc-700"
+                >
+                  {messageSending ? 'Enviando…' : 'Enviar mensagem'}
+                </Button>
               </div>
             </div>
 
