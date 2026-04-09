@@ -18,6 +18,15 @@ export function AdminModerationView({ onBack }) {
   const [quickOpen, setQuickOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [zoom, setZoom] = useState(false);
+  const [rejectConfirmOpen, setRejectConfirmOpen] = useState(false);
+  const [shortcutsEnabled, setShortcutsEnabled] = useState(() => {
+    try {
+      const v = localStorage.getItem('fitrank.admin.shortcuts');
+      return v === null ? true : v !== '0';
+    } catch {
+      return true;
+    }
+  });
 
   const [status, setStatus] = useState('pending');
   const [tenantId, setTenantId] = useState('');
@@ -118,6 +127,7 @@ export function AdminModerationView({ onBack }) {
     setFocusIdx(idx);
     setQuickOpen(true);
     setZoom(false);
+    setRejectConfirmOpen(false);
   };
 
   const nextItem = () => {
@@ -125,10 +135,12 @@ export function AdminModerationView({ onBack }) {
     if (next < items.length) {
       setFocusIdx(next);
       setZoom(false);
+      setRejectConfirmOpen(false);
       return;
     }
     // fim da lista atual
     setQuickOpen(false);
+    setRejectConfirmOpen(false);
   };
 
   const prevItem = () => {
@@ -136,6 +148,7 @@ export function AdminModerationView({ onBack }) {
     if (prev >= 0) {
       setFocusIdx(prev);
       setZoom(false);
+      setRejectConfirmOpen(false);
     }
   };
 
@@ -163,6 +176,81 @@ export function AdminModerationView({ onBack }) {
       setBusy(false);
     }
   };
+
+  const toggleShortcuts = () => {
+    setShortcutsEnabled((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('fitrank.admin.shortcuts', next ? '1' : '0');
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (!quickOpen || !focused) return;
+    if (!shortcutsEnabled) return;
+
+    const onKeyDown = (e) => {
+      if (busy) return;
+      if (e.defaultPrevented) return;
+
+      const target = e.target;
+      const isTyping =
+        target instanceof HTMLElement &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+      if (isTyping) return;
+
+      const k = e.key;
+
+      if (k === 'Escape') {
+        e.preventDefault();
+        if (rejectConfirmOpen) {
+          setRejectConfirmOpen(false);
+          return;
+        }
+        setQuickOpen(false);
+        return;
+      }
+
+      if (k === 'ArrowRight') {
+        e.preventDefault();
+        nextItem();
+        return;
+      }
+      if (k === 'ArrowLeft') {
+        e.preventDefault();
+        prevItem();
+        return;
+      }
+
+      const key = k.length === 1 ? k.toLowerCase() : k;
+      if (key === 'z') {
+        e.preventDefault();
+        setZoom((v) => !v);
+        return;
+      }
+      if (key === 's' || key === 'p') {
+        e.preventDefault();
+        nextItem();
+        return;
+      }
+      if (key === 'a') {
+        e.preventDefault();
+        review('approve');
+        return;
+      }
+      if (key === 'r') {
+        e.preventDefault();
+        setRejectConfirmOpen(true);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [quickOpen, focused?.id, shortcutsEnabled, busy, rejectConfirmOpen]);
 
   return (
     <div className="space-y-6 pb-24">
@@ -202,14 +290,25 @@ export function AdminModerationView({ onBack }) {
           <p className="text-xs text-zinc-500">
             Modo rápido: <span className="text-zinc-300 font-bold">{quickOpen ? 'aberto' : 'fechado'}</span>
           </p>
-          <Button
-            type="button"
-            disabled={items.length === 0}
-            onClick={() => openQuick(Math.max(0, focusIdx))}
-            className="text-xs py-2 px-3 bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
-          >
-            Abrir modo rápido
-          </Button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleShortcuts}
+              className="text-[10px] font-bold uppercase px-2 py-2 rounded-lg border border-zinc-800 text-zinc-400 hover:text-zinc-200"
+              aria-pressed={shortcutsEnabled}
+              title="Atalhos de teclado"
+            >
+              Atalhos: {shortcutsEnabled ? 'ON' : 'OFF'}
+            </button>
+            <Button
+              type="button"
+              disabled={items.length === 0}
+              onClick={() => openQuick(Math.max(0, focusIdx))}
+              className="text-xs py-2 px-3 bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+            >
+              Abrir modo rápido
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
@@ -344,6 +443,15 @@ export function AdminModerationView({ onBack }) {
               </button>
             </div>
 
+            <div className="flex flex-wrap gap-2 text-[10px] text-zinc-500 uppercase">
+              <span className="border border-zinc-800 rounded-full px-2 py-1">A aprovar</span>
+              <span className="border border-zinc-800 rounded-full px-2 py-1">R rejeitar</span>
+              <span className="border border-zinc-800 rounded-full px-2 py-1">S/P pular</span>
+              <span className="border border-zinc-800 rounded-full px-2 py-1">←/→ navegar</span>
+              <span className="border border-zinc-800 rounded-full px-2 py-1">Z zoom</span>
+              <span className="border border-zinc-800 rounded-full px-2 py-1">Esc fechar</span>
+            </div>
+
             <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-black">
               {focused.foto_url ? (
                 <img
@@ -385,11 +493,36 @@ export function AdminModerationView({ onBack }) {
               type="button"
               variant="outline"
               disabled={busy}
-              onClick={() => review('reject')}
+              onClick={() => setRejectConfirmOpen(true)}
               className="w-full text-xs py-3 border-red-500/40 text-red-300 hover:bg-red-500/10"
             >
               Rejeitar
             </Button>
+
+            {rejectConfirmOpen ? (
+              <div className="border border-zinc-800 rounded-2xl p-4 bg-zinc-950/40 space-y-3">
+                <p className="text-sm text-white font-bold">Confirmar rejeição?</p>
+                <p className="text-xs text-zinc-500">
+                  (Motivos padronizados entram no US-ADM-07. Por enquanto, isso apenas marca como rejeitado.)
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button type="button" variant="secondary" disabled={busy} onClick={() => setRejectConfirmOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      setRejectConfirmOpen(false);
+                      review('reject');
+                    }}
+                    className="bg-red-500/90 hover:bg-red-500 text-black font-bold"
+                  >
+                    Rejeitar
+                  </Button>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}
