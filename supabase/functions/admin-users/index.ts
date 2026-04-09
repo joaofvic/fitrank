@@ -45,6 +45,16 @@ const unbanUserSchema = z.object({
   reason: z.string().min(1).max(500).optional()
 });
 
+const adjustPointsSchema = z.object({
+  action: z.literal('adjust-points'),
+  user_id: z.string().uuid(),
+  delta: z.coerce.number().int().min(-100_000).max(100_000).refine((v) => v !== 0, 'delta não pode ser 0'),
+  reason: z.string().min(1).max(500),
+  reference: z.string().max(500).optional(),
+  effective_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  category: z.string().min(1).max(50).optional()
+});
+
 function looksUuid(v: string) {
   // uuid v4-ish: aceitamos qualquer uuid canônico
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
@@ -159,8 +169,9 @@ Deno.serve(async (req) => {
       const parsedReview = setUnderReviewSchema.safeParse(raw);
       const parsedBan = banUserSchema.safeParse(raw);
       const parsedUnban = unbanUserSchema.safeParse(raw);
+      const parsedAdjust = adjustPointsSchema.safeParse(raw);
 
-      if (!parsedReset.success && !parsedReview.success && !parsedBan.success && !parsedUnban.success) {
+      if (!parsedReset.success && !parsedReview.success && !parsedBan.success && !parsedUnban.success && !parsedAdjust.success) {
         return jsonResponse(
           {
             error: 'Payload inválido',
@@ -168,7 +179,8 @@ Deno.serve(async (req) => {
               reset: parsedReset.error.flatten(),
               under_review: parsedReview.error.flatten(),
               ban: parsedBan.error.flatten(),
-              unban: parsedUnban.error.flatten()
+              unban: parsedUnban.error.flatten(),
+              adjust_points: parsedAdjust.error.flatten()
             }
           },
           400
@@ -267,6 +279,40 @@ Deno.serve(async (req) => {
         return jsonResponse({ ok: true }, 200);
       }
 
+      if (parsedAdjust.success) {
+        const { user_id, delta, reason, reference, effective_date, category } = parsedAdjust.data;
+
+        const { data: prof } = await admin.from('profiles').select('tenant_id').eq('id', user_id).maybeSingle();
+
+        const { data: row, error: rpcErr } = await admin.rpc('admin_adjust_points', {
+          p_user_id: user_id,
+          p_delta: delta,
+          p_reason: reason,
+          p_reference: reference ?? null,
+          p_actor: user.id,
+          p_effective_date: effective_date ?? null,
+          p_category: category ?? null
+        });
+        if (rpcErr) throw rpcErr;
+
+        await admin.from('admin_user_audit').insert({
+          user_id,
+          tenant_id: prof?.tenant_id ?? null,
+          action: 'adjust_points',
+          reason,
+          metadata: {
+            delta,
+            category: category ?? null,
+            effective_date: effective_date ?? null,
+            reference: reference ?? null,
+            ledger_id: row?.id ?? null
+          },
+          acted_by: user.id
+        });
+
+        return jsonResponse({ ok: true, ledger: row ?? null }, 200);
+      }
+
       // unban
       const { user_id, reason } = parsedUnban.data;
       const { data: prof, error: pErr } = await admin
@@ -343,6 +389,14 @@ Deno.serve(async (req) => {
         .order('acted_at', { ascending: false })
         .limit(50);
       if (auErr) throw auErr;
+
+      const { data: ledger, error: ledErr } = await admin
+        .from('points_ledger')
+        .select('id, delta, category, reason, reference, effective_date, created_by, created_at, points_before, points_after')
+        .eq('user_id', user_id)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (ledErr) throw ledErr;
 
       const actorIds = Array.from(new Set((audit ?? []).map((a) => a.acted_by).filter(Boolean)));
       const actorMap = new Map<string, string>();
@@ -431,6 +485,7 @@ Deno.serve(async (req) => {
             },
             recent_checkins: recentWithLabels,
             top_rejection_reasons: [],
+          points_ledger: ledger ?? [],
             audit: (audit ?? []).map((a) => ({
               ...a,
               actor_email: a.acted_by ? actorMap.get(a.acted_by) ?? null : null
@@ -453,6 +508,7 @@ Deno.serve(async (req) => {
           },
           recent_checkins: recentWithLabels,
           top_rejection_reasons: topWithLabels,
+          points_ledger: ledger ?? [],
           audit: (audit ?? []).map((a) => ({
             ...a,
             actor_email: a.acted_by ? actorMap.get(a.acted_by) ?? null : null
