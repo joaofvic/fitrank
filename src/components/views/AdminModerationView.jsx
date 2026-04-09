@@ -319,6 +319,65 @@ export function AdminModerationView({ onBack }) {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [quickOpen, focused?.id, shortcutsEnabled, busy, rejectConfirmOpen]);
 
+  useEffect(() => {
+    if (quickOpen) return;
+    if (viewMode !== 'grid') return;
+    if (!shortcutsEnabled) return;
+
+    const onKeyDown = (e) => {
+      if (busy) return;
+      if (e.defaultPrevented) return;
+
+      const target = e.target;
+      const isTyping =
+        target instanceof HTMLElement &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+      if (isTyping) return;
+
+      // Ctrl/Cmd+A: selecionar tudo
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        selectAll();
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        if (batchRejectConfirmOpen) {
+          setBatchRejectConfirmOpen(false);
+          return;
+        }
+        clearSelection();
+        return;
+      }
+
+      const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+
+      if (key === 'g') {
+        e.preventDefault();
+        setViewMode('list');
+        clearSelection();
+        return;
+      }
+
+      if (key === 'a') {
+        if (selectedCount === 0) return;
+        e.preventDefault();
+        batchReview('approve');
+        return;
+      }
+
+      if (key === 'r') {
+        if (selectedCount === 0) return;
+        e.preventDefault();
+        setBatchRejectConfirmOpen(true);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [quickOpen, viewMode, shortcutsEnabled, busy, selectedCount, batchRejectConfirmOpen]);
+
   return (
     <div className="space-y-6 pb-24">
       <div className="flex items-center justify-between gap-2">
@@ -474,6 +533,14 @@ export function AdminModerationView({ onBack }) {
                 Limpar
               </Button>
             </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2 text-[10px] text-zinc-500 uppercase">
+            <span className="border border-zinc-800 rounded-full px-2 py-1">Ctrl/Cmd+A selecionar tudo</span>
+            <span className="border border-zinc-800 rounded-full px-2 py-1">A aprovar lote</span>
+            <span className="border border-zinc-800 rounded-full px-2 py-1">R rejeitar lote</span>
+            <span className="border border-zinc-800 rounded-full px-2 py-1">Esc limpar</span>
+            <span className="border border-zinc-800 rounded-full px-2 py-1">G voltar lista</span>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
