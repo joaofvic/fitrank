@@ -14,6 +14,7 @@ import { CheckinModal } from './components/views/CheckinModal.jsx';
 import { AdminTenantsView } from './components/views/AdminTenantsView.jsx';
 import { AdminModerationView } from './components/views/AdminModerationView.jsx';
 import { AdminUsersView } from './components/views/AdminUsersView.jsx';
+import { AdminEngagementView } from './components/views/AdminEngagementView.jsx';
 
 export default function App() {
   const {
@@ -198,6 +199,7 @@ export default function App() {
             onOpenAdmin={profile?.is_platform_master ? () => setView('admin-tenants') : undefined}
             onOpenUsers={profile?.is_platform_master ? () => setView('admin-users') : undefined}
             onOpenModeration={profile?.is_platform_master ? () => setView('admin-moderation') : undefined}
+            onOpenEngagement={profile?.is_platform_master ? () => setView('admin-engagement') : undefined}
             onSignOut={configured ? signOut : undefined}
           />
         )}
@@ -209,6 +211,9 @@ export default function App() {
         )}
         {view === 'admin-users' && profile?.is_platform_master && (
           <AdminUsersView onBack={() => setView('profile')} />
+        )}
+        {view === 'admin-engagement' && profile?.is_platform_master && (
+          <AdminEngagementView onBack={() => setView('profile')} />
         )}
 
         {view === 'checkin-modal' && (
