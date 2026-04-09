@@ -32,11 +32,17 @@ set search_path = public
 as $$
 declare
   v_tenant uuid;
+  v_banned boolean;
 begin
   if auth.uid() is null or auth.uid() <> new.user_id then
     raise exception 'Check-in só pode ser criado pelo próprio usuário';
   end if;
-  select p.tenant_id into v_tenant from public.profiles p where p.id = auth.uid();
+  select p.tenant_id, coalesce(p.is_banned, false) into v_tenant, v_banned
+  from public.profiles p
+  where p.id = auth.uid();
+  if v_banned then
+    raise exception 'Conta suspensa. Você não pode registrar treinos no momento.';
+  end if;
   if v_tenant is null or v_tenant <> new.tenant_id then
     raise exception 'Check-in em tenant inválido';
   end if;

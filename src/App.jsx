@@ -13,6 +13,7 @@ import { ChallengesView } from './components/views/ChallengesView.jsx';
 import { CheckinModal } from './components/views/CheckinModal.jsx';
 import { AdminTenantsView } from './components/views/AdminTenantsView.jsx';
 import { AdminModerationView } from './components/views/AdminModerationView.jsx';
+import { AdminUsersView } from './components/views/AdminUsersView.jsx';
 
 export default function App() {
   const {
@@ -195,6 +196,7 @@ export default function App() {
             cloudDisplayName={profile?.display_name}
             isPlatformMaster={profile?.is_platform_master}
             onOpenAdmin={profile?.is_platform_master ? () => setView('admin-tenants') : undefined}
+            onOpenUsers={profile?.is_platform_master ? () => setView('admin-users') : undefined}
             onOpenModeration={profile?.is_platform_master ? () => setView('admin-moderation') : undefined}
             onSignOut={configured ? signOut : undefined}
           />
@@ -204,6 +206,9 @@ export default function App() {
         )}
         {view === 'admin-moderation' && profile?.is_platform_master && (
           <AdminModerationView onBack={() => setView('profile')} />
+        )}
+        {view === 'admin-users' && profile?.is_platform_master && (
+          <AdminUsersView onBack={() => setView('profile')} />
         )}
 
         {view === 'checkin-modal' && (

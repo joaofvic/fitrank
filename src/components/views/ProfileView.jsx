@@ -12,6 +12,7 @@ export function ProfileView({
   isPlatformMaster = false,
   onOpenAdmin,
   onOpenModeration,
+  onOpenUsers,
   onSignOut
 }) {
   const displayNome = cloudDisplayName || userData?.nome;
@@ -95,6 +96,11 @@ export function ProfileView({
           {isPlatformMaster && onOpenAdmin && (
             <Button variant="secondary" className="w-full py-2 text-sm" onClick={onOpenAdmin}>
               Admin · Tenants
+            </Button>
+          )}
+          {isPlatformMaster && onOpenUsers && (
+            <Button variant="secondary" className="w-full py-2 text-sm" onClick={onOpenUsers}>
+              Admin · Usuários
             </Button>
           )}
           {isPlatformMaster && onOpenModeration && (
