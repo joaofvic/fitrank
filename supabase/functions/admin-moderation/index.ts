@@ -3,7 +3,8 @@ import { z } from 'npm:zod@3.24.2';
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, PATCH, OPTIONS'
 };
 
 const querySchema = z.object({
@@ -20,6 +21,13 @@ const querySchema = z.object({
   tipo: z.string().min(1).max(200).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(30),
   offset: z.coerce.number().int().min(0).max(10_000).default(0)
+});
+
+const reviewSchema = z.object({
+  checkin_id: z.string().uuid(),
+  action: z.enum(['approve', 'reject']),
+  rejection_reason_code: z.string().min(1).max(64).optional(),
+  rejection_note: z.string().min(1).max(500).optional()
 });
 
 Deno.serve(async (req) => {
@@ -63,24 +71,83 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'Acesso negado' }, 403);
   }
 
-  if (req.method !== 'GET') {
-    return jsonResponse({ error: 'Método não permitido' }, 405);
-  }
-
   const url = new URL(req.url);
-  const raw = Object.fromEntries(url.searchParams.entries());
-  const parsed = querySchema.safeParse(raw);
-  if (!parsed.success) {
-    return jsonResponse({ error: 'Query inválida', details: parsed.error.flatten() }, 400);
-  }
-
-  const { status, tenant_id, from, to, tipo, limit, offset } = parsed.data;
 
   const admin = createClient(supabaseUrl, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false }
   });
 
   try {
+    if (req.method === 'PATCH') {
+      const raw = await req.json().catch(() => null);
+      const parsed = reviewSchema.safeParse(raw);
+      if (!parsed.success) {
+        return jsonResponse({ error: 'Payload inválido', details: parsed.error.flatten() }, 400);
+      }
+
+      const { checkin_id, action, rejection_reason_code, rejection_note } = parsed.data;
+      const nextStatus = action === 'approve' ? 'approved' : 'rejected';
+      const patch: Record<string, unknown> = {
+        photo_review_status: nextStatus,
+        photo_reviewed_at: new Date().toISOString(),
+        photo_reviewed_by: user.id
+      };
+
+      if (nextStatus === 'rejected') {
+        patch.photo_rejection_reason_code = rejection_reason_code ?? null;
+        patch.photo_rejection_note = rejection_note ?? null;
+      } else {
+        patch.photo_rejection_reason_code = null;
+        patch.photo_rejection_note = null;
+      }
+
+      const { data, error } = await admin
+        .from('checkins')
+        .update(patch)
+        .eq('id', checkin_id)
+        // trava otimista: só revisa se ainda está pending
+        .eq('photo_review_status', 'pending')
+        .select(
+          `
+            id,
+            tenant_id,
+            user_id,
+            checkin_local_date,
+            tipo_treino,
+            points_awarded,
+            foto_url,
+            created_at,
+            photo_review_status,
+            photo_reviewed_at,
+            photo_reviewed_by,
+            photo_rejection_reason_code,
+            photo_rejection_note,
+            profiles:profiles!checkins_user_profile_fkey ( id, display_name, nome, academia ),
+            tenants:tenants!checkins_tenant_id_fkey ( id, slug, name )
+          `
+        )
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data) {
+        return jsonResponse({ error: 'Item já foi revisado por outro admin.' }, 409);
+      }
+
+      return jsonResponse({ item: data }, 200);
+    }
+
+    if (req.method !== 'GET') {
+      return jsonResponse({ error: 'Método não permitido' }, 405);
+    }
+
+    const raw = Object.fromEntries(url.searchParams.entries());
+    const parsed = querySchema.safeParse(raw);
+    if (!parsed.success) {
+      return jsonResponse({ error: 'Query inválida', details: parsed.error.flatten() }, 400);
+    }
+
+    const { status, tenant_id, from, to, tipo, limit, offset } = parsed.data;
+
     let q = admin
       .from('checkins')
       .select(

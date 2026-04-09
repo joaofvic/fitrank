@@ -3,7 +3,8 @@ import { z } from 'npm:zod@3.24.2';
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, PATCH, OPTIONS'
 };
 
 const patchSchema = z.object({

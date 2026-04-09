@@ -14,6 +14,10 @@ export function AdminModerationView({ onBack }) {
 
   const [items, setItems] = useState([]);
   const [tenants, setTenants] = useState([]);
+  const [focusIdx, setFocusIdx] = useState(-1);
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [zoom, setZoom] = useState(false);
 
   const [status, setStatus] = useState('pending');
   const [tenantId, setTenantId] = useState('');
@@ -86,6 +90,10 @@ export function AdminModerationView({ onBack }) {
     }
 
     setItems(Array.isArray(data?.items) ? data.items : []);
+    setFocusIdx((prev) => {
+      const next = Array.isArray(data?.items) && data.items.length > 0 ? Math.min(prev, data.items.length - 1) : -1;
+      return Number.isFinite(next) ? next : -1;
+    });
     setLoading(false);
   }, [supabase, profile?.is_platform_master, status, tenantId, from, to, tipo, session?.access_token]);
 
@@ -100,6 +108,61 @@ export function AdminModerationView({ onBack }) {
   if (!profile?.is_platform_master) {
     return null;
   }
+
+  const focused = focusIdx >= 0 && focusIdx < items.length ? items[focusIdx] : null;
+  const focusedName =
+    focused?.profiles?.display_name?.trim() || focused?.profiles?.nome?.trim() || 'Atleta';
+  const focusedTenant = focused?.tenants?.slug || focused?.tenant_id || '—';
+
+  const openQuick = (idx) => {
+    setFocusIdx(idx);
+    setQuickOpen(true);
+    setZoom(false);
+  };
+
+  const nextItem = () => {
+    const next = focusIdx + 1;
+    if (next < items.length) {
+      setFocusIdx(next);
+      setZoom(false);
+      return;
+    }
+    // fim da lista atual
+    setQuickOpen(false);
+  };
+
+  const prevItem = () => {
+    const prev = focusIdx - 1;
+    if (prev >= 0) {
+      setFocusIdx(prev);
+      setZoom(false);
+    }
+  };
+
+  const review = async (action) => {
+    if (!focused?.id) return;
+    if (!supabase) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { data: sData } = await supabase.auth.getSession();
+      const token = sData?.session?.access_token ?? session?.access_token ?? null;
+      const { error: fnError } = await invokeEdge('admin-moderation', token, {
+        method: 'PATCH',
+        body: { checkin_id: focused.id, action }
+      });
+      if (fnError) {
+        setError(fnError.message);
+        return;
+      }
+      // remove item da lista local para agilizar
+      setItems((prev) => prev.filter((x) => x.id !== focused.id));
+      setFocusIdx((prev) => Math.max(0, Math.min(prev, items.length - 2)));
+      nextItem();
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div className="space-y-6 pb-24">
@@ -133,6 +196,20 @@ export function AdminModerationView({ onBack }) {
               {s.label}
             </Button>
           ))}
+        </div>
+
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs text-zinc-500">
+            Modo rápido: <span className="text-zinc-300 font-bold">{quickOpen ? 'aberto' : 'fechado'}</span>
+          </p>
+          <Button
+            type="button"
+            disabled={items.length === 0}
+            onClick={() => openQuick(Math.max(0, focusIdx))}
+            className="text-xs py-2 px-3 bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+          >
+            Abrir modo rápido
+          </Button>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
@@ -205,7 +282,19 @@ export function AdminModerationView({ onBack }) {
               'Atleta';
             const tenantLabel = it?.tenants?.slug || it.tenant_id;
             return (
-              <li key={it.id} className="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-4 space-y-3">
+              <li
+                key={it.id}
+                className="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-4 space-y-3 cursor-pointer hover:border-zinc-700"
+                onClick={() => openQuick(items.findIndex((x) => x.id === it.id))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    openQuick(items.findIndex((x) => x.id === it.id));
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-bold text-white truncate">{nome}</p>
@@ -234,6 +323,76 @@ export function AdminModerationView({ onBack }) {
           })}
         </ul>
       )}
+
+      {quickOpen && focused ? (
+        <div className="fixed inset-0 z-50 bg-black/90 flex flex-col justify-end p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 w-full max-w-lg mx-auto space-y-4">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs text-zinc-500 font-mono truncate">{focusedTenant}</p>
+                <p className="text-lg font-black text-white truncate">{focusedName}</p>
+                <p className="text-xs text-zinc-500 mt-1">
+                  {focused.tipo_treino} · {focused.checkin_local_date} · +{focused.points_awarded} pts
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQuickOpen(false)}
+                className="text-sm text-zinc-500 hover:text-green-400"
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-black">
+              {focused.foto_url ? (
+                <img
+                  src={focused.foto_url}
+                  alt=""
+                  className={`w-full h-80 object-contain transition-transform ${zoom ? 'scale-150 cursor-zoom-out' : 'cursor-zoom-in'}`}
+                  onClick={() => setZoom((z) => !z)}
+                />
+              ) : (
+                <div className="h-80 flex items-center justify-center text-zinc-600 text-sm">Sem foto</div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={busy}
+                onClick={prevItem}
+                className="text-xs py-3"
+              >
+                Anterior
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={busy}
+                onClick={nextItem}
+                className="text-xs py-3"
+              >
+                Pular
+              </Button>
+              <Button type="button" disabled={busy} onClick={() => review('approve')} className="text-xs py-3">
+                Aprovar
+              </Button>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={() => review('reject')}
+              className="w-full text-xs py-3 border-red-500/40 text-red-300 hover:bg-red-500/10"
+            >
+              Rejeitar
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
