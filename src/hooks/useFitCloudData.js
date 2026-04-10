@@ -287,6 +287,35 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
     [supabase, userId, tenantId, refreshAll]
   );
 
+  const retryCheckin = useCallback(
+    async (checkinId, fotoFile) => {
+      if (!supabase || !userId || !tenantId) {
+        throw new Error('Sessão inválida');
+      }
+      if (!fotoFile || !(fotoFile.size > 0)) {
+        throw new Error('Foto obrigatória para reenviar.');
+      }
+
+      const safeName = fotoFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `${tenantId}/${userId}/${Date.now()}-${safeName}`;
+      const { error: upErr } = await supabase.storage.from('checkin-photos').upload(path, fotoFile, {
+        upsert: false,
+        contentType: fotoFile.type || 'image/jpeg'
+      });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from('checkin-photos').getPublicUrl(path);
+
+      const { error: rpcErr } = await supabase.rpc('retry_rejected_checkin', {
+        p_checkin_id: checkinId,
+        p_new_foto_url: pub.publicUrl
+      });
+      if (rpcErr) throw rpcErr;
+
+      await refreshAll();
+    },
+    [supabase, userId, tenantId, refreshAll]
+  );
+
   return {
     leaderboard,
     checkins,
@@ -300,6 +329,7 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
     refreshCheckins,
     refreshNotifications,
     insertCheckin,
+    retryCheckin,
     rankingPeriod,
     setRankingPeriod,
     rankingPeriodLabel

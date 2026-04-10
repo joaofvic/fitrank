@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { User, Camera, Flame, Zap, Calendar, CheckCircle2, Crown } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { User, Camera, Flame, Zap, Calendar, CheckCircle2, Crown, RefreshCw } from 'lucide-react';
 import { Card } from '../ui/Card.jsx';
 import { Button } from '../ui/Button.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
@@ -19,6 +19,7 @@ export function ProfileView({
   onOpenUsers,
   onOpenEngagement,
   onOpenAudit,
+  onRetryCheckin,
   onSignOut
 }) {
   const { supabase } = useAuth();
@@ -41,6 +42,29 @@ export function ProfileView({
     })();
     return () => { cancelled = true; };
   }, [supabase]);
+
+  const [retryingId, setRetryingId] = useState(null);
+  const retryFileRef = useRef(null);
+  const retryTargetRef = useRef(null);
+
+  const handleRetryFile = useCallback(
+    async (e) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file || !retryTargetRef.current || !onRetryCheckin) return;
+      setRetryingId(retryTargetRef.current);
+      try {
+        await onRetryCheckin(retryTargetRef.current, file);
+      } catch (err) {
+        console.error('FitRank: retry failed', err.message);
+        alert(err.message || 'Erro ao reenviar foto.');
+      } finally {
+        setRetryingId(null);
+        retryTargetRef.current = null;
+      }
+    },
+    [onRetryCheckin]
+  );
 
   const displayNome = cloudDisplayName || userData?.nome;
   const created = userData?.created_at
@@ -178,6 +202,15 @@ export function ProfileView({
           Histórico de Treinos
         </h3>
 
+        <input
+          ref={retryFileRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={handleRetryFile}
+        />
+
         {checkins.length === 0 ? (
           <div className="text-center py-10 border-2 border-dashed border-zinc-800 rounded-2xl text-zinc-600">
             Você ainda não registrou nenhum treino.
@@ -217,6 +250,20 @@ export function ProfileView({
                           <p className="text-[11px] text-zinc-400">
                             Observação: <span className="text-zinc-200">{c.photo_rejection_note}</span>
                           </p>
+                        ) : null}
+                        {onRetryCheckin ? (
+                          <button
+                            type="button"
+                            disabled={retryingId === c.id}
+                            onClick={() => {
+                              retryTargetRef.current = c.id;
+                              retryFileRef.current?.click();
+                            }}
+                            className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-orange-400 hover:text-orange-300 transition-colors disabled:opacity-50"
+                          >
+                            <RefreshCw className={`w-3.5 h-3.5 ${retryingId === c.id ? 'animate-spin' : ''}`} />
+                            {retryingId === c.id ? 'Reenviando…' : 'Reenviar foto'}
+                          </button>
                         ) : null}
                       </div>
                     ) : c.photo_review_status === 'pending' ? (

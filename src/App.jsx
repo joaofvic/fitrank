@@ -208,6 +208,7 @@ export default function App() {
             }
             onOpenEngagement={profile?.is_platform_master ? () => setView('admin-engagement') : undefined}
             onOpenAudit={profile?.is_platform_master ? () => setView('admin-audit') : undefined}
+            onRetryCheckin={useCloud ? cloud.retryCheckin : undefined}
             onSignOut={configured ? signOut : undefined}
           />
         )}
