@@ -52,7 +52,8 @@ const adjustPointsSchema = z.object({
   reason: z.string().min(1).max(500),
   reference: z.string().max(500).optional(),
   effective_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  category: z.string().min(1).max(50).optional()
+  category: z.string().min(1).max(50).optional(),
+  period_scope: z.enum(['day', 'week', 'month']).optional()
 });
 
 function looksUuid(v: string) {
@@ -330,7 +331,7 @@ Deno.serve(async (req) => {
       }
 
       if (parsedAdjust.success) {
-        const { user_id, delta, reason, reference, effective_date, category } = parsedAdjust.data;
+        const { user_id, delta, reason, reference, effective_date, category, period_scope } = parsedAdjust.data;
 
         const { data: prof } = await admin.from('profiles').select('tenant_id').eq('id', user_id).maybeSingle();
 
@@ -341,7 +342,8 @@ Deno.serve(async (req) => {
           p_reference: reference ?? null,
           p_actor: user.id,
           p_effective_date: effective_date ?? null,
-          p_category: category ?? null
+          p_category: category ?? null,
+          p_period_scope: period_scope ?? null
         });
         if (rpcErr) throw rpcErr;
 
@@ -355,6 +357,7 @@ Deno.serve(async (req) => {
             category: category ?? null,
             effective_date: effective_date ?? null,
             reference: reference ?? null,
+            period_scope: period_scope ?? null,
             ledger_id: row?.id ?? null
           },
           acted_by: user.id
@@ -371,7 +374,8 @@ Deno.serve(async (req) => {
             reason,
             ledger_id: row?.id ?? null,
             category: category ?? null,
-            effective_date: effective_date ?? null
+            effective_date: effective_date ?? null,
+            period_scope: period_scope ?? null
           }
         });
 

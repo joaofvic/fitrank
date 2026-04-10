@@ -4,16 +4,16 @@ overview: Adicionar seletor de período (dia/semana/mês) ao ajuste de pontos no
 todos:
   - id: migration-period-scope
     content: "Criar migration: coluna period_scope + atualizar RPCs admin_adjust_points e get_tenant_leaderboard_period"
-    status: pending
+    status: completed
   - id: edge-fn-update
     content: Atualizar Edge Function admin-users para aceitar e repassar period_scope
-    status: pending
+    status: completed
   - id: admin-ui-period
     content: Adicionar seletor de período (dia/semana/mês) no formulário de ajuste em AdminUsersView.jsx
-    status: pending
+    status: completed
   - id: leaderboard-hook
     content: Passar p_period na chamada RPC do leaderboard em useFitCloudData.js
-    status: pending
+    status: completed
 isProject: false
 ---
 

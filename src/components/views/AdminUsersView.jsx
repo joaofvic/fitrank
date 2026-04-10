@@ -51,6 +51,7 @@ export function AdminUsersView({ onBack }) {
   const [banReason, setBanReason] = useState('');
   const [pointsDelta, setPointsDelta] = useState('');
   const [pointsReason, setPointsReason] = useState('');
+  const [pointsPeriod, setPointsPeriod] = useState('all');
 
   const loadUsers = useCallback(async () => {
     if (!edgeReady) return;
@@ -96,6 +97,7 @@ export function AdminUsersView({ onBack }) {
       setActionError(null);
       setPointsDelta('');
       setPointsReason('');
+      setPointsPeriod('all');
       try {
         const params = new URLSearchParams();
         params.set('mode', 'detail');
@@ -402,6 +404,37 @@ export function AdminUsersView({ onBack }) {
                       className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-600 font-mono"
                     />
                   </label>
+
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-zinc-500">Período do ranking</span>
+                    <div className="flex gap-1">
+                      {[
+                        { id: 'all', label: 'Todos' },
+                        { id: 'day', label: 'Dia' },
+                        { id: 'week', label: 'Semana' },
+                        { id: 'month', label: 'Mês' }
+                      ].map(({ id, label }) => (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => setPointsPeriod(id)}
+                          className={`flex-1 py-2 px-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-colors ${
+                            pointsPeriod === id
+                              ? 'bg-green-500/20 text-green-400 border border-green-500/40'
+                              : 'text-zinc-500 border border-zinc-800 hover:text-zinc-300'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-zinc-600">
+                      {pointsPeriod === 'all'
+                        ? 'Pontos aparecem em todos os rankings (dia, semana e mês).'
+                        : `Pontos aparecem apenas no ranking ${pointsPeriod === 'day' ? 'diário' : pointsPeriod === 'week' ? 'semanal' : 'mensal'}.`}
+                    </p>
+                  </div>
+
                   <label className="space-y-1">
                     <span className="text-[10px] uppercase font-bold text-zinc-500">Motivo</span>
                     <input
@@ -426,7 +459,8 @@ export function AdminUsersView({ onBack }) {
                         user_id: selectedUserId,
                         delta: Number(pointsDelta),
                         reason: pointsReason.trim(),
-                        category: 'manual'
+                        category: 'manual',
+                        ...(pointsPeriod !== 'all' && { period_scope: pointsPeriod })
                       })
                     }
                     className="text-xs py-2.5 px-3 w-full"

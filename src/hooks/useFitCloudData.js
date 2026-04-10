@@ -35,7 +35,8 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
     try {
       const { data, error: rpcError } = await supabase.rpc('get_tenant_leaderboard_period', {
         p_start: rankingStart,
-        p_end: rankingEnd
+        p_end: rankingEnd,
+        p_period: rankingPeriod
       });
       if (rpcError) {
         console.error('FitRank: ranking', rpcError.message);
@@ -55,7 +56,7 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
     } finally {
       setLeaderboardLoading(false);
     }
-  }, [supabase, userId, rankingStart, rankingEnd]);
+  }, [supabase, userId, rankingStart, rankingEnd, rankingPeriod]);
 
   const refreshCheckins = useCallback(async () => {
     if (!supabase || !userId) return;
