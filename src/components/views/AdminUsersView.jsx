@@ -51,15 +51,6 @@ export function AdminUsersView({ onBack }) {
   const [banReason, setBanReason] = useState('');
   const [pointsDelta, setPointsDelta] = useState('');
   const [pointsReason, setPointsReason] = useState('');
-  const [pointsReference, setPointsReference] = useState('');
-  const [pointsEffectiveDate, setPointsEffectiveDate] = useState(() => {
-    try {
-      return new Date().toISOString().slice(0, 10);
-    } catch {
-      return '';
-    }
-  });
-  const [pointsCategory, setPointsCategory] = useState('manual');
 
   const loadUsers = useCallback(async () => {
     if (!edgeReady) return;
@@ -105,15 +96,6 @@ export function AdminUsersView({ onBack }) {
       setActionError(null);
       setPointsDelta('');
       setPointsReason('');
-      setPointsReference('');
-      setPointsEffectiveDate(() => {
-        try {
-          return new Date().toISOString().slice(0, 10);
-        } catch {
-          return '';
-        }
-      });
-      setPointsCategory('manual');
       try {
         const params = new URLSearchParams();
         params.set('mode', 'detail');
@@ -407,39 +389,16 @@ export function AdminUsersView({ onBack }) {
                 </div>
               </div>
 
-              <div className="space-y-2 rounded-2xl border border-zinc-800 bg-black/20 p-4">
-                <p className="text-[10px] uppercase text-zinc-500 font-bold">Ajustar pontos (ledger)</p>
+              <div className="space-y-3 rounded-2xl border border-zinc-800 bg-black/20 p-4">
+                <p className="text-[10px] uppercase text-zinc-500 font-bold">Ajustar pontos</p>
                 <div className="grid grid-cols-1 gap-2">
                   <label className="space-y-1">
-                    <span className="text-[10px] uppercase font-bold text-zinc-500">Data efetiva</span>
-                    <input
-                      type="date"
-                      value={pointsEffectiveDate}
-                      onChange={(e) => setPointsEffectiveDate(e.target.value)}
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-600 font-mono"
-                    />
-                  </label>
-                  <label className="space-y-1">
-                    <span className="text-[10px] uppercase font-bold text-zinc-500">Categoria</span>
-                    <select
-                      value={pointsCategory}
-                      onChange={(e) => setPointsCategory(e.target.value)}
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white"
-                    >
-                      <option value="manual">Manual</option>
-                      <option value="bonus">Bônus</option>
-                      <option value="correction">Correção</option>
-                      <option value="incident">Incidente</option>
-                      <option value="refund">Estorno</option>
-                    </select>
-                  </label>
-                  <label className="space-y-1">
-                    <span className="text-[10px] uppercase font-bold text-zinc-500">Delta (ex: 50 ou -50)</span>
+                    <span className="text-[10px] uppercase font-bold text-zinc-500">Pontos a adicionar ou remover</span>
                     <input
                       value={pointsDelta}
                       onChange={(e) => setPointsDelta(e.target.value)}
                       inputMode="numeric"
-                      placeholder="0"
+                      placeholder="Ex: 100 ou -200"
                       className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-600 font-mono"
                     />
                   </label>
@@ -448,78 +407,37 @@ export function AdminUsersView({ onBack }) {
                     <input
                       value={pointsReason}
                       onChange={(e) => setPointsReason(e.target.value)}
-                      placeholder="Ex: ajuste manual por incidente X"
+                      placeholder="Ex: ajuste manual, bônus, correção..."
                       className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-600"
                     />
                   </label>
-                  <label className="space-y-1">
-                    <span className="text-[10px] uppercase font-bold text-zinc-500">Referência (opcional)</span>
-                    <input
-                      value={pointsReference}
-                      onChange={(e) => setPointsReference(e.target.value)}
-                      placeholder="Ex: checkin_id, link, ticket, etc."
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-600"
-                    />
-                  </label>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      type="button"
-                      disabled={
-                        actionLoading ||
-                        !selectedUserId ||
-                        !pointsReason.trim() ||
-                        !Number.isFinite(Number(pointsDelta)) ||
-                        Number(pointsDelta) === 0 ||
-                        !/^\d{4}-\d{2}-\d{2}$/.test(pointsEffectiveDate)
-                      }
-                      onClick={() =>
-                        runAdminAction({
-                          action: 'adjust-points',
-                          user_id: selectedUserId,
-                          delta: Number(pointsDelta),
-                          reason: pointsReason.trim(),
-                          reference: pointsReference.trim() || undefined,
-                          effective_date: pointsEffectiveDate,
-                          category: pointsCategory
-                        })
-                      }
-                      className="text-xs py-2 px-3"
-                    >
-                      Aplicar ajuste
-                    </Button>
-                    <p className="text-[11px] text-zinc-500">
-                      Isso grava no ledger e recalcula o total em <span className="font-mono">profiles.pontos</span>.
-                    </p>
-                  </div>
+                  <Button
+                    type="button"
+                    disabled={
+                      actionLoading ||
+                      !selectedUserId ||
+                      !pointsReason.trim() ||
+                      !Number.isFinite(Number(pointsDelta)) ||
+                      Number(pointsDelta) === 0
+                    }
+                    onClick={() =>
+                      runAdminAction({
+                        action: 'adjust-points',
+                        user_id: selectedUserId,
+                        delta: Number(pointsDelta),
+                        reason: pointsReason.trim(),
+                        category: 'manual'
+                      })
+                    }
+                    className="text-xs py-2.5 px-3 w-full"
+                  >
+                    {Number(pointsDelta) > 0
+                      ? `Adicionar +${pointsDelta} pontos`
+                      : Number(pointsDelta) < 0
+                        ? `Remover ${pointsDelta} pontos`
+                        : 'Aplicar ajuste'}
+                  </Button>
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-[10px] uppercase text-zinc-500 font-bold">Extrato (ledger)</p>
-                {Array.isArray(detail?.points_ledger) && detail.points_ledger.length > 0 ? (
-                  <div className="space-y-2 max-h-56 overflow-auto pr-1">
-                    {detail.points_ledger.map((l) => (
-                      <div key={l.id} className="rounded-xl border border-zinc-800 bg-black/20 p-3 space-y-1">
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="text-xs text-white font-bold">
-                            {l.delta > 0 ? `+${l.delta}` : `${l.delta}`} · {l.category || 'manual'}
-                          </p>
-                          <span className="text-[10px] text-zinc-500">{fmtDateTime(l.created_at)}</span>
-                        </div>
-                        {l.effective_date ? <p className="text-[11px] text-zinc-400">Data efetiva: {l.effective_date}</p> : null}
-                        {l.reason ? <p className="text-[11px] text-zinc-400">Motivo: {l.reason}</p> : null}
-                        {l.reference ? <p className="text-[11px] text-zinc-500 truncate">Ref: {l.reference}</p> : null}
-                        {typeof l.points_before === 'number' && typeof l.points_after === 'number' ? (
-                          <p className="text-[11px] text-zinc-500">
-                            {l.points_before} → <span className="text-zinc-300 font-bold">{l.points_after}</span>
-                          </p>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-zinc-600">Sem lançamentos no ledger.</p>
-                )}
               </div>
 
               <div className="grid grid-cols-2 gap-2">
