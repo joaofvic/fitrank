@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { User, Camera, Flame, Zap, Calendar, CheckCircle2, Crown, RefreshCw } from 'lucide-react';
+import {
+  User, Camera, Flame, Zap, Calendar, CheckCircle2, Crown, RefreshCw,
+  Settings, X, Building2, Trophy, Users, Shield, SlidersHorizontal, BarChart3, ScrollText, LogOut
+} from 'lucide-react';
 import { Card } from '../ui/Card.jsx';
 import { Button } from '../ui/Button.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
@@ -43,6 +46,7 @@ export function ProfileView({
     return () => { cancelled = true; };
   }, [supabase]);
 
+  const [adminOpen, setAdminOpen] = useState(false);
   const [retryingId, setRetryingId] = useState(null);
   const retryFileRef = useRef(null);
   const retryTargetRef = useRef(null);
@@ -136,51 +140,6 @@ export function ProfileView({
         </div>
       </div>
 
-      {(isPlatformMaster || onSignOut) && (
-        <div className="flex flex-col gap-2">
-          {isPlatformMaster && onOpenAdmin && (
-            <Button variant="secondary" className="w-full py-2 text-sm" onClick={onOpenAdmin}>
-              Admin · Tenants
-            </Button>
-          )}
-          {isPlatformMaster && onOpenChallenges && (
-            <Button variant="secondary" className="w-full py-2 text-sm" onClick={onOpenChallenges}>
-              Admin · Desafios
-            </Button>
-          )}
-          {isPlatformMaster && onOpenUsers && (
-            <Button variant="secondary" className="w-full py-2 text-sm" onClick={onOpenUsers}>
-              Admin · Usuários
-            </Button>
-          )}
-          {isPlatformMaster && onOpenModeration && (
-            <Button variant="secondary" className="w-full py-2 text-sm" onClick={onOpenModeration}>
-              Admin · Moderação
-            </Button>
-          )}
-          {isPlatformMaster && onOpenModerationSettings && (
-            <Button variant="secondary" className="w-full py-2 text-sm" onClick={onOpenModerationSettings}>
-              Admin · Config moderação
-            </Button>
-          )}
-          {isPlatformMaster && onOpenEngagement && (
-            <Button variant="secondary" className="w-full py-2 text-sm" onClick={onOpenEngagement}>
-              Admin · Engajamento
-            </Button>
-          )}
-          {isPlatformMaster && onOpenAudit && (
-            <Button variant="secondary" className="w-full py-2 text-sm" onClick={onOpenAudit}>
-              Admin · Auditoria
-            </Button>
-          )}
-          {onSignOut && (
-            <Button variant="ghost" className="w-full py-2 text-sm" onClick={onSignOut}>
-              Sair da conta
-            </Button>
-          )}
-        </div>
-      )}
-
       <div className="grid grid-cols-2 gap-3">
         <Card className="flex flex-col items-center justify-center py-6 border-orange-500/20">
           <Flame className="w-8 h-8 text-orange-500 fill-orange-500 mb-2" />
@@ -195,6 +154,64 @@ export function ProfileView({
           <span className="text-xs text-zinc-500 uppercase">Total Pontos</span>
         </Card>
       </div>
+
+      {isPlatformMaster && (
+        <Button
+          variant="outline"
+          className="w-full py-2.5 text-sm"
+          onClick={() => setAdminOpen(true)}
+        >
+          <Settings className="w-4 h-4" />
+          Painel do Administrador
+        </Button>
+      )}
+
+      {adminOpen && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in-fade"
+            onClick={() => setAdminOpen(false)}
+          />
+          <div className="relative max-w-lg w-full mx-auto bg-zinc-900 border-t border-zinc-800 rounded-t-2xl p-5 pb-8 animate-in-slide-up">
+            <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-5" />
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-sm font-black uppercase tracking-wide text-zinc-300">
+                Painel do Administrador
+              </h3>
+              <button
+                type="button"
+                onClick={() => setAdminOpen(false)}
+                className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { fn: onOpenAdmin, icon: Building2, label: 'Tenants' },
+                { fn: onOpenChallenges, icon: Trophy, label: 'Desafios' },
+                { fn: onOpenUsers, icon: Users, label: 'Usuários' },
+                { fn: onOpenModeration, icon: Shield, label: 'Moderação' },
+                { fn: onOpenModerationSettings, icon: SlidersHorizontal, label: 'Config moderação' },
+                { fn: onOpenEngagement, icon: BarChart3, label: 'Engajamento' },
+                { fn: onOpenAudit, icon: ScrollText, label: 'Auditoria' }
+              ]
+                .filter((item) => Boolean(item.fn))
+                .map(({ fn, icon: Icon, label }) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => { setAdminOpen(false); fn(); }}
+                    className="flex flex-col items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-800/40 p-4 text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                  >
+                    <Icon className="w-5 h-5 text-green-500" />
+                    <span className="text-xs font-bold uppercase tracking-wide">{label}</span>
+                  </button>
+                ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-4">
         <h3 className="font-bold flex items-center gap-2">
@@ -237,7 +254,9 @@ export function ProfileView({
                     </p>
                     {c.photo_review_status === 'rejected' ? (
                       <div className="mt-2 space-y-1">
-                        <p className="text-[11px] text-red-300 font-bold">Foto rejeitada</p>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-red-500/10 text-red-400 border border-red-500/20">
+                          Foto rejeitada
+                        </span>
                         {c.photo_rejection_reason_code ? (
                           <p className="text-[11px] text-zinc-400">
                             Motivo:{' '}
@@ -267,7 +286,9 @@ export function ProfileView({
                         ) : null}
                       </div>
                     ) : c.photo_review_status === 'pending' ? (
-                      <p className="text-[11px] text-yellow-300 mt-1">Aguardando revisão da foto</p>
+                      <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
+                        Aguardando revisão
+                      </span>
                     ) : null}
                   </div>
                 </div>
@@ -296,6 +317,13 @@ export function ProfileView({
           Ver Benefícios
         </Button>
       </Card>
+
+      {onSignOut && (
+        <Button variant="ghost" className="w-full py-2 text-sm text-zinc-500" onClick={onSignOut}>
+          <LogOut className="w-4 h-4" />
+          Sair da conta
+        </Button>
+      )}
     </div>
   );
 }
