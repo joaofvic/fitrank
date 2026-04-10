@@ -236,11 +236,21 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
       if (!supabase || !userId || !tenantId) {
         throw new Error('Sessão inválida');
       }
-      if (!fotoFile || !(fotoFile.size > 0)) {
-        throw new Error('Foto obrigatória para registrar o treino.');
-      }
       const today = todayLocalISODate();
       let foto_url = null;
+
+      let exemptTipos = [];
+      try {
+        const { data: exData } = await supabase.rpc('checkin_photo_exempt_tipos');
+        if (Array.isArray(exData)) exemptTipos = exData;
+      } catch {
+        exemptTipos = [];
+      }
+      const needsPhoto = !exemptTipos.includes(tipoTreino);
+
+      if (needsPhoto && (!fotoFile || !(fotoFile.size > 0))) {
+        throw new Error('Foto obrigatória para registrar o treino.');
+      }
 
       if (fotoFile && fotoFile.size > 0) {
         const safeName = fotoFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');

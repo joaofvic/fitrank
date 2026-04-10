@@ -13,6 +13,7 @@ import { ChallengesView } from './components/views/ChallengesView.jsx';
 import { CheckinModal } from './components/views/CheckinModal.jsx';
 import { AdminTenantsView } from './components/views/AdminTenantsView.jsx';
 import { AdminModerationView } from './components/views/AdminModerationView.jsx';
+import { AdminModerationSettingsView } from './components/views/AdminModerationSettingsView.jsx';
 import { AdminUsersView } from './components/views/AdminUsersView.jsx';
 import { AdminEngagementView } from './components/views/AdminEngagementView.jsx';
 import { AdminAuditView } from './components/views/AdminAuditView.jsx';
@@ -200,6 +201,9 @@ export default function App() {
             onOpenAdmin={profile?.is_platform_master ? () => setView('admin-tenants') : undefined}
             onOpenUsers={profile?.is_platform_master ? () => setView('admin-users') : undefined}
             onOpenModeration={profile?.is_platform_master ? () => setView('admin-moderation') : undefined}
+            onOpenModerationSettings={
+              profile?.is_platform_master ? () => setView('admin-moderation-settings') : undefined
+            }
             onOpenEngagement={profile?.is_platform_master ? () => setView('admin-engagement') : undefined}
             onOpenAudit={profile?.is_platform_master ? () => setView('admin-audit') : undefined}
             onSignOut={configured ? signOut : undefined}
@@ -210,6 +214,9 @@ export default function App() {
         )}
         {view === 'admin-moderation' && profile?.is_platform_master && (
           <AdminModerationView onBack={() => setView('profile')} />
+        )}
+        {view === 'admin-moderation-settings' && profile?.is_platform_master && (
+          <AdminModerationSettingsView onBack={() => setView('profile')} />
         )}
         {view === 'admin-users' && profile?.is_platform_master && (
           <AdminUsersView onBack={() => setView('profile')} />

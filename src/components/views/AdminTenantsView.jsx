@@ -1,17 +1,22 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { Button } from '../ui/Button.jsx';
 import { invokeEdge } from '../../lib/supabase/invoke-edge.js';
 
 export function AdminTenantsView({ onBack }) {
-  const { supabase, profile } = useAuth();
+  const { supabase, profile, session, loading: authLoading } = useAuth();
+  const edgeReady = useMemo(
+    () =>
+      Boolean(supabase && profile?.is_platform_master && !authLoading && session?.access_token),
+    [supabase, profile?.is_platform_master, authLoading, session?.access_token]
+  );
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
 
   const load = useCallback(async () => {
-    if (!supabase || !profile?.is_platform_master) return;
+    if (!edgeReady) return;
     setLoading(true);
     setError(null);
     const { data, error: fnError } = await invokeEdge('admin-tenants', supabase, {
@@ -27,13 +32,14 @@ export function AdminTenantsView({ onBack }) {
       setTenants(data?.tenants ?? []);
     }
     setLoading(false);
-  }, [supabase, profile?.is_platform_master]);
+  }, [edgeReady, supabase]);
 
   useEffect(() => {
     load();
   }, [load]);
 
   const setStatus = async (tenantId, status) => {
+    if (!edgeReady) return;
     setUpdatingId(tenantId);
     setError(null);
     const { data, error: fnError } = await invokeEdge('admin-tenants', supabase, {

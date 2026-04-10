@@ -1,6 +1,8 @@
+import { useCallback, useEffect, useState } from 'react';
 import { User, Camera, Flame, Zap, Calendar, CheckCircle2, Crown } from 'lucide-react';
 import { Card } from '../ui/Card.jsx';
 import { Button } from '../ui/Button.jsx';
+import { useAuth } from '../auth/AuthProvider.jsx';
 
 export function ProfileView({
   userData,
@@ -12,30 +14,46 @@ export function ProfileView({
   isPlatformMaster = false,
   onOpenAdmin,
   onOpenModeration,
+  onOpenModerationSettings,
   onOpenUsers,
   onOpenEngagement,
   onOpenAudit,
   onSignOut
 }) {
+  const { supabase } = useAuth();
+  const [reasonLabelMap, setReasonLabelMap] = useState({});
+
+  useEffect(() => {
+    if (!supabase) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('photo_rejection_reasons')
+        .select('code, label')
+        .eq('is_active', true);
+      if (cancelled || error) return;
+      const map = {};
+      for (const r of data ?? []) {
+        if (r.code && r.label) map[r.code] = r.label;
+      }
+      setReasonLabelMap(map);
+    })();
+    return () => { cancelled = true; };
+  }, [supabase]);
+
   const displayNome = cloudDisplayName || userData?.nome;
   const created = userData?.created_at
     ? new Date(userData.created_at).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
     : '—';
 
-  const rejectionReasonLabel = (code) => {
-    const c = (code ?? '').trim();
-    if (!c) return null;
-    const map = {
-      illegible_dark: 'Foto ilegível/escura',
-      not_proof: 'Não comprova atividade',
-      duplicate_reused: 'Foto duplicada/reutilizada',
-      inappropriate: 'Conteúdo impróprio',
-      screenshot: 'Foto de tela/print',
-      workout_mismatch: 'Tipo de treino não condizente',
-      other: 'Outro'
-    };
-    return map[c] ?? c;
-  };
+  const rejectionReasonLabel = useCallback(
+    (code) => {
+      const c = (code ?? '').trim();
+      if (!c) return null;
+      return reasonLabelMap[c] ?? c;
+    },
+    [reasonLabelMap]
+  );
 
   return (
     <div className="space-y-6 animate-in-fade">
@@ -108,6 +126,11 @@ export function ProfileView({
           {isPlatformMaster && onOpenModeration && (
             <Button variant="secondary" className="w-full py-2 text-sm" onClick={onOpenModeration}>
               Admin · Moderação
+            </Button>
+          )}
+          {isPlatformMaster && onOpenModerationSettings && (
+            <Button variant="secondary" className="w-full py-2 text-sm" onClick={onOpenModerationSettings}>
+              Admin · Config moderação
             </Button>
           )}
           {isPlatformMaster && onOpenEngagement && (

@@ -6,10 +6,10 @@ enabled = true
 
 # Edge Functions: use [functions.nome] (verify_jwt, etc.). Não use [functions].enabled — a CLI espera mapas por função.
 [functions.admin-users]
-verify_jwt = true
+verify_jwt = false
 
 [functions.admin-moderation]
-verify_jwt = true
+verify_jwt = false
 
 [functions.admin-tenants]
-verify_jwt = true
+verify_jwt = false

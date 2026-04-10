@@ -435,7 +435,7 @@ Deno.serve(async (req) => {
       const { data: prof, error: pErr } = await admin
         .from('profiles')
         .select(
-          'id, tenant_id, display_name, nome, academia, pontos, streak, last_checkin_date, created_at, is_pro, photo_under_review, is_banned, banned_at, banned_by, ban_reason'
+          'id, tenant_id, display_name, nome, academia, pontos, streak, last_checkin_date, created_at, is_pro, photo_under_review, is_banned, banned_at, banned_by, ban_reason, moderation_auto_flag, moderation_auto_flag_at'
         )
         .eq('id', user_id)
         .maybeSingle();

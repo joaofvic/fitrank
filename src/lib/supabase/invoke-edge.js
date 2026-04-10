@@ -1,7 +1,6 @@
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-/** Uma única renovação por vez — evita 429 (Too Many Requests) com vários invokeEdge em paralelo. */
 let refreshInFlight = null;
 
 async function refreshSessionSingleFlight(supabase) {
@@ -34,7 +33,6 @@ function isSupabaseClient(x) {
   return Boolean(x && typeof x === 'object' && typeof x.auth?.getSession === 'function');
 }
 
-/** true se o JWT de access estiver ausente ou já expirado (margem ~45s para clock skew). */
 function isAccessTokenExpiredOrMissing(token) {
   if (!token || typeof token !== 'string') return true;
   try {
@@ -46,21 +44,20 @@ function isAccessTokenExpiredOrMissing(token) {
     const payload = JSON.parse(atob(b64));
     const expMs = typeof payload.exp === 'number' ? payload.exp * 1000 : null;
     if (expMs == null) return true;
-    return Date.now() >= expMs - 45_000;
+    return Date.now() >= expMs - 60_000;
   } catch {
     return true;
   }
 }
 
 /**
- * Resolve Bearer: string JWT ou cliente Supabase.
- * Renova só se não houver token ou se o access JWT já estiver expirado — evita o 1º fetch com JWT morto
- * (ruído no console) sem competir com autoRefreshToken renovando tokens ainda válidos.
- * Em 401, invokeEdge tenta refreshSessionSingleFlight uma vez e repete o fetch.
+ * Resolve Bearer: string JWT ou cliente Supabase (recomendado).
+ * Renova o access token se expirado localmente (margem 60s).
  */
 async function resolveAccessToken(accessTokenOrClient) {
   if (isSupabaseClient(accessTokenOrClient)) {
     const supabase = accessTokenOrClient;
+
     const {
       data: { session }
     } = await supabase.auth.getSession();
@@ -83,9 +80,6 @@ async function resolveAccessToken(accessTokenOrClient) {
   return { token: accessTokenOrClient, supabase: null };
 }
 
-/**
- * Monta URL da Edge Function preservando query embutida em `path` e mesclando `searchParams`.
- */
 function buildFunctionUrl(path, searchParams) {
   const raw = path.replace(/^\//, '');
   const qMark = raw.indexOf('?');
@@ -157,7 +151,7 @@ export async function invokeEdge(path, accessTokenOrClient, { method = 'GET', bo
   if (result.error?.status === 401 && supabase) {
     const { data: ref, error: refErr } = await refreshSessionSingleFlight(supabase);
     const t2 = !refErr && ref?.session?.access_token ? ref.session.access_token : null;
-    if (t2) {
+    if (t2 && t2 !== firstToken) {
       result = await edgeFetchOnce(url, t2, method, body);
     }
   }

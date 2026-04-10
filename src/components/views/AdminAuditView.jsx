@@ -18,6 +18,10 @@ function actionLabelPt(action) {
     'moderation.reapprove': 'Moderação · reaprovar',
     'moderation.batch_approve': 'Moderação · lote aprovar',
     'moderation.batch_reject': 'Moderação · lote rejeitar',
+    'moderation.reasons.save': 'Moderação · motivos de rejeição',
+    'moderation.reasons.reorder': 'Moderação · ordem dos motivos',
+    'moderation.reasons.delete': 'Moderação · exclusão de motivo',
+    'moderation.settings.save': 'Moderação · políticas e isenções',
     'admin.message.send': 'Mensagem administrativa',
     'tenant.status_change': 'Tenant · status'
   };

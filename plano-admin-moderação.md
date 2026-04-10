@@ -197,10 +197,30 @@ Este documento define o escopo do **Admin Panel** do FitRank, com foco principal
 **Para** adaptar às regras da plataforma.
 
 **Critérios de aceitação**
-- CRUD de “motivos de rejeição” (ativar/desativar, ordem).
+- CRUD de “motivos de rejeição” (ativar/desativar, ordem; exclusão só se nenhum check-in referenciar o código; motivo **Outro** não pode ser excluído nem desativado).
 - Políticas:
   - auto-flag para usuário com X rejeições em Y dias
   - exigir foto para certos tipos de treino (se aplicável)
+
+#### US-ADM-16 — Revisão: deploy das migrations
+
+As RPCs e triggers desta história existem **apenas após** as migrations abaixo estarem aplicadas no banco. A mesma ordem deve existir em **local**, **staging** e **produção**; se o app chamar `/rest/v1/rpc/...` e receber **404**, o ambiente remoto está com schema defasado em relação ao repositório.
+
+Migrations (nome do arquivo em `supabase/migrations/`):
+
+- `20260410160000_us_adm_16_moderation_settings.sql`
+- `20260410170000_admin_tipo_treino_catalog.sql`
+- `20260410180000_admin_photo_rejection_reasons_reorder.sql`
+- `20260410190000_protect_other_rejection_reason.sql`
+- `20260410200000_admin_photo_rejection_reasons_delete.sql`
+- `20260410210000_photo_rejection_reasons_select_policy.sql`
+
+**Como aplicar:** com o [Supabase CLI](https://supabase.com/docs/guides/cli) autenticado e projeto linkado, por exemplo `supabase db push`, ou o pipeline de CI/CD que sua equipe usar para rodar migrations nos ambientes compartilhados.
+
+#### Política global de foto (decisão de produto — coberta no MVP)
+
+- **Comportamento atual:** por padrão, **todo** check-in exige foto; em **Admin · Config moderação**, a lista “Tipos de treino sem foto” define exceções (texto exato do tipo). Lista **vazia** = nenhuma isenção = foto sempre obrigatória.
+- **Fora do escopo US-ADM-16 até nova decisão:** regras adicionais (ex.: isenção só para usuário novo, por tenant ou por desafio) seriam evoluções futuras.
 
 ---
 
@@ -212,6 +232,7 @@ Este documento define o escopo do **Admin Panel** do FitRank, com foco principal
 
 ---
 
-## Pendência de produto (para fechar o MVP)
-- A plataforma exige **foto para todo check-in**, ou apenas para certos tipos/usuários (ex.: usuário novo, desafios, tenants específicos)?
+## Notas de produto (MVP)
+
+- **Foto no check-in:** ver “Política global de foto” em US-ADM-16 (revisão) acima — padrão com foto obrigatória e isenções configuráveis por tipo de treino.
 

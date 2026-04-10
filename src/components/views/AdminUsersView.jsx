@@ -28,7 +28,13 @@ function fmtDateTime(v) {
 }
 
 export function AdminUsersView({ onBack }) {
-  const { supabase, profile } = useAuth();
+  const { supabase, profile, session, loading: authLoading } = useAuth();
+
+  const edgeReady = useMemo(
+    () =>
+      Boolean(supabase && profile?.is_platform_master && !authLoading && session?.access_token),
+    [supabase, profile?.is_platform_master, authLoading, session?.access_token]
+  );
 
   const [q, setQ] = useState('');
   const [tenantId, setTenantId] = useState('');
@@ -56,7 +62,7 @@ export function AdminUsersView({ onBack }) {
   const [pointsCategory, setPointsCategory] = useState('manual');
 
   const loadUsers = useCallback(async () => {
-    if (!supabase || !profile?.is_platform_master) return;
+    if (!edgeReady) return;
     setLoading(true);
     setError(null);
     try {
@@ -66,7 +72,10 @@ export function AdminUsersView({ onBack }) {
       params.set('limit', '20');
       params.set('offset', '0');
 
-      const { data, error: fnError } = await invokeEdge(`admin-users?${params.toString()}`, supabase, { method: 'GET' });
+      const { data, error: fnError } = await invokeEdge('admin-users', supabase, {
+        method: 'GET',
+        searchParams: Object.fromEntries(params.entries())
+      });
       if (fnError) {
         setUsers([]);
         setError(fnError.message);
@@ -81,7 +90,7 @@ export function AdminUsersView({ onBack }) {
     } finally {
       setLoading(false);
     }
-  }, [supabase, profile?.is_platform_master, q, tenantId]);
+  }, [edgeReady, q, tenantId, supabase]);
 
   useEffect(() => {
     loadUsers();
@@ -89,7 +98,7 @@ export function AdminUsersView({ onBack }) {
 
   const loadDetail = useCallback(
     async (userId) => {
-      if (!supabase || !profile?.is_platform_master) return;
+      if (!edgeReady) return;
       setSelectedUserId(userId);
       setDetailLoading(true);
       setDetailError(null);
@@ -110,7 +119,10 @@ export function AdminUsersView({ onBack }) {
         params.set('mode', 'detail');
         params.set('user_id', userId);
 
-        const { data, error: fnError } = await invokeEdge(`admin-users?${params.toString()}`, supabase, { method: 'GET' });
+        const { data, error: fnError } = await invokeEdge('admin-users', supabase, {
+          method: 'GET',
+          searchParams: Object.fromEntries(params.entries())
+        });
         if (fnError) {
           setDetail(null);
           setDetailError(fnError.message);
@@ -127,12 +139,12 @@ export function AdminUsersView({ onBack }) {
         setDetailLoading(false);
       }
     },
-    [supabase, profile?.is_platform_master]
+    [edgeReady, supabase]
   );
 
   const runAdminAction = useCallback(
     async (payload) => {
-      if (!supabase || !profile?.is_platform_master) return;
+      if (!edgeReady) return;
       if (!payload?.user_id || typeof payload.user_id !== 'string') {
         setActionError('Selecione um usuário válido antes de executar ações.');
         return;
@@ -155,7 +167,7 @@ export function AdminUsersView({ onBack }) {
         setActionLoading(false);
       }
     },
-    [supabase, profile?.is_platform_master, selectedUserId, loadDetail, loadUsers]
+    [edgeReady, selectedUserId, loadDetail, loadUsers]
   );
 
   const selected = useMemo(() => users.find((u) => u.id === selectedUserId) ?? null, [users, selectedUserId]);
@@ -292,12 +304,18 @@ export function AdminUsersView({ onBack }) {
                 <div className="flex flex-wrap items-center gap-2">
                   <span
                     className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full border ${
-                      detail?.profile?.photo_under_review
-                        ? 'bg-yellow-500/10 text-yellow-300 border-yellow-500/20'
-                        : 'bg-zinc-800 text-zinc-300 border-zinc-700'
+                      detail?.profile?.moderation_auto_flag
+                        ? 'bg-orange-500/15 text-orange-200 border-orange-500/25'
+                        : detail?.profile?.photo_under_review
+                          ? 'bg-yellow-500/10 text-yellow-300 border-yellow-500/20'
+                          : 'bg-zinc-800 text-zinc-300 border-zinc-700'
                     }`}
                   >
-                    {detail?.profile?.photo_under_review ? 'Sob revisão' : 'Sem revisão'}
+                    {detail?.profile?.moderation_auto_flag
+                      ? 'Auto-flag (rejeições)'
+                      : detail?.profile?.photo_under_review
+                        ? 'Sob revisão'
+                        : 'Sem revisão'}
                   </span>
                   <span
                     className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full border ${

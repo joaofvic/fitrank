@@ -20,7 +20,14 @@ const DEFAULT_REJECTION_REASONS = [
 ];
 
 export function AdminModerationView({ onBack }) {
-  const { supabase, profile } = useAuth();
+  const { supabase, profile, session, loading: authLoading } = useAuth();
+
+  /** Evita chamar Edge Functions antes da sessão JWT estar pronta (reduz 401 / Invalid JWT). */
+  const edgeReady = useMemo(
+    () =>
+      Boolean(supabase && profile?.is_platform_master && !authLoading && session?.access_token),
+    [supabase, profile?.is_platform_master, authLoading, session?.access_token]
+  );
 
   const [items, setItems] = useState([]);
   const [tenants, setTenants] = useState([]);
@@ -82,7 +89,7 @@ export function AdminModerationView({ onBack }) {
   }, [tenants]);
 
   const loadTenants = useCallback(async () => {
-    if (!supabase || !profile?.is_platform_master) return;
+    if (!edgeReady) return;
     const { data, error: fnError } = await invokeEdge('admin-tenants', supabase, {
       method: 'GET'
     });
@@ -97,10 +104,10 @@ export function AdminModerationView({ onBack }) {
       return;
     }
     setTenants(data?.tenants ?? []);
-  }, [supabase, profile?.is_platform_master]);
+  }, [supabase, edgeReady]);
 
   const loadQueue = useCallback(async () => {
-    if (!supabase || !profile?.is_platform_master) return;
+    if (!edgeReady) return;
     setLoading(true);
     setError(null);
     setBatchRejectConfirmOpen(false);
@@ -146,7 +153,7 @@ export function AdminModerationView({ onBack }) {
       return Number.isFinite(next) ? next : -1;
     });
     setLoading(false);
-  }, [supabase, profile?.is_platform_master, status, tenantId, from, to, tipo, search, sort]);
+  }, [edgeReady, status, tenantId, from, to, tipo, search, sort]);
 
   const formatPendingAge = useCallback((createdAt) => {
     const created = new Date(createdAt);
@@ -181,7 +188,7 @@ export function AdminModerationView({ onBack }) {
   }, [loadQueue]);
 
   useEffect(() => {
-    if (!supabase || !profile?.is_platform_master) return;
+    if (!edgeReady) return;
     let cancelled = false;
     (async () => {
       const { data, error: fnError } = await invokeEdge('admin-moderation?mode=rejection-reasons', supabase, {
@@ -208,10 +215,10 @@ export function AdminModerationView({ onBack }) {
     return () => {
       cancelled = true;
     };
-  }, [supabase, profile?.is_platform_master]);
+  }, [supabase, edgeReady]);
 
   useEffect(() => {
-    if (!supabase || !profile?.is_platform_master) return;
+    if (!edgeReady) return;
     let cancelled = false;
     (async () => {
       const { data, error: fnError } = await invokeEdge('admin-moderation?mode=message-templates', supabase, {
@@ -231,7 +238,7 @@ export function AdminModerationView({ onBack }) {
     return () => {
       cancelled = true;
     };
-  }, [supabase, profile?.is_platform_master, messageTemplateCode]);
+  }, [supabase, edgeReady, messageTemplateCode]);
 
   const focused = focusIdx >= 0 && focusIdx < items.length ? items[focusIdx] : null;
 
@@ -245,7 +252,7 @@ export function AdminModerationView({ onBack }) {
       setAuditError(null);
       return;
     }
-    if (!supabase || !profile?.is_platform_master) return;
+    if (!edgeReady) return;
 
     let cancelled = false;
     (async () => {
@@ -290,11 +297,11 @@ export function AdminModerationView({ onBack }) {
     return () => {
       cancelled = true;
     };
-  }, [quickOpen, focused?.user_id, focused?.tenant_id, supabase, profile?.is_platform_master]);
+  }, [quickOpen, focused?.user_id, focused?.tenant_id, supabase, edgeReady]);
 
   useEffect(() => {
     if (!quickOpen || !focused?.id) return;
-    if (!supabase || !profile?.is_platform_master) return;
+    if (!edgeReady) return;
 
     let cancelled = false;
     (async () => {
@@ -334,7 +341,7 @@ export function AdminModerationView({ onBack }) {
     return () => {
       cancelled = true;
     };
-  }, [quickOpen, focused?.id, supabase, profile?.is_platform_master]);
+  }, [quickOpen, focused?.id, supabase, edgeReady]);
 
   const pct = useCallback((value) => {
     if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
@@ -351,7 +358,7 @@ export function AdminModerationView({ onBack }) {
   }, []);
 
   const sendMessage = useCallback(async () => {
-    if (!supabase) return;
+    if (!edgeReady) return;
     if (!focused?.user_id) return;
     const code = (messageTemplateCode ?? '').trim();
     if (!code) {
@@ -382,7 +389,14 @@ export function AdminModerationView({ onBack }) {
     } finally {
       setMessageSending(false);
     }
-  }, [supabase, focused?.id, focused?.user_id, focused?.tenant_id, messageTemplateCode, messageBodyOverride]);
+  }, [
+    edgeReady,
+    focused?.id,
+    focused?.user_id,
+    focused?.tenant_id,
+    messageTemplateCode,
+    messageBodyOverride
+  ]);
 
   if (!profile?.is_platform_master) {
     return null;
@@ -434,7 +448,7 @@ export function AdminModerationView({ onBack }) {
 
   const review = async (action, extras = null) => {
     if (!focused?.id) return;
-    if (!supabase) return;
+    if (!edgeReady) return;
     setBusy(true);
     setError(null);
     try {
@@ -490,7 +504,7 @@ export function AdminModerationView({ onBack }) {
   };
 
   const batchReview = async (action, extras = null) => {
-    if (!supabase) return;
+    if (!edgeReady) return;
     if (selectedIds.size === 0) return;
     setBusy(true);
     setError(null);

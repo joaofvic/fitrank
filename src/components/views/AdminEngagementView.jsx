@@ -614,7 +614,12 @@ function EngagementLineBarChart({
 }
 
 export function AdminEngagementView({ onBack }) {
-  const { supabase, profile } = useAuth();
+  const { supabase, profile, session, loading: authLoading } = useAuth();
+  const edgeReady = useMemo(
+    () =>
+      Boolean(supabase && profile?.is_platform_master && !authLoading && session?.access_token),
+    [supabase, profile?.is_platform_master, authLoading, session?.access_token]
+  );
   const [tenants, setTenants] = useState([]);
   const [tenantId, setTenantId] = useState('');
   const [regionFilter, setRegionFilter] = useState('');
@@ -697,12 +702,12 @@ export function AdminEngagementView({ onBack }) {
   }, [csvSections, prefsHydrated, supabase, profile?.id, profile?.is_platform_master]);
 
   const loadTenants = useCallback(async () => {
-    if (!supabase || !profile?.is_platform_master) return;
+    if (!edgeReady) return;
     const { data: res, error: fnError } = await invokeEdge('admin-tenants', supabase, { method: 'GET' });
     if (!fnError && !res?.error) {
       setTenants(res?.tenants ?? []);
     }
-  }, [supabase, profile?.is_platform_master]);
+  }, [edgeReady, supabase]);
 
   useEffect(() => {
     loadTenants();

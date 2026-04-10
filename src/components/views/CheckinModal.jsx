@@ -1,14 +1,32 @@
 import { useEffect, useRef, useState } from 'react';
+import { useAuth } from '../auth/AuthProvider.jsx';
 import { CheckCircle2, Camera, Plus } from 'lucide-react';
 import { Button } from '../ui/Button.jsx';
-
-const WORKOUT_TYPES = ['Musculação', 'Cárdio', 'Funcional', 'Luta', 'Crossfit', 'Outro'];
+import { CHECKIN_GRID_WORKOUT_TYPES } from '../../lib/workout-types.js';
 
 export function CheckinModal({ onClose, onCheckin }) {
+  const { supabase } = useAuth();
   const [foto, setFoto] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [error, setError] = useState(null);
+  const [exemptTipos, setExemptTipos] = useState([]);
   const inputRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!supabase) return;
+      try {
+        const { data } = await supabase.rpc('checkin_photo_exempt_tipos');
+        if (!cancelled && Array.isArray(data)) setExemptTipos(data);
+      } catch {
+        if (!cancelled) setExemptTipos([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
 
   useEffect(() => {
     if (!foto) {
@@ -21,14 +39,15 @@ export function CheckinModal({ onClose, onCheckin }) {
   }, [foto]);
 
   const handleType = async (type) => {
-    if (!foto) {
+    const canSkipPhoto = exemptTipos.includes(type);
+    if (!canSkipPhoto && !foto) {
       setError('Adicione uma foto para comprovar o treino.');
       inputRef.current?.focus?.();
       return;
     }
     try {
       setError(null);
-      await Promise.resolve(onCheckin(type, foto));
+      await Promise.resolve(onCheckin(type, canSkipPhoto ? null : foto));
     } finally {
       setFoto(null);
       if (inputRef.current) inputRef.current.value = '';
@@ -55,17 +74,23 @@ export function CheckinModal({ onClose, onCheckin }) {
         <div className="space-y-4">
           <p className="text-zinc-400 text-sm">O que você treinou hoje?</p>
           <div className="grid grid-cols-2 gap-3">
-            {WORKOUT_TYPES.map((type) => (
-              <button
-                key={type}
-                type="button"
-                onClick={() => handleType(type)}
-                className="bg-zinc-800 hover:bg-green-500/10 border border-zinc-700 hover:border-green-500/50 p-4 rounded-2xl text-left transition-all group"
-              >
-                <CheckCircle2 size={18} className="text-zinc-600 group-hover:text-green-500 mb-2 transition-colors" />
-                <span className="font-bold block text-zinc-300 group-hover:text-white">{type}</span>
-              </button>
-            ))}
+            {CHECKIN_GRID_WORKOUT_TYPES.map((type, i) => {
+              const isLast = i === CHECKIN_GRID_WORKOUT_TYPES.length - 1;
+              const isOddTotal = CHECKIN_GRID_WORKOUT_TYPES.length % 2 !== 0;
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => handleType(type)}
+                  className={`bg-zinc-800 hover:bg-green-500/10 border border-zinc-700 hover:border-green-500/50 p-4 rounded-2xl text-left transition-all group ${
+                    isLast && isOddTotal ? 'col-span-2' : ''
+                  }`}
+                >
+                  <CheckCircle2 size={18} className="text-zinc-600 group-hover:text-green-500 mb-2 transition-colors" />
+                  <span className="font-bold block text-zinc-300 group-hover:text-white">{type}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -93,7 +118,9 @@ export function CheckinModal({ onClose, onCheckin }) {
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-zinc-300">Foto (obrigatória)</p>
+              <p className="text-sm font-bold text-zinc-300">
+                Foto {exemptTipos.length > 0 ? '(obrigatória exceto tipos isentos na config admin)' : '(obrigatória)'}
+              </p>
               <p className="text-[10px] text-zinc-500 uppercase truncate">
                 {foto ? foto.name : 'Enviada com o próximo check-in'}
               </p>
