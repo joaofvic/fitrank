@@ -370,7 +370,7 @@ export function ChallengesView() {
         <Info className="w-8 h-8 text-orange-500 mx-auto" />
         <h4 className="font-bold text-orange-500">Desafios pagos</h4>
         <p className="text-sm text-zinc-400">
-          Torneios com premiação via PIX e outros formatos entram nas próximas fases do produto.
+          Torneios com premiações via PIX serão adicionados em breve.
         </p>
       </div>
     </div>
