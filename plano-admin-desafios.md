@@ -72,10 +72,16 @@ Este documento define o plano faseado para construir o módulo de **Gestão de D
   - Cálculo de duração em dias e dias restantes
 - **Padrões seguidos**: `edgeReady` memoizado, `invokeEdge` com `searchParams`, error/loading states, mobile-first dark UI
 
-## Epic 4 — Adaptação do ChallengesView.jsx (pendente)
+## Epic 4 — Adaptação do ChallengesView.jsx ✅
 
-- Múltiplos desafios simultâneos
-- Exibir tipo_treino, duração, progresso temporal
+- **Arquivo modificado**: `src/components/views/ChallengesView.jsx` (~260 linhas, reescrito)
+- **Múltiplos desafios**: carrega todos os desafios `status = 'ativo'` do tenant do usuário
+- **Informações por card**: nome, descrição (line-clamp), data_inicio—data_fim, dias restantes, tipo_treino (badges), contagem de participantes / max_participantes
+- **Inscrição**: botão "Participar do desafio" por card, desabilitado se vagas esgotadas (max_participantes atingido)
+- **Ranking expansível**: toggle "Ver ranking / Esconder ranking" por card, carregado sob demanda via `get_desafio_ranking` RPC
+- **Estados**: enrolled highlight (borda verde), loading, error, busy (por card individual)
+- **UX**: cards colapsáveis, layout compacto mobile-first, dark theme consistente
+- **Backward compat**: desafios legados (mensais) continuam aparecendo pois têm `status = 'ativo'`
 
 ## Epic 5 — Testes e Qualidade (pendente)
 

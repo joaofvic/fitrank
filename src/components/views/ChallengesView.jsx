@@ -1,113 +1,166 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Trophy, User, Info } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Trophy, User, Info, ChevronDown, ChevronUp, Calendar, Dumbbell, Users } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { Card } from '../ui/Card.jsx';
 import { Button } from '../ui/Button.jsx';
-import { firstOfMonthLocalISODate } from '../../lib/dates.js';
+import { todayLocalISODate } from '../../lib/dates.js';
+
+function formatDateBR(iso) {
+  if (!iso) return '—';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function daysRemaining(dataFim) {
+  if (!dataFim) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const end = new Date(dataFim + 'T23:59:59');
+  const diff = Math.ceil((end - today) / 86_400_000);
+  return diff;
+}
+
+function durationLabel(dataInicio, dataFim) {
+  if (!dataInicio || !dataFim) return null;
+  const start = new Date(dataInicio + 'T00:00:00');
+  const end = new Date(dataFim + 'T00:00:00');
+  const days = Math.round((end - start) / 86_400_000) + 1;
+  return days === 1 ? '1 dia' : `${days} dias`;
+}
 
 export function ChallengesView() {
   const { supabase, session, profile, refreshProfile } = useAuth();
-  const [desafio, setDesafio] = useState(null);
-  const [ranking, setRanking] = useState([]);
-  const [enrolled, setEnrolled] = useState(false);
+  const [desafios, setDesafios] = useState([]);
+  const [enrolledIds, setEnrolledIds] = useState(new Set());
+  const [participantCounts, setParticipantCounts] = useState({});
+  const [rankings, setRankings] = useState({});
+  const [expandedId, setExpandedId] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
+  const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState(null);
 
   const tenantId = profile?.tenant_id;
   const userId = session?.user?.id;
-  const monthStart = firstOfMonthLocalISODate();
+  const today = useMemo(() => todayLocalISODate(), []);
 
-  const loadDesafioAndRanking = useCallback(async () => {
+  const loadDesafios = useCallback(async () => {
     if (!supabase || !tenantId) {
-      setDesafio(null);
-      setRanking([]);
-      setEnrolled(false);
+      setDesafios([]);
+      setEnrolledIds(new Set());
+      setParticipantCounts({});
       setLoading(false);
       return;
     }
     setLoading(true);
     setError(null);
 
-    const { data: dRow, error: dErr } = await supabase
-      .from('desafios')
-      .select('id, nome, ativo, mes_referencia')
-      .eq('tenant_id', tenantId)
-      .eq('ativo', true)
-      .eq('mes_referencia', monthStart)
-      .maybeSingle();
+    try {
+      const { data: rows, error: dErr } = await supabase
+        .from('desafios')
+        .select('id, nome, descricao, status, tipo_treino, data_inicio, data_fim, max_participantes, mes_referencia')
+        .eq('tenant_id', tenantId)
+        .eq('status', 'ativo')
+        .order('data_inicio', { ascending: false });
 
-    if (dErr) {
-      console.error('FitRank: desafio', dErr.message);
-      setError(dErr.message);
-      setDesafio(null);
-      setRanking([]);
+      if (dErr) throw dErr;
+      const list = rows || [];
+      setDesafios(list);
+
+      if (list.length === 0) {
+        setEnrolledIds(new Set());
+        setParticipantCounts({});
+        setLoading(false);
+        return;
+      }
+
+      const ids = list.map((r) => r.id);
+
+      const { data: myParts } = await supabase
+        .from('desafio_participantes')
+        .select('desafio_id')
+        .eq('user_id', userId)
+        .in('desafio_id', ids);
+
+      setEnrolledIds(new Set((myParts || []).map((p) => p.desafio_id)));
+
+      const counts = {};
+      for (const id of ids) {
+        const { count } = await supabase
+          .from('desafio_participantes')
+          .select('id', { count: 'exact', head: true })
+          .eq('desafio_id', id);
+        counts[id] = count ?? 0;
+      }
+      setParticipantCounts(counts);
+    } catch (e) {
+      console.error('FitRank: desafios', e.message);
+      setError(e.message);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setDesafio(dRow);
-
-    if (!dRow?.id) {
-      setRanking([]);
-      setEnrolled(false);
-      setLoading(false);
-      return;
-    }
-
-    const { data: part, error: pErr } = await supabase
-      .from('desafio_participantes')
-      .select('id')
-      .eq('desafio_id', dRow.id)
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (!pErr && part) setEnrolled(true);
-    else setEnrolled(false);
-
-    const { data: rankData, error: rErr } = await supabase.rpc('get_desafio_ranking', {
-      p_desafio_id: dRow.id
-    });
-
-    if (rErr) {
-      console.error('FitRank: ranking desafio', rErr.message);
-      setRanking([]);
-    } else {
-      setRanking(Array.isArray(rankData) ? rankData : []);
-    }
-
-    setLoading(false);
-  }, [supabase, tenantId, userId, monthStart]);
+  }, [supabase, tenantId, userId]);
 
   useEffect(() => {
-    loadDesafioAndRanking();
-  }, [loadDesafioAndRanking]);
+    loadDesafios();
+  }, [loadDesafios]);
 
-  const handleParticipar = async () => {
-    if (!supabase || !desafio?.id || !tenantId || !userId) return;
-    setBusy(true);
+  const loadRanking = useCallback(
+    async (desafioId) => {
+      if (!supabase) return;
+      const { data, error: rErr } = await supabase.rpc('get_desafio_ranking', {
+        p_desafio_id: desafioId
+      });
+      if (rErr) {
+        console.error('FitRank: ranking', rErr.message);
+        setRankings((prev) => ({ ...prev, [desafioId]: [] }));
+      } else {
+        setRankings((prev) => ({ ...prev, [desafioId]: Array.isArray(data) ? data : [] }));
+      }
+    },
+    [supabase]
+  );
+
+  const toggleExpand = useCallback(
+    async (desafioId) => {
+      if (expandedId === desafioId) {
+        setExpandedId(null);
+        return;
+      }
+      setExpandedId(desafioId);
+      if (!rankings[desafioId]) {
+        await loadRanking(desafioId);
+      }
+    },
+    [expandedId, rankings, loadRanking]
+  );
+
+  const handleParticipar = async (desafioId) => {
+    if (!supabase || !tenantId || !userId || busyId) return;
+    setBusyId(desafioId);
     setError(null);
     try {
       const { error: insErr } = await supabase.from('desafio_participantes').insert({
-        desafio_id: desafio.id,
+        desafio_id: desafioId,
         user_id: userId,
         tenant_id: tenantId
       });
       if (insErr) {
         if (insErr.code === '23505') {
-          setEnrolled(true);
+          setEnrolledIds((prev) => new Set([...prev, desafioId]));
         } else {
           throw insErr;
         }
       } else {
-        setEnrolled(true);
+        setEnrolledIds((prev) => new Set([...prev, desafioId]));
+        setParticipantCounts((prev) => ({ ...prev, [desafioId]: (prev[desafioId] ?? 0) + 1 }));
       }
-      await loadDesafioAndRanking();
+      await loadRanking(desafioId);
+      if (!expandedId) setExpandedId(desafioId);
       if (refreshProfile) await refreshProfile();
     } catch (e) {
-      setError(e.message ?? 'Não foi possível participar');
+      setError(e.message ?? 'Erro ao participar');
     } finally {
-      setBusy(false);
+      setBusyId(null);
     }
   };
 
@@ -123,7 +176,9 @@ export function ChallengesView() {
     <div className="space-y-6 animate-in-fade">
       <div className="space-y-1">
         <h2 className="text-2xl font-black">Desafios</h2>
-        <p className="text-zinc-500">Competição mensal do seu tenant — ranking próprio.</p>
+        <p className="text-zinc-500 text-sm">
+          Competições do seu grupo — inscreva-se e suba no ranking!
+        </p>
       </div>
 
       {error && (
@@ -134,78 +189,181 @@ export function ChallengesView() {
 
       {loading ? (
         <p className="text-zinc-500 text-sm">Carregando…</p>
-      ) : !desafio ? (
+      ) : desafios.length === 0 ? (
         <Card className="border-zinc-800 text-zinc-500 text-sm py-8 text-center">
-          Nenhum desafio ativo para este mês. Um admin pode criar em <code className="text-zinc-400">desafios</code>{' '}
-          (mes_referencia = primeiro dia do mês).
+          Nenhum desafio ativo no momento.
         </Card>
       ) : (
-        <Card className="group relative overflow-hidden border-green-500/20">
-          <div className="space-y-4">
-            <div className="flex justify-between items-start gap-2">
-              <div>
-                <div className="bg-zinc-800 text-green-400 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase mb-2 inline-block">
-                  Mensal
-                </div>
-                <h3 className="text-xl font-bold">{desafio.nome}</h3>
-                <p className="text-zinc-500 text-sm mt-1">
-                  Mês referência:{' '}
-                  {new Date(desafio.mes_referencia + 'T12:00:00').toLocaleDateString('pt-BR', {
-                    month: 'long',
-                    year: 'numeric'
-                  })}
-                </p>
-              </div>
-              <div className="bg-yellow-500/10 p-2 rounded-xl border border-yellow-500/20 shrink-0">
-                <Trophy size={24} className="text-yellow-500" />
-              </div>
-            </div>
+        <div className="space-y-4">
+          {desafios.map((d) => {
+            const isEnrolled = enrolledIds.has(d.id);
+            const isExpanded = expandedId === d.id;
+            const ranking = rankings[d.id] || [];
+            const count = participantCounts[d.id] ?? 0;
+            const remaining = daysRemaining(d.data_fim);
+            const duration = durationLabel(d.data_inicio, d.data_fim);
+            const isFull = d.max_participantes && count >= d.max_participantes;
+            const tipos = Array.isArray(d.tipo_treino) ? d.tipo_treino : [];
 
-            {!enrolled ? (
-              <Button
-                type="button"
-                variant="outline"
-                disabled={busy}
-                onClick={handleParticipar}
-                className="w-full py-3"
+            return (
+              <Card
+                key={d.id}
+                className={`group relative overflow-hidden transition-colors ${
+                  isEnrolled
+                    ? 'border-green-500/30 bg-zinc-900/60'
+                    : 'border-zinc-800 hover:border-zinc-700'
+                }`}
               >
-                {busy ? 'Inscrevendo…' : 'Participar do desafio'}
-              </Button>
-            ) : (
-              <p className="text-green-400 text-sm font-bold">Você está inscrito. Pontos do check-in somam aqui.</p>
-            )}
-
-            <div className="border-t border-zinc-800 pt-4 space-y-2">
-              <h4 className="text-sm font-bold text-zinc-400 uppercase tracking-wide">Ranking do desafio</h4>
-              {ranking.length === 0 ? (
-                <p className="text-zinc-600 text-sm">Ainda sem participantes no ranking.</p>
-              ) : (
-                <ul className="space-y-2">
-                  {ranking.map((row, idx) => (
-                    <li
-                      key={row.user_id}
-                      className={`flex items-center justify-between p-3 rounded-xl border ${
-                        row.is_me ? 'border-green-500/40 bg-zinc-800/50' : 'border-zinc-800 bg-zinc-900/40'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="text-zinc-600 font-black w-6 shrink-0">#{idx + 1}</span>
-                        <User className="w-4 h-4 text-zinc-500 shrink-0" />
-                        <span className={`font-bold truncate ${row.is_me ? 'text-green-400' : 'text-white'}`}>
-                          {row.nome_exibicao}
-                          {row.is_me && (
-                            <span className="text-zinc-500 font-normal text-xs ml-1">(você)</span>
-                          )}
-                        </span>
+                <div className="space-y-3">
+                  {/* Header */}
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                        {remaining !== null && remaining >= 0 && (
+                          <span className="bg-green-500/10 text-green-400 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
+                            {remaining === 0
+                              ? 'Último dia'
+                              : remaining === 1
+                                ? '1 dia restante'
+                                : `${remaining} dias restantes`}
+                          </span>
+                        )}
+                        {remaining !== null && remaining < 0 && (
+                          <span className="bg-zinc-800 text-zinc-500 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
+                            Encerrado
+                          </span>
+                        )}
+                        {duration && (
+                          <span className="text-zinc-600 text-[10px] font-medium uppercase">
+                            {duration}
+                          </span>
+                        )}
                       </div>
-                      <span className="text-green-400 font-black shrink-0">{row.pontos_desafio} pts</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-        </Card>
+                      <h3 className="text-lg font-bold leading-tight">{d.nome}</h3>
+                      {d.descricao && (
+                        <p className="text-zinc-500 text-xs mt-1 line-clamp-2">{d.descricao}</p>
+                      )}
+                    </div>
+                    <div className="bg-yellow-500/10 p-2 rounded-xl border border-yellow-500/20 shrink-0">
+                      <Trophy size={22} className="text-yellow-500" />
+                    </div>
+                  </div>
+
+                  {/* Meta row */}
+                  <div className="flex items-center gap-3 text-[11px] text-zinc-500 flex-wrap">
+                    <span className="flex items-center gap-1">
+                      <Calendar size={12} />
+                      {formatDateBR(d.data_inicio)} — {formatDateBR(d.data_fim)}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Users size={12} />
+                      {count} participante{count !== 1 ? 's' : ''}
+                      {d.max_participantes ? ` / ${d.max_participantes}` : ''}
+                    </span>
+                  </div>
+
+                  {/* Workout types */}
+                  {tipos.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {tipos.map((t) => (
+                        <span
+                          key={t}
+                          className="flex items-center gap-1 bg-zinc-800 text-zinc-400 text-[10px] font-medium px-2 py-0.5 rounded-full"
+                        >
+                          <Dumbbell size={10} />
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Enrollment action */}
+                  {!isEnrolled ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={!!busyId || !!isFull}
+                      onClick={() => handleParticipar(d.id)}
+                      className="w-full py-2.5 text-sm"
+                    >
+                      {busyId === d.id
+                        ? 'Inscrevendo…'
+                        : isFull
+                          ? 'Vagas esgotadas'
+                          : 'Participar do desafio'}
+                    </Button>
+                  ) : (
+                    <p className="text-green-400 text-sm font-bold">
+                      Você está inscrito — seus check-ins somam pontos aqui.
+                    </p>
+                  )}
+
+                  {/* Expand/collapse ranking */}
+                  <button
+                    type="button"
+                    onClick={() => toggleExpand(d.id)}
+                    className="flex items-center gap-1.5 text-zinc-500 hover:text-zinc-300 text-xs font-medium transition-colors w-full justify-center pt-1"
+                  >
+                    {isExpanded ? (
+                      <>
+                        Esconder ranking <ChevronUp size={14} />
+                      </>
+                    ) : (
+                      <>
+                        Ver ranking <ChevronDown size={14} />
+                      </>
+                    )}
+                  </button>
+
+                  {/* Ranking list */}
+                  {isExpanded && (
+                    <div className="border-t border-zinc-800 pt-3 space-y-2">
+                      <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wide">
+                        Ranking do desafio
+                      </h4>
+                      {ranking.length === 0 ? (
+                        <p className="text-zinc-600 text-xs">Ainda sem participantes no ranking.</p>
+                      ) : (
+                        <ul className="space-y-1.5">
+                          {ranking.map((row, idx) => (
+                            <li
+                              key={row.user_id}
+                              className={`flex items-center justify-between p-2.5 rounded-xl border ${
+                                row.is_me
+                                  ? 'border-green-500/40 bg-zinc-800/50'
+                                  : 'border-zinc-800 bg-zinc-900/40'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <span className="text-zinc-600 font-black w-5 text-xs shrink-0">
+                                  #{idx + 1}
+                                </span>
+                                <User className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+                                <span
+                                  className={`font-bold text-sm truncate ${row.is_me ? 'text-green-400' : 'text-white'}`}
+                                >
+                                  {row.nome_exibicao}
+                                  {row.is_me && (
+                                    <span className="text-zinc-500 font-normal text-[10px] ml-1">
+                                      (você)
+                                    </span>
+                                  )}
+                                </span>
+                              </div>
+                              <span className="text-green-400 font-black text-sm shrink-0">
+                                {row.pontos_desafio} pts
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </Card>
+            );
+          })}
+        </div>
       )}
 
       <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-6 text-center space-y-3">

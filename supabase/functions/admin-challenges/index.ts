@@ -12,7 +12,7 @@ async function insertPlatformAudit(
   row: {
     actor_id: string;
     action: string;
-    target_type: 'user' | 'checkin' | 'tenant' | 'none' | 'desafio';
+    target_type: string;
     target_id: string | null;
     tenant_id: string | null;
     payload: Record<string, unknown>;
@@ -63,9 +63,9 @@ const participantsQuerySchema = z.object({
 
 const createSchema = z.object({
   tenant_id: z.string().uuid(),
-  nome: z.string().min(1).max(200).trim(),
-  descricao: z.string().max(2000).default('').trim(),
-  tipo_treino: z.array(z.string().min(1).max(100).trim()).default([]),
+  nome: z.string().min(1).max(200),
+  descricao: z.string().max(2000).default(''),
+  tipo_treino: z.array(z.string().min(1).max(100)).default([]),
   data_inicio: z.string().regex(dateRegex),
   data_fim: z.string().regex(dateRegex),
   max_participantes: z.number().int().min(1).nullable().default(null),
@@ -75,9 +75,9 @@ const createSchema = z.object({
 const updateSchema = z.object({
   action: z.literal('update'),
   id: z.string().uuid(),
-  nome: z.string().min(1).max(200).trim().optional(),
-  descricao: z.string().max(2000).trim().optional(),
-  tipo_treino: z.array(z.string().min(1).max(100).trim()).optional(),
+  nome: z.string().min(1).max(200).optional(),
+  descricao: z.string().max(2000).optional(),
+  tipo_treino: z.array(z.string().min(1).max(100)).optional(),
   data_inicio: z.string().regex(dateRegex).optional(),
   data_fim: z.string().regex(dateRegex).optional(),
   max_participantes: z.number().int().min(1).nullable().optional()
@@ -93,7 +93,7 @@ const removeParticipantSchema = z.object({
   action: z.literal('remove_participant'),
   desafio_id: z.string().uuid(),
   user_id: z.string().uuid(),
-  motivo: z.string().min(1).max(500).trim()
+  motivo: z.string().min(1).max(500)
 });
 
 function validateDateRange(inicio: string, fim: string): string | null {
@@ -114,7 +114,7 @@ function validateTipoTreino(tipos: string[], catalog: string[]): string | null {
   const catalogSet = new Set(catalog);
   const invalid = tipos.filter((t) => !catalogSet.has(t));
   if (invalid.length > 0) {
-    return `Tipo(s) de treino inválido(s): ${invalid.join(', ')}`;
+    return 'Tipo(s) de treino invalido(s): ' + invalid.join(', ');
   }
   return null;
 }
@@ -129,12 +129,12 @@ Deno.serve(async (req) => {
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
   if (!supabaseUrl || !anonKey || !serviceKey) {
-    return jsonResponse({ error: 'Configuração do servidor incompleta' }, 500);
+    return jsonResponse({ error: 'Configuracao do servidor incompleta' }, 500);
   }
 
   const authHeader = req.headers.get('Authorization');
   if (!authHeader?.startsWith('Bearer ')) {
-    return jsonResponse({ error: 'Não autorizado' }, 401);
+    return jsonResponse({ error: 'Nao autorizado' }, 401);
   }
 
   const userClient = createClient(supabaseUrl, anonKey, {
@@ -147,7 +147,7 @@ Deno.serve(async (req) => {
   } = await userClient.auth.getUser();
 
   if (userError || !user) {
-    return jsonResponse({ error: 'Sessão inválida' }, 401);
+    return jsonResponse({ error: 'Sessao invalida' }, 401);
   }
 
   const { data: profile, error: profileError } = await userClient
@@ -167,9 +167,6 @@ Deno.serve(async (req) => {
   const url = new URL(req.url);
 
   try {
-    // -------------------------------------------------------------------------
-    // GET — list / detail / participants
-    // -------------------------------------------------------------------------
     if (req.method === 'GET') {
       const params = Object.fromEntries(url.searchParams.entries());
       const mode = params.mode ?? 'list';
@@ -177,21 +174,21 @@ Deno.serve(async (req) => {
       if (mode === 'detail') {
         const parsed = detailQuerySchema.safeParse(params);
         if (!parsed.success) {
-          return jsonResponse({ error: 'Query inválida', details: parsed.error.flatten() }, 400);
+          return jsonResponse({ error: 'Query invalida', details: parsed.error.flatten() }, 400);
         }
         const { data, error } = await userClient.rpc('admin_desafio_detail', {
           p_desafio_id: parsed.data.id
         });
         if (error) throw error;
         const row = Array.isArray(data) ? data[0] ?? null : data;
-        if (!row) return jsonResponse({ error: 'Desafio não encontrado' }, 404);
+        if (!row) return jsonResponse({ error: 'Desafio nao encontrado' }, 404);
         return jsonResponse({ desafio: row }, 200);
       }
 
       if (mode === 'participants') {
         const parsed = participantsQuerySchema.safeParse(params);
         if (!parsed.success) {
-          return jsonResponse({ error: 'Query inválida', details: parsed.error.flatten() }, 400);
+          return jsonResponse({ error: 'Query invalida', details: parsed.error.flatten() }, 400);
         }
         const { data, error } = await userClient.rpc('admin_desafio_participantes', {
           p_desafio_id: parsed.data.id,
@@ -202,10 +199,9 @@ Deno.serve(async (req) => {
         return jsonResponse({ participants: data ?? [] }, 200);
       }
 
-      // default: list
       const parsed = listQuerySchema.safeParse(params);
       if (!parsed.success) {
-        return jsonResponse({ error: 'Query inválida', details: parsed.error.flatten() }, 400);
+        return jsonResponse({ error: 'Query invalida', details: parsed.error.flatten() }, 400);
       }
       const { data, error } = await userClient.rpc('admin_desafios_list', {
         p_tenant_id: parsed.data.tenant_id ?? null,
@@ -220,14 +216,11 @@ Deno.serve(async (req) => {
       return jsonResponse({ desafios: data ?? [] }, 200);
     }
 
-    // -------------------------------------------------------------------------
-    // POST — create
-    // -------------------------------------------------------------------------
     if (req.method === 'POST') {
       const raw = await req.json().catch(() => null);
       const parsed = createSchema.safeParse(raw);
       if (!parsed.success) {
-        return jsonResponse({ error: 'Payload inválido', details: parsed.error.flatten() }, 400);
+        return jsonResponse({ error: 'Payload invalido', details: parsed.error.flatten() }, 400);
       }
 
       const d = parsed.data;
@@ -235,16 +228,14 @@ Deno.serve(async (req) => {
       const dateErr = validateDateRange(d.data_inicio, d.data_fim);
       if (dateErr) return jsonResponse({ error: dateErr }, 400);
 
-      // tenant valido
       const { data: tenantRow, error: tenantErr } = await admin
         .from('tenants')
         .select('id')
         .eq('id', d.tenant_id)
         .maybeSingle();
       if (tenantErr) throw tenantErr;
-      if (!tenantRow) return jsonResponse({ error: 'Tenant não encontrado' }, 400);
+      if (!tenantRow) return jsonResponse({ error: 'Tenant nao encontrado' }, 400);
 
-      // tipo_treino no catalogo
       if (d.tipo_treino.length > 0) {
         const catalog = await fetchCatalog(userClient);
         const tipoErr = validateTipoTreino(d.tipo_treino, catalog);
@@ -289,20 +280,16 @@ Deno.serve(async (req) => {
       return jsonResponse({ desafio: created }, 201);
     }
 
-    // -------------------------------------------------------------------------
-    // PATCH — update / lifecycle / remove_participant
-    // -------------------------------------------------------------------------
     if (req.method === 'PATCH') {
       const raw = await req.json().catch(() => null);
       if (!raw || typeof raw !== 'object' || !raw.action) {
-        return jsonResponse({ error: 'Campo "action" obrigatório no payload' }, 400);
+        return jsonResponse({ error: 'Campo action obrigatorio no payload' }, 400);
       }
 
-      // --- remove_participant ---
       if (raw.action === 'remove_participant') {
         const parsed = removeParticipantSchema.safeParse(raw);
         if (!parsed.success) {
-          return jsonResponse({ error: 'Payload inválido', details: parsed.error.flatten() }, 400);
+          return jsonResponse({ error: 'Payload invalido', details: parsed.error.flatten() }, 400);
         }
         const rp = parsed.data;
 
@@ -315,7 +302,7 @@ Deno.serve(async (req) => {
 
         if (pErr) throw pErr;
         if (!participant) {
-          return jsonResponse({ error: 'Participante não encontrado' }, 404);
+          return jsonResponse({ error: 'Participante nao encontrado' }, 404);
         }
 
         const { error: delErr } = await admin
@@ -341,11 +328,10 @@ Deno.serve(async (req) => {
         return jsonResponse({ ok: true }, 200);
       }
 
-      // --- lifecycle: activate / close / cancel ---
       if (raw.action === 'activate' || raw.action === 'close' || raw.action === 'cancel') {
         const parsed = lifecycleSchema.safeParse(raw);
         if (!parsed.success) {
-          return jsonResponse({ error: 'Payload inválido', details: parsed.error.flatten() }, 400);
+          return jsonResponse({ error: 'Payload invalido', details: parsed.error.flatten() }, 400);
         }
         const lc = parsed.data;
 
@@ -356,7 +342,7 @@ Deno.serve(async (req) => {
           .maybeSingle();
 
         if (fetchErr) throw fetchErr;
-        if (!existing) return jsonResponse({ error: 'Desafio não encontrado' }, 404);
+        if (!existing) return jsonResponse({ error: 'Desafio nao encontrado' }, 404);
 
         const transitions: Record<string, { from: string[]; to: string }> = {
           activate: { from: ['rascunho'], to: 'ativo' },
@@ -367,7 +353,7 @@ Deno.serve(async (req) => {
         const rule = transitions[lc.action];
         if (!rule.from.includes(existing.status)) {
           return jsonResponse(
-            { error: `Transição inválida: ${existing.status} → ${rule.to}` },
+            { error: 'Transicao invalida: ' + existing.status + ' -> ' + rule.to },
             400
           );
         }
@@ -375,7 +361,7 @@ Deno.serve(async (req) => {
         if (lc.action === 'activate') {
           if (!existing.data_inicio || !existing.data_fim) {
             return jsonResponse(
-              { error: 'Datas de início e fim obrigatórias para ativar' },
+              { error: 'Datas de inicio e fim obrigatorias para ativar' },
               400
             );
           }
@@ -392,7 +378,7 @@ Deno.serve(async (req) => {
 
         await insertPlatformAudit(admin, {
           actor_id: user.id,
-          action: `desafio.${lc.action}`,
+          action: 'desafio.' + lc.action,
           target_type: 'desafio',
           target_id: lc.id,
           tenant_id: existing.tenant_id,
@@ -407,11 +393,10 @@ Deno.serve(async (req) => {
         return jsonResponse({ desafio: updated }, 200);
       }
 
-      // --- update fields ---
       if (raw.action === 'update') {
         const parsed = updateSchema.safeParse(raw);
         if (!parsed.success) {
-          return jsonResponse({ error: 'Payload inválido', details: parsed.error.flatten() }, 400);
+          return jsonResponse({ error: 'Payload invalido', details: parsed.error.flatten() }, 400);
         }
         const upd = parsed.data;
 
@@ -422,16 +407,15 @@ Deno.serve(async (req) => {
           .maybeSingle();
 
         if (fetchErr) throw fetchErr;
-        if (!existing) return jsonResponse({ error: 'Desafio não encontrado' }, 404);
+        if (!existing) return jsonResponse({ error: 'Desafio nao encontrado' }, 404);
 
         if (existing.status === 'cancelado') {
-          return jsonResponse({ error: 'Desafio cancelado não pode ser editado' }, 400);
+          return jsonResponse({ error: 'Desafio cancelado nao pode ser editado' }, 400);
         }
         if (existing.status === 'encerrado') {
-          return jsonResponse({ error: 'Desafio encerrado não pode ser editado' }, 400);
+          return jsonResponse({ error: 'Desafio encerrado nao pode ser editado' }, 400);
         }
 
-        // desafio ativo com participantes: bloquear edicao de datas e tenant
         if (existing.status === 'ativo') {
           const { count } = await admin
             .from('desafio_participantes')
@@ -440,7 +424,7 @@ Deno.serve(async (req) => {
 
           if ((count ?? 0) > 0 && (upd.data_inicio || upd.data_fim)) {
             return jsonResponse(
-              { error: 'Não é possível alterar datas de desafio ativo com participantes' },
+              { error: 'Nao e possivel alterar datas de desafio ativo com participantes' },
               400
             );
           }
@@ -461,7 +445,6 @@ Deno.serve(async (req) => {
           return jsonResponse({ error: 'Nenhum campo para atualizar' }, 400);
         }
 
-        // validar range de datas resultante
         const finalInicio = (fields.data_inicio as string) ?? existing.data_inicio;
         const finalFim = (fields.data_fim as string) ?? existing.data_fim;
         if (finalInicio && finalFim) {
@@ -469,7 +452,6 @@ Deno.serve(async (req) => {
           if (dateErr) return jsonResponse({ error: dateErr }, 400);
         }
 
-        // validar tipo_treino no catalogo
         if (upd.tipo_treino && upd.tipo_treino.length > 0) {
           const catalog = await fetchCatalog(userClient);
           const tipoErr = validateTipoTreino(upd.tipo_treino, catalog);
@@ -497,16 +479,13 @@ Deno.serve(async (req) => {
         return jsonResponse({ desafio: updated }, 200);
       }
 
-      return jsonResponse({ error: `Ação desconhecida: ${raw.action}` }, 400);
+      return jsonResponse({ error: 'Acao desconhecida: ' + raw.action }, 400);
     }
 
-    // -------------------------------------------------------------------------
-    // DELETE — cancel (soft-delete)
-    // -------------------------------------------------------------------------
     if (req.method === 'DELETE') {
       const id = url.searchParams.get('id');
       if (!id || !z.string().uuid().safeParse(id).success) {
-        return jsonResponse({ error: 'Parâmetro "id" (uuid) obrigatório' }, 400);
+        return jsonResponse({ error: 'Parametro id (uuid) obrigatorio' }, 400);
       }
 
       const { data: existing, error: fetchErr } = await admin
@@ -516,10 +495,10 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (fetchErr) throw fetchErr;
-      if (!existing) return jsonResponse({ error: 'Desafio não encontrado' }, 404);
+      if (!existing) return jsonResponse({ error: 'Desafio nao encontrado' }, 404);
 
       if (existing.status === 'cancelado') {
-        return jsonResponse({ error: 'Desafio já está cancelado' }, 400);
+        return jsonResponse({ error: 'Desafio ja esta cancelado' }, 400);
       }
 
       const { data: updated, error: updErr } = await admin
@@ -547,7 +526,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ desafio: updated }, 200);
     }
 
-    return jsonResponse({ error: 'Método não permitido' }, 405);
+    return jsonResponse({ error: 'Metodo nao permitido' }, 405);
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Erro interno';
     console.error('admin-challenges:', message);
