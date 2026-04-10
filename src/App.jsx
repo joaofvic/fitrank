@@ -17,6 +17,7 @@ import { AdminModerationSettingsView } from './components/views/AdminModerationS
 import { AdminUsersView } from './components/views/AdminUsersView.jsx';
 import { AdminEngagementView } from './components/views/AdminEngagementView.jsx';
 import { AdminAuditView } from './components/views/AdminAuditView.jsx';
+import { AdminChallengesView } from './components/views/AdminChallengesView.jsx';
 
 export default function App() {
   const {
@@ -199,6 +200,7 @@ export default function App() {
             cloudDisplayName={profile?.display_name}
             isPlatformMaster={profile?.is_platform_master}
             onOpenAdmin={profile?.is_platform_master ? () => setView('admin-tenants') : undefined}
+            onOpenChallenges={profile?.is_platform_master ? () => setView('admin-challenges') : undefined}
             onOpenUsers={profile?.is_platform_master ? () => setView('admin-users') : undefined}
             onOpenModeration={profile?.is_platform_master ? () => setView('admin-moderation') : undefined}
             onOpenModerationSettings={
@@ -211,6 +213,9 @@ export default function App() {
         )}
         {view === 'admin-tenants' && profile?.is_platform_master && (
           <AdminTenantsView onBack={() => setView('profile')} />
+        )}
+        {view === 'admin-challenges' && profile?.is_platform_master && (
+          <AdminChallengesView onBack={() => setView('profile')} />
         )}
         {view === 'admin-moderation' && profile?.is_platform_master && (
           <AdminModerationView onBack={() => setView('profile')} />

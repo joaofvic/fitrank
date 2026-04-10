@@ -56,11 +56,21 @@ Este documento define o plano faseado para construir o módulo de **Gestão de D
 - Segurança: Bearer JWT → `is_platform_master` → 403; `service_role` para mutações; zod em todos os inputs
 - Auditoria: `desafio.create`, `desafio.update`, `desafio.activate`, `desafio.close`, `desafio.cancel`, `desafio.remove_participant`
 
-## Epic 3 — CRUD Admin no Frontend (pendente)
+## Epic 3 — CRUD Admin no Frontend ✅
 
-- `src/components/views/AdminChallengesView.jsx`
-- Integrar em `App.jsx` e `ProfileView.jsx`
-- Reutilizar `WorkoutTypeMultiSelect.jsx`
+- **Arquivo criado**: `src/components/views/AdminChallengesView.jsx` (~430 linhas)
+- **Integração `App.jsx`**: import + rota `admin-challenges` + prop `onOpenChallenges`
+- **Integração `ProfileView.jsx`**: prop `onOpenChallenges` + botão "Admin · Desafios"
+- **Sub-views internas**: `list` (listagem com filtros) → `detail` (detalhe + participantes) → `form` (criar/editar)
+- **Funcionalidades**:
+  - Listagem cross-tenant com filtros (tenant, status, busca textual)
+  - Criação de desafio (nome, descrição, tenant, tipos de treino via `WorkoutTypeMultiSelect`, datas, max participantes, status inicial)
+  - Edição com regras de status (campos bloqueados para cancelado/encerrado, datas bloqueadas para ativo com participantes)
+  - Ciclo de vida: ativar, encerrar, cancelar (com confirm)
+  - Detalhe com metadados completos + lista de participantes com ranking
+  - Remover participante com motivo obrigatório (prompt)
+  - Cálculo de duração em dias e dias restantes
+- **Padrões seguidos**: `edgeReady` memoizado, `invokeEdge` com `searchParams`, error/loading states, mobile-first dark UI
 
 ## Epic 4 — Adaptação do ChallengesView.jsx (pendente)
 

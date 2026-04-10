@@ -13,6 +13,7 @@ export function ProfileView({
   cloudDisplayName = null,
   isPlatformMaster = false,
   onOpenAdmin,
+  onOpenChallenges,
   onOpenModeration,
   onOpenModerationSettings,
   onOpenUsers,
@@ -116,6 +117,11 @@ export function ProfileView({
           {isPlatformMaster && onOpenAdmin && (
             <Button variant="secondary" className="w-full py-2 text-sm" onClick={onOpenAdmin}>
               Admin · Tenants
+            </Button>
+          )}
+          {isPlatformMaster && onOpenChallenges && (
+            <Button variant="secondary" className="w-full py-2 text-sm" onClick={onOpenChallenges}>
+              Admin · Desafios
             </Button>
           )}
           {isPlatformMaster && onOpenUsers && (
