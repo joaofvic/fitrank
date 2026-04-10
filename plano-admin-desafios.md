@@ -45,11 +45,16 @@ Este documento define o plano faseado para construir o módulo de **Gestão de D
 
 ---
 
-## Epic 2 — Edge Function `admin-challenges` (pendente)
+## Epic 2 — Edge Function `admin-challenges` ✅
 
-- Arquivo: `supabase/functions/admin-challenges/index.ts`
-- Métodos: GET (list/detail), POST (create), PATCH (update/lifecycle), DELETE (cancel)
-- Zod, `is_platform_master`, `service_role`, audit via `platform_admin_audit_log`
+- Arquivo: `supabase/functions/admin-challenges/index.ts` (557 linhas)
+- Deploy: `admin-challenges` v1 (ACTIVE, verify_jwt: false)
+- **GET**: `?mode=list` (filtros: tenant_id, status, from, to, search, limit, offset) | `?mode=detail&id=` | `?mode=participants&id=`
+- **POST**: criar desafio (validação: datas coerentes, tenant válido, tipo_treino no catálogo)
+- **PATCH**: `action: update` (edição de campos, regras por status) | `action: activate/close/cancel` (ciclo de vida com transições válidas) | `action: remove_participant` (com motivo obrigatório)
+- **DELETE**: `?id=` soft-cancel
+- Segurança: Bearer JWT → `is_platform_master` → 403; `service_role` para mutações; zod em todos os inputs
+- Auditoria: `desafio.create`, `desafio.update`, `desafio.activate`, `desafio.close`, `desafio.cancel`, `desafio.remove_participant`
 
 ## Epic 3 — CRUD Admin no Frontend (pendente)
 
