@@ -4,7 +4,7 @@ overview: Adicionar filtro de tipo de treino nas 3 triggers de pontuacao de desa
 todos:
   - id: migration-tipo-treino-filter
     content: Criar migration com CREATE OR REPLACE das 3 funcoes (bump, reject, reapprove) adicionando filtro AND (des.tipo_treino = '{}' OR new.tipo_treino = ANY(des.tipo_treino))
-    status: pending
+    status: completed
 isProject: false
 ---
 
