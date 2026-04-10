@@ -4,25 +4,25 @@ overview: Redesign completo da ProfileView com foco em hierarquia visual, agrupa
 todos:
   - id: helpers
     content: Criar helpers groupCheckinsByDate() e formatDateLabel() e workoutTypeIcon() dentro do ProfileView
-    status: pending
+    status: completed
   - id: header-redesign
     content: Redesign do header do perfil com gradiente sutil e ring no avatar
-    status: pending
+    status: completed
   - id: stats-3col
     content: Alterar grid de stats para 3 colunas adicionando total de check-ins aprovados
-    status: pending
+    status: completed
   - id: history-grouped
     content: Reescrever bloco do historico com agrupamento por data e headers de grupo
-    status: pending
+    status: completed
   - id: history-items
     content: "Redesign dos itens: borda lateral colorida, thumbnail 12x12 com overlay, icone por tipo, pontos estilizados por status"
-    status: pending
+    status: completed
   - id: retry-cleanup
     content: Melhorar area de rejeicao/retry com layout mais compacto e botao pill
-    status: pending
+    status: completed
   - id: pro-banner
     content: Atualizar banner PRO com gradiente e botao secondary
-    status: pending
+    status: completed
 isProject: false
 ---
 

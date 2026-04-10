@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   User, Camera, Flame, Zap, Calendar, CheckCircle2, Crown, RefreshCw,
-  Settings, X, Building2, Trophy, Users, Shield, SlidersHorizontal, BarChart3, ScrollText, LogOut
+  Settings, X, Building2, Trophy, Users, Shield, SlidersHorizontal, BarChart3, ScrollText, LogOut,
+  Dumbbell, Activity, HeartPulse, Footprints, Clock, Check
 } from 'lucide-react';
 import { Card } from '../ui/Card.jsx';
 import { Button } from '../ui/Button.jsx';
@@ -84,6 +85,51 @@ export function ProfileView({
     [reasonLabelMap]
   );
 
+  const WORKOUT_ICON_MAP = {
+    musculacao: Dumbbell,
+    crossfit: Zap,
+    funcional: Activity,
+    cardio: HeartPulse,
+    corrida: Footprints,
+    outro: Flame,
+  };
+
+  function workoutTypeIcon(type) {
+    const key = (type ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return WORKOUT_ICON_MAP[key] ?? CheckCircle2;
+  }
+
+  function formatDateLabel(dateStr) {
+    const d = new Date(dateStr + 'T12:00:00');
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const diff = Math.round((today - target) / 86400000);
+    if (diff === 0) return 'Hoje';
+    if (diff === 1) return 'Ontem';
+    const day = d.getDate();
+    const month = d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+    if (d.getFullYear() === now.getFullYear()) return `${day} ${month}`;
+    return `${day} ${month} ${d.getFullYear()}`;
+  }
+
+  function groupCheckinsByDate(list) {
+    const groups = [];
+    let currentKey = null;
+    let currentGroup = null;
+    for (const c of list) {
+      if (c.date !== currentKey) {
+        currentKey = c.date;
+        currentGroup = { date: c.date, label: formatDateLabel(c.date), items: [] };
+        groups.push(currentGroup);
+      }
+      currentGroup.items.push(c);
+    }
+    return groups;
+  }
+
+  const checkinGroups = checkins.length > 0 ? groupCheckinsByDate(checkins) : [];
+
   return (
     <div className="space-y-6 animate-in-fade">
       {Array.isArray(notifications) && notifications.length > 0 ? (
@@ -119,39 +165,46 @@ export function ProfileView({
         </Card>
       ) : null}
 
-      <div className="text-center space-y-4">
+      <div className="text-center space-y-3 rounded-2xl bg-gradient-to-b from-green-500/5 to-transparent pt-8 pb-5 px-4 -mx-1">
         <div className="relative inline-block">
-          <div className="w-24 h-24 rounded-full bg-zinc-800 border-4 border-zinc-700 flex items-center justify-center mx-auto shadow-2xl shadow-green-500/10">
+          <div className="w-24 h-24 rounded-full bg-zinc-800 ring-2 ring-green-500/30 flex items-center justify-center mx-auto shadow-2xl shadow-green-500/10">
             <User size={48} className="text-zinc-500" />
           </div>
-          <div className="absolute bottom-0 right-0 bg-green-500 p-2 rounded-full border-4 border-black">
-            <Camera size={16} className="text-black" />
+          <div className="absolute bottom-0 right-0 bg-green-500 p-1.5 rounded-full ring-4 ring-black">
+            <Camera size={14} className="text-black" />
           </div>
         </div>
-        <div>
+        <div className="space-y-1">
           <h2 className="text-2xl font-black">{displayNome}</h2>
-          <p className="text-zinc-500">Desde {created}</p>
+          <p className="text-sm text-zinc-500">Desde {created}</p>
           {cloudTenant && (
-            <p className="text-xs text-zinc-600 mt-1">
-              Academia: <span className="text-zinc-400 font-mono">{cloudTenant.slug}</span>
-              {cloudTenant.name ? ` · ${cloudTenant.name}` : ''}
-            </p>
+            <span className="inline-flex items-center gap-1.5 mt-1 px-3 py-1 rounded-full text-[11px] font-semibold bg-zinc-800/60 text-zinc-400 border border-zinc-700/50">
+              <Building2 className="w-3 h-3" />
+              {cloudTenant.name || cloudTenant.slug}
+            </span>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <Card className="flex flex-col items-center justify-center py-6 border-orange-500/20">
-          <Flame className="w-8 h-8 text-orange-500 fill-orange-500 mb-2" />
-          <span className="text-2xl font-black">{userData?.streak || 0}</span>
-          <span className="text-xs text-zinc-500 uppercase">
-            {(userData?.streak || 0) === 1 ? 'Dia Seguido' : 'Dias Seguidos'}
+      <div className="grid grid-cols-3 gap-2">
+        <Card className="flex flex-col items-center justify-center py-4 border-orange-500/20">
+          <Flame className="w-6 h-6 text-orange-500 fill-orange-500 mb-1.5" />
+          <span className="text-xl font-black tabular-nums">{userData?.streak || 0}</span>
+          <span className="text-[10px] text-zinc-500 uppercase">
+            {(userData?.streak || 0) === 1 ? 'Dia' : 'Dias'} Seguido{(userData?.streak || 0) !== 1 ? 's' : ''}
           </span>
         </Card>
-        <Card className="flex flex-col items-center justify-center py-6 border-green-500/20">
-          <Zap className="w-8 h-8 text-green-500 fill-green-500 mb-2" />
-          <span className="text-2xl font-black">{userData?.pontos || 0}</span>
-          <span className="text-xs text-zinc-500 uppercase">Total Pontos</span>
+        <Card className="flex flex-col items-center justify-center py-4 border-green-500/20">
+          <Zap className="w-6 h-6 text-green-500 fill-green-500 mb-1.5" />
+          <span className="text-xl font-black tabular-nums">{userData?.pontos || 0}</span>
+          <span className="text-[10px] text-zinc-500 uppercase">Pontos</span>
+        </Card>
+        <Card className="flex flex-col items-center justify-center py-4 border-blue-500/20">
+          <CheckCircle2 className="w-6 h-6 text-blue-500 mb-1.5" />
+          <span className="text-xl font-black tabular-nums">
+            {checkins.filter((c) => c.photo_review_status !== 'rejected').length}
+          </span>
+          <span className="text-[10px] text-zinc-500 uppercase">Treinos</span>
         </Card>
       </div>
 
@@ -233,73 +286,103 @@ export function ProfileView({
             Você ainda não registrou nenhum treino.
           </div>
         ) : (
-          <div className="space-y-3">
-            {checkins.map((c) => (
-              <div
-                key={c.id}
-                className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 flex items-center justify-between"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-zinc-800 flex items-center justify-center overflow-hidden shrink-0">
-                    {c.foto_url ? (
-                      <img src={c.foto_url} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <CheckCircle2 className="w-6 h-6 text-green-500" />
-                    )}
-                  </div>
-                  <div>
-                    <p className="font-bold text-white">{c.type}</p>
-                    <p className="text-xs text-zinc-500">
-                      {new Date(c.date + 'T12:00:00').toLocaleDateString('pt-BR')}
-                    </p>
-                    {c.photo_review_status === 'rejected' ? (
-                      <div className="mt-2 space-y-1">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-red-500/10 text-red-400 border border-red-500/20">
-                          Foto rejeitada
-                        </span>
-                        {c.photo_rejection_reason_code ? (
-                          <p className="text-[11px] text-zinc-400">
-                            Motivo:{' '}
-                            <span className="text-zinc-200">
-                              {rejectionReasonLabel(c.photo_rejection_reason_code)}
-                            </span>
-                          </p>
-                        ) : null}
-                        {c.photo_rejection_note ? (
-                          <p className="text-[11px] text-zinc-400">
-                            Observação: <span className="text-zinc-200">{c.photo_rejection_note}</span>
-                          </p>
-                        ) : null}
-                        {onRetryCheckin ? (
-                          <button
-                            type="button"
-                            disabled={retryingId === c.id}
-                            onClick={() => {
-                              retryTargetRef.current = c.id;
-                              retryFileRef.current?.click();
-                            }}
-                            className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-orange-400 hover:text-orange-300 transition-colors disabled:opacity-50"
-                          >
-                            <RefreshCw className={`w-3.5 h-3.5 ${retryingId === c.id ? 'animate-spin' : ''}`} />
-                            {retryingId === c.id ? 'Reenviando…' : 'Reenviar foto'}
-                          </button>
-                        ) : null}
+          <div className="space-y-5">
+            {checkinGroups.map((group) => (
+              <div key={group.date} className="space-y-2">
+                <p className="text-[11px] font-bold uppercase text-zinc-500 tracking-wider px-1">
+                  {group.label}
+                </p>
+                <div className="space-y-2">
+                  {group.items.map((c) => {
+                    const status = c.photo_review_status ?? 'approved';
+                    const borderColor = status === 'rejected'
+                      ? 'border-l-red-500'
+                      : status === 'pending'
+                        ? 'border-l-yellow-500'
+                        : 'border-l-green-500';
+                    const TypeIcon = workoutTypeIcon(c.type);
+                    const overlayColors = status === 'rejected'
+                      ? 'bg-red-500 text-white'
+                      : status === 'pending'
+                        ? 'bg-yellow-500 text-black'
+                        : 'bg-green-500 text-black';
+                    const OverlayIcon = status === 'rejected' ? X : status === 'pending' ? Clock : Check;
+
+                    return (
+                      <div
+                        key={c.id}
+                        className={`bg-zinc-900/50 border border-zinc-800 border-l-[3px] ${borderColor} rounded-xl p-3 flex items-start justify-between gap-3`}
+                      >
+                        <div className="flex items-start gap-3 min-w-0">
+                          <div className="relative shrink-0">
+                            <div className="w-12 h-12 rounded-xl bg-zinc-800 flex items-center justify-center overflow-hidden">
+                              {c.foto_url ? (
+                                <img src={c.foto_url} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <TypeIcon className="w-6 h-6 text-zinc-400" />
+                              )}
+                            </div>
+                            <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center ring-2 ring-zinc-900 ${overlayColors}`}>
+                              <OverlayIcon className="w-3 h-3" strokeWidth={3} />
+                            </div>
+                          </div>
+
+                          <div className="min-w-0 space-y-1">
+                            <p className="font-bold text-sm text-white truncate">{c.type}</p>
+
+                            {status === 'rejected' ? (
+                              <div className="space-y-1.5">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-red-500/10 text-red-400 border border-red-500/20">
+                                  Foto rejeitada
+                                </span>
+                                {c.photo_rejection_reason_code ? (
+                                  <p className="text-[11px] text-zinc-500 truncate">
+                                    {rejectionReasonLabel(c.photo_rejection_reason_code)}
+                                    {c.photo_rejection_note ? ` · ${c.photo_rejection_note}` : ''}
+                                  </p>
+                                ) : c.photo_rejection_note ? (
+                                  <p className="text-[11px] text-zinc-500 truncate">{c.photo_rejection_note}</p>
+                                ) : null}
+                                {onRetryCheckin ? (
+                                  <button
+                                    type="button"
+                                    disabled={retryingId === c.id}
+                                    onClick={() => {
+                                      retryTargetRef.current = c.id;
+                                      retryFileRef.current?.click();
+                                    }}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-orange-500/10 text-orange-400 border border-orange-500/30 hover:bg-orange-500/20 transition-colors disabled:opacity-50"
+                                  >
+                                    <RefreshCw className={`w-3 h-3 ${retryingId === c.id ? 'animate-spin' : ''}`} />
+                                    {retryingId === c.id ? 'Reenviando…' : 'Reenviar foto'}
+                                  </button>
+                                ) : null}
+                              </div>
+                            ) : status === 'pending' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
+                                <Clock className="w-3 h-3" />
+                                Aguardando revisão
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        <div
+                          className={`shrink-0 px-2 py-1 rounded-lg text-xs font-bold tabular-nums whitespace-nowrap ${
+                            status === 'rejected'
+                              ? 'text-zinc-600 line-through'
+                              : status === 'pending'
+                                ? 'bg-yellow-500/10 text-yellow-400'
+                                : 'bg-green-500/10 text-green-500'
+                          }`}
+                        >
+                          {status === 'rejected'
+                            ? '0 PTS'
+                            : `+${c.points_earned ?? 0} PTS`}
+                        </div>
                       </div>
-                    ) : c.photo_review_status === 'pending' ? (
-                      <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
-                        Aguardando revisão
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-                <div
-                  className={`px-2 py-1 rounded text-xs font-bold ${
-                    c.photo_review_status === 'rejected'
-                      ? 'bg-zinc-700/30 text-zinc-300 border border-zinc-700/40'
-                      : 'bg-green-500/10 text-green-500'
-                  }`}
-                >
-                  +{c.photo_review_status === 'rejected' ? 0 : c.points_earned ?? 0} PTS
+                    );
+                  })}
                 </div>
               </div>
             ))}
@@ -307,19 +390,19 @@ export function ProfileView({
         )}
       </div>
 
-      <Card className="bg-zinc-800/30 border-dashed border-zinc-700">
+      <Card className="bg-gradient-to-br from-yellow-500/5 via-transparent to-yellow-500/5 border-dashed border-yellow-500/20">
         <h4 className="font-bold mb-1 flex items-center gap-2">
-          <Crown className="w-4 h-4 text-yellow-500" />
+          <Crown className="w-5 h-5 text-yellow-500 drop-shadow-[0_0_6px_rgba(234,179,8,0.4)]" />
           Seja um Membro PRO
         </h4>
         <p className="text-sm text-zinc-500 mb-4">Desbloqueie badges exclusivos e acesso a ligas premium.</p>
-        <Button variant="outline" className="w-full py-2">
+        <Button variant="secondary" className="w-full py-2">
           Ver Benefícios
         </Button>
       </Card>
 
       {onSignOut && (
-        <Button variant="ghost" className="w-full py-2 text-sm text-zinc-500" onClick={onSignOut}>
+        <Button variant="ghost" className="w-full mt-2 py-2 text-sm text-zinc-500" onClick={onSignOut}>
           <LogOut className="w-4 h-4" />
           Sair da conta
         </Button>
