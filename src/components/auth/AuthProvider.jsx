@@ -98,7 +98,8 @@ export function AuthProvider({ children }) {
 
   const refreshProfile = useCallback(() => {
     const uid = session?.user?.id;
-    if (uid) loadProfile(uid);
+    if (uid) return loadProfile(uid);
+    return Promise.resolve();
   }, [session?.user?.id, loadProfile]);
 
   const value = useMemo(

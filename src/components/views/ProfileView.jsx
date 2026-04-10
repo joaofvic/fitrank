@@ -161,7 +161,9 @@ export function ProfileView({
         <Card className="flex flex-col items-center justify-center py-6 border-orange-500/20">
           <Flame className="w-8 h-8 text-orange-500 fill-orange-500 mb-2" />
           <span className="text-2xl font-black">{userData?.streak || 0}</span>
-          <span className="text-xs text-zinc-500 uppercase">Dias Seguidos</span>
+          <span className="text-xs text-zinc-500 uppercase">
+            {(userData?.streak || 0) === 1 ? 'Dia Seguido' : 'Dias Seguidos'}
+          </span>
         </Card>
         <Card className="flex flex-col items-center justify-center py-6 border-green-500/20">
           <Zap className="w-8 h-8 text-green-500 fill-green-500 mb-2" />

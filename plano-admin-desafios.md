@@ -83,11 +83,73 @@ Este documento define o plano faseado para construir o módulo de **Gestão de D
 - **UX**: cards colapsáveis, layout compacto mobile-first, dark theme consistente
 - **Backward compat**: desafios legados (mensais) continuam aparecendo pois têm `status = 'ativo'`
 
-## Epic 5 — Testes e Qualidade (pendente)
+## Epic 5 — Testes e Qualidade ✅
 
-- Smoke tests de RLS
-- Validação de payloads Edge Function
-- Checklist visual mobile-first
+### 5.1 — Smoke Tests RLS (7/7 PASSED)
+
+Executados via SQL com `SET LOCAL ROLE authenticated` + `set_config('request.jwt.claims', ...)` para simular contexto de usuário real. Tenant temporário `_rls_test_tenant` criado e removido após os testes.
+
+| # | Teste | Resultado |
+|---|-------|-----------|
+| 1 | Regular user vê apenas desafios do próprio tenant | PASSED (3 own, 0 other) |
+| 2 | Admin vê desafios cross-tenant | PASSED (4 total, 1 other tenant) |
+| 3 | Regular user não pode INSERT em desafios | PASSED (42501 RLS violation) |
+| 4 | Regular user não pode inserir participante como outro user | PASSED (42501 RLS violation) |
+| 5 | Regular user não vê participantes de outro tenant | PASSED (0 rows) |
+| 6 | Regular user não pode DELETE desafio | PASSED (0 rows affected) |
+| 7 | Regular user não pode UPDATE desafio | PASSED (0 rows affected, nome inalterado) |
+
+### 5.2 — Validação de Payloads Edge Function (4/4 PASSED)
+
+Executados via HTTP (`Invoke-WebRequest`) contra `admin-challenges` v12.
+
+| # | Teste | Resultado |
+|---|-------|-----------|
+| 1 | GET sem Authorization header → 401 | PASSED |
+| 2 | GET com Bearer inválido → 401 | PASSED |
+| 3 | OPTIONS → 200 + CORS headers corretos | PASSED (ACAM: GET, POST, PATCH, DELETE, OPTIONS) |
+| 4 | PUT (método não suportado) → auth check antes de método | PASSED (401) |
+
+### 5.3 — Checklist Visual Mobile-First
+
+#### Admin: AdminChallengesView
+
+- [ ] **List**: header "Admin · Desafios" + botão "Voltar" visíveis
+- [ ] **List**: filtros (tenant, status, busca) renderizam e funcionam
+- [ ] **List**: botão "Novo desafio" full-width
+- [ ] **List**: cards com nome, tenant_slug, StatusBadge, datas, participantes, tipo_treino badges
+- [ ] **List**: card clicável abre detail view
+- [ ] **Form (criar)**: todos os campos renderizam (nome, descrição, tenant select, WorkoutTypeMultiSelect, datas com cálculo de duração, max participantes, status inicial)
+- [ ] **Form (criar)**: botão desabilitado quando campos obrigatórios vazios
+- [ ] **Form (criar)**: criar desafio como "Rascunho" e "Ativo" funciona
+- [ ] **Form (editar)**: campos pré-preenchidos; tenant bloqueado
+- [ ] **Form (editar)**: datas bloqueadas para desafio ativo com participantes
+- [ ] **Detail**: metadados completos (nome, descrição, tenant, criador, datas, dias restantes, tipos, participantes/max)
+- [ ] **Detail**: botões de lifecycle (Ativar, Encerrar, Cancelar) com confirm
+- [ ] **Detail**: lista de participantes com ranking e botão remover (com prompt de motivo)
+- [ ] **Detail**: responsive em tela 375px (mobile)
+
+#### User: ChallengesView
+
+- [ ] **Header**: "Desafios" + subtítulo visíveis
+- [ ] **Cards**: todos os desafios ativos do tenant renderizados
+- [ ] **Card**: nome, descrição (line-clamp), período, dias restantes badge, tipo_treino badges, participantes/max
+- [ ] **Card**: desafio inscrito tem borda verde + mensagem "Você está inscrito"
+- [ ] **Card**: desafio não inscrito mostra botão "Participar do desafio"
+- [ ] **Card**: vagas esgotadas mostra botão desabilitado "Vagas esgotadas"
+- [ ] **Ranking**: toggle "Ver ranking / Esconder ranking" funciona
+- [ ] **Ranking**: lista com posição, nome, pontos, "(você)" para o próprio user
+- [ ] **Inscrição**: clicar "Participar" inscreve, atualiza contagem e abre ranking
+- [ ] **Empty state**: "Nenhum desafio ativo no momento." quando sem desafios
+- [ ] **Teaser**: card "Desafios pagos" visível no final
+- [ ] **Responsive**: layout OK em 375px (iPhone SE)
+
+---
+
+## Notas técnicas
+
+- **Zod `.trim()` incompatível com Deno Edge Functions**: o método `z.string().trim()` causa boot crash no runtime Deno do Supabase. Usar validação sem `.trim()` e tratar manualmente se necessário.
+- **Deploy via MCP**: o Supabase MCP `deploy_edge_function` envia o conteúdo como JSON string. Evitar caracteres UTF-8 acentuados em string literals (usar ASCII) para prevenir problemas de encoding no deploy.
 
 ---
 
