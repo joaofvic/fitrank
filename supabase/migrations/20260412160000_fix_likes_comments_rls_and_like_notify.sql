@@ -49,10 +49,11 @@ AS $$
 DECLARE
   v_checkin_owner_id uuid;
   v_checkin_tenant_id uuid;
+  v_foto_url text;
   v_liker_name text;
 BEGIN
-  SELECT c.user_id, c.tenant_id
-  INTO v_checkin_owner_id, v_checkin_tenant_id
+  SELECT c.user_id, c.tenant_id, c.foto_url
+  INTO v_checkin_owner_id, v_checkin_tenant_id, v_foto_url
   FROM public.checkins c
   WHERE c.id = new.checkin_id;
 
@@ -78,7 +79,8 @@ BEGIN
     v_liker_name || ' curtiu seu treino.',
     jsonb_build_object(
       'checkin_id', new.checkin_id,
-      'liker_id', new.user_id
+      'liker_id', new.user_id,
+      'foto_url', v_foto_url
     )
   );
 

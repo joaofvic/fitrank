@@ -99,10 +99,11 @@ as $$
 declare
   v_checkin_owner_id uuid;
   v_checkin_tenant_id uuid;
+  v_foto_url text;
   v_commenter_name text;
 begin
-  select c.user_id, c.tenant_id
-  into v_checkin_owner_id, v_checkin_tenant_id
+  select c.user_id, c.tenant_id, c.foto_url
+  into v_checkin_owner_id, v_checkin_tenant_id, v_foto_url
   from public.checkins c
   where c.id = new.checkin_id;
 
@@ -129,7 +130,8 @@ begin
     jsonb_build_object(
       'comment_id', new.id,
       'checkin_id', new.checkin_id,
-      'commenter_id', new.user_id
+      'commenter_id', new.user_id,
+      'foto_url', v_foto_url
     )
   );
 

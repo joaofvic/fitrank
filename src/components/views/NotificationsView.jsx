@@ -73,10 +73,11 @@ function groupByTimePeriod(items) {
 function NotificationItem({ notification, isNew }) {
   const Icon = NOTIFICATION_ICONS[notification.type] || Info;
   const colorClass = NOTIFICATION_COLORS[notification.type] || DEFAULT_ICON_CLASS;
+  const thumbUrl = notification.data?.foto_url ?? null;
 
   return (
     <div
-      className={`flex items-start gap-3 px-4 py-3 transition-colors ${
+      className={`flex items-center gap-3 px-4 py-3 transition-colors ${
         isNew ? 'bg-zinc-800/40' : ''
       }`}
     >
@@ -92,10 +93,15 @@ function NotificationItem({ notification, isNew }) {
             {notification.body}
           </p>
         )}
+        <span className="text-[10px] text-zinc-600 mt-0.5 block">
+          {formatTimeAgo(notification.created_at)}
+        </span>
       </div>
-      <span className="text-[10px] text-zinc-600 shrink-0 pt-0.5">
-        {formatTimeAgo(notification.created_at)}
-      </span>
+      {thumbUrl && (
+        <div className="w-11 h-11 rounded-lg overflow-hidden bg-zinc-800 shrink-0 border border-zinc-700/50">
+          <img src={thumbUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
+        </div>
+      )}
     </div>
   );
 }
