@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   User, Camera, Flame, Zap, Calendar, CheckCircle2, Crown, RefreshCw,
   Settings, X, Building2, Trophy, Users, Shield, SlidersHorizontal, BarChart3, ScrollText, LogOut,
-  Dumbbell, Activity, HeartPulse, Footprints, Clock, Check
+  Dumbbell, Activity, HeartPulse, Footprints, Clock, Check, ChevronLeft, ChevronRight, Loader2
 } from 'lucide-react';
 import { Card } from '../ui/Card.jsx';
 import { Button } from '../ui/Button.jsx';
@@ -24,6 +24,13 @@ export function ProfileView({
   onOpenEngagement,
   onOpenAudit,
   onRetryCheckin,
+  checkinPage = 0,
+  checkinLimit = 10,
+  checkinCount = 0,
+  checkinApprovedCount,
+  checkinsLoading = false,
+  onPageChange,
+  onLimitChange,
   onSignOut
 }) {
   const { supabase } = useAuth();
@@ -202,7 +209,7 @@ export function ProfileView({
         <Card className="flex flex-col items-center justify-center py-4 border-blue-500/20">
           <CheckCircle2 className="w-6 h-6 text-blue-500 mb-1.5" />
           <span className="text-xl font-black tabular-nums">
-            {checkins.filter((c) => c.photo_review_status !== 'rejected').length}
+            {checkinApprovedCount ?? checkins.filter((c) => c.photo_review_status !== 'rejected').length}
           </span>
           <span className="text-[10px] text-zinc-500 uppercase">Treinos</span>
         </Card>
@@ -267,10 +274,31 @@ export function ProfileView({
       )}
 
       <div className="space-y-4">
-        <h3 className="font-bold flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-zinc-400" />
-          Histórico de Treinos
-        </h3>
+        <div className="flex items-center justify-between">
+          <h3 className="font-bold flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-zinc-400" />
+            Histórico de Treinos
+          </h3>
+          {onLimitChange && checkinCount > 0 && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-zinc-500">Exibir:</span>
+              {[5, 10, 20, 50].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => onLimitChange(n)}
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors ${
+                    checkinLimit === n
+                      ? 'bg-green-500/10 text-green-500 border border-green-500/30'
+                      : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         <input
           ref={retryFileRef}
@@ -281,12 +309,17 @@ export function ProfileView({
           onChange={handleRetryFile}
         />
 
-        {checkins.length === 0 ? (
+        {checkins.length === 0 && !checkinsLoading ? (
           <div className="text-center py-10 border-2 border-dashed border-zinc-800 rounded-2xl text-zinc-600">
             Você ainda não registrou nenhum treino.
           </div>
         ) : (
-          <div className="space-y-5">
+          <div className={`space-y-5 transition-opacity ${checkinsLoading ? 'opacity-50' : ''}`}>
+            {checkinsLoading && (
+              <div className="flex justify-center py-2">
+                <Loader2 className="w-5 h-5 text-green-500 animate-spin" />
+              </div>
+            )}
             {checkinGroups.map((group) => (
               <div key={group.date} className="space-y-2">
                 <p className="text-[11px] font-bold uppercase text-zinc-500 tracking-wider px-1">
@@ -388,6 +421,70 @@ export function ProfileView({
             ))}
           </div>
         )}
+
+        {onPageChange && checkinCount > checkinLimit && (() => {
+          const totalPages = Math.ceil(checkinCount / checkinLimit);
+          const current = checkinPage;
+
+          const pages = [];
+          for (let i = 0; i < totalPages; i++) {
+            if (
+              i === 0 ||
+              i === totalPages - 1 ||
+              (i >= current - 1 && i <= current + 1)
+            ) {
+              pages.push(i);
+            } else if (pages[pages.length - 1] !== -1) {
+              pages.push(-1);
+            }
+          }
+
+          return (
+            <div className="flex items-center justify-center gap-1.5 pt-3">
+              <button
+                type="button"
+                disabled={current === 0 || checkinsLoading}
+                onClick={() => onPageChange(current - 1)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors disabled:opacity-30 disabled:pointer-events-none"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              {pages.map((p, idx) =>
+                p === -1 ? (
+                  <span key={`ellipsis-${idx}`} className="text-zinc-600 text-xs px-1">...</span>
+                ) : (
+                  <button
+                    key={p}
+                    type="button"
+                    disabled={checkinsLoading}
+                    onClick={() => onPageChange(p)}
+                    className={`w-8 h-8 rounded-lg text-xs font-bold transition-colors ${
+                      p === current
+                        ? 'bg-green-500/10 text-green-500 border border-green-500/30'
+                        : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+                    }`}
+                  >
+                    {p + 1}
+                  </button>
+                )
+              )}
+
+              <button
+                type="button"
+                disabled={current >= totalPages - 1 || checkinsLoading}
+                onClick={() => onPageChange(current + 1)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors disabled:opacity-30 disabled:pointer-events-none"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+
+              <span className="text-[10px] text-zinc-600 ml-2 tabular-nums">
+                {current + 1}/{totalPages}
+              </span>
+            </div>
+          );
+        })()}
       </div>
 
       <Card className="bg-gradient-to-br from-yellow-500/5 via-transparent to-yellow-500/5 border-dashed border-yellow-500/20">

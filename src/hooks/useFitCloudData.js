@@ -29,6 +29,12 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const [checkinPage, setCheckinPage] = useState(0);
+  const [checkinLimit, setCheckinLimit] = useState(10);
+  const [checkinCount, setCheckinCount] = useState(0);
+  const [checkinApprovedCount, setCheckinApprovedCount] = useState(0);
+  const [checkinsLoading, setCheckinsLoading] = useState(false);
+
   const refreshLeaderboard = useCallback(async () => {
     if (!supabase || !userId) return;
     setLeaderboardLoading(true);
@@ -60,31 +66,56 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
 
   const refreshCheckins = useCallback(async () => {
     if (!supabase || !userId) return;
-    const { data, error: qError } = await supabase
-      .from('checkins')
-      .select(
-        'id, checkin_local_date, tipo_treino, points_awarded, foto_url, photo_review_status, photo_rejection_reason_code, photo_rejection_note'
-      )
-      .eq('user_id', userId)
-      .order('checkin_local_date', { ascending: false })
-      .order('created_at', { ascending: false });
-    if (qError) {
-      console.error('FitRank: checkins', qError.message);
-      return;
+    setCheckinsLoading(true);
+    try {
+      const from = checkinPage * checkinLimit;
+      const to = from + checkinLimit - 1;
+
+      const [pageResult, countResult] = await Promise.all([
+        supabase
+          .from('checkins')
+          .select(
+            'id, checkin_local_date, tipo_treino, points_awarded, foto_url, photo_review_status, photo_rejection_reason_code, photo_rejection_note',
+            { count: 'exact' }
+          )
+          .eq('user_id', userId)
+          .order('checkin_local_date', { ascending: false })
+          .order('created_at', { ascending: false })
+          .range(from, to),
+        supabase
+          .from('checkins')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .neq('photo_review_status', 'rejected')
+      ]);
+
+      if (pageResult.error) {
+        console.error('FitRank: checkins', pageResult.error.message);
+        return;
+      }
+
+      setCheckinCount(pageResult.count ?? 0);
+      setCheckinApprovedCount(countResult.count ?? 0);
+      setCheckins(
+        (pageResult.data ?? []).map((c) => ({
+          id: c.id,
+          date: c.checkin_local_date,
+          type: c.tipo_treino,
+          points_earned: c.photo_review_status === 'rejected' ? 0 : c.points_awarded,
+          foto_url: c.foto_url,
+          photo_review_status: c.photo_review_status,
+          photo_rejection_reason_code: c.photo_rejection_reason_code,
+          photo_rejection_note: c.photo_rejection_note
+        }))
+      );
+    } finally {
+      setCheckinsLoading(false);
     }
-    setCheckins(
-      (data ?? []).map((c) => ({
-        id: c.id,
-        date: c.checkin_local_date,
-        type: c.tipo_treino,
-        points_earned: c.photo_review_status === 'rejected' ? 0 : c.points_awarded,
-        foto_url: c.foto_url,
-        photo_review_status: c.photo_review_status,
-        photo_rejection_reason_code: c.photo_rejection_reason_code,
-        photo_rejection_note: c.photo_rejection_note
-      }))
-    );
-  }, [supabase, userId]);
+  }, [supabase, userId, checkinPage, checkinLimit]);
+
+  useEffect(() => {
+    setCheckinPage(0);
+  }, [checkinLimit]);
 
   const refreshNotifications = useCallback(async () => {
     if (!supabase || !userId) return;
@@ -282,6 +313,7 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
         throw insErr;
       }
 
+      setCheckinPage(0);
       await refreshAll();
     },
     [supabase, userId, tenantId, refreshAll]
@@ -311,6 +343,7 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
       });
       if (rpcErr) throw rpcErr;
 
+      setCheckinPage(0);
       await refreshAll();
     },
     [supabase, userId, tenantId, refreshAll]
@@ -332,6 +365,13 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
     retryCheckin,
     rankingPeriod,
     setRankingPeriod,
-    rankingPeriodLabel
+    rankingPeriodLabel,
+    checkinPage,
+    setCheckinPage,
+    checkinLimit,
+    setCheckinLimit,
+    checkinCount,
+    checkinApprovedCount,
+    checkinsLoading
   };
 }

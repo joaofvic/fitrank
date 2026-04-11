@@ -209,6 +209,13 @@ export default function App() {
             onOpenEngagement={profile?.is_platform_master ? () => setView('admin-engagement') : undefined}
             onOpenAudit={profile?.is_platform_master ? () => setView('admin-audit') : undefined}
             onRetryCheckin={useCloud ? cloud.retryCheckin : undefined}
+            checkinPage={useCloud ? cloud.checkinPage : 0}
+            checkinLimit={useCloud ? cloud.checkinLimit : 0}
+            checkinCount={useCloud ? cloud.checkinCount : 0}
+            checkinApprovedCount={useCloud ? cloud.checkinApprovedCount : undefined}
+            checkinsLoading={useCloud ? cloud.checkinsLoading : false}
+            onPageChange={useCloud ? cloud.setCheckinPage : undefined}
+            onLimitChange={useCloud ? cloud.setCheckinLimit : undefined}
             onSignOut={configured ? signOut : undefined}
           />
         )}
