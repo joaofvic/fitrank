@@ -16,7 +16,7 @@ todos:
     status: completed
   - id: epic-5-apply
     content: Aplicar migration no Supabase e verificar RPCs
-    status: pending
+    status: completed
 isProject: false
 ---
 
