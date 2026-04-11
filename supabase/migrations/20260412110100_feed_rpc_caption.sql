@@ -29,7 +29,7 @@ AS $$
   SELECT
     c.id,
     c.user_id,
-    p.display_name,
+    COALESCE(p.display_name, p.nome, 'Usuário'),
     c.checkin_local_date,
     c.tipo_treino,
     c.foto_url,
