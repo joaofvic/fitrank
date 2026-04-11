@@ -1154,8 +1154,8 @@ export function AdminModerationView({ onBack }) {
       )}
 
       {quickOpen && focused ? (
-        <div className="fixed inset-0 z-50 bg-black/90 flex flex-col justify-end p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 w-full max-w-lg mx-auto space-y-4">
+        <div className="fixed inset-0 z-50 bg-black/90 overflow-y-auto p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 w-full max-w-lg mx-auto space-y-4 my-4">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-xs text-zinc-500 font-mono truncate">{focusedTenant}</p>
