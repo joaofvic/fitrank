@@ -16,7 +16,7 @@ todos:
     status: completed
   - id: hook-social
     content: Criar hook useSocialData.js com feed paginado, CRUD de amizades, toggleLike otimista e comentarios
-    status: pending
+    status: completed
   - id: extract-workout-icons
     content: Extrair workoutTypeIcon para src/lib/workout-icons.js e importar no ProfileView
     status: pending
