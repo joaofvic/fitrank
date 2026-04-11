@@ -7,7 +7,7 @@ todos:
     status: completed
   - id: epic-2-view
     content: Criar NotificationsView.jsx com layout estilo Instagram (novas + historico agrupado por tempo)
-    status: pending
+    status: completed
   - id: epic-3-app
     content: "Integrar no App.jsx: icone Bell com badge no header, roteamento para notifications view"
     status: pending
