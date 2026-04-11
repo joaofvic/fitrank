@@ -82,10 +82,10 @@ export default function App() {
     setTimeout(() => setMessage(null), 3000);
   };
 
-  const handleCheckin = async (workoutType = 'Treino Geral', fotoFile = null) => {
+  const handleCheckin = async (workoutType = 'Treino Geral', fotoFile = null, feedVisible = true, feedCaption = null) => {
     if (useCloud) {
       try {
-        await cloud.insertCheckin(workoutType, fotoFile);
+        await cloud.insertCheckin(workoutType, fotoFile, feedVisible, feedCaption);
         showToast('Check-in realizado! +10 pontos ⚡');
         setView('home');
       } catch (err) {
