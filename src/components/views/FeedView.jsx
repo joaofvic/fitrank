@@ -16,7 +16,8 @@ export function FeedView({
   onDeleteComment,
   onOpenFriends,
   onOpenProfile,
-  currentUserId
+  currentUserId,
+  onUpdatePrivacy
 }) {
   const [commentsOpen, setCommentsOpen] = useState(null);
   const feedLoaded = useRef(false);
@@ -93,6 +94,7 @@ export function FeedView({
               onOpenComments={(id) => setCommentsOpen(id)}
               onOpenProfile={onOpenProfile}
               currentUserId={currentUserId}
+              onUpdatePrivacy={onUpdatePrivacy}
             />
           ))}
 

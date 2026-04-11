@@ -41,7 +41,9 @@ export function useSocialData({ supabase, session, profile }) {
         likes_count: Number(r.likes_count ?? 0),
         comments_count: Number(r.comments_count ?? 0),
         has_liked: r.has_liked ?? false,
-        caption: r.feed_caption ?? null
+        caption: r.feed_caption ?? null,
+        allow_comments: r.allow_comments ?? true,
+        hide_likes_count: r.hide_likes_count ?? false
       }));
       if (page === 0) {
         setFeed(rows);
@@ -405,6 +407,30 @@ export function useSocialData({ supabase, session, profile }) {
     return true;
   }, [supabase, userId, loadFriends]);
 
+  const updatePostPrivacy = useCallback(async (checkinId, fields) => {
+    if (!supabase || !userId) return false;
+    const allowed = {};
+    if (fields.allow_comments !== undefined) allowed.allow_comments = fields.allow_comments;
+    if (fields.hide_likes_count !== undefined) allowed.hide_likes_count = fields.hide_likes_count;
+    if (Object.keys(allowed).length === 0) return false;
+
+    const { error } = await supabase
+      .from('checkins')
+      .update(allowed)
+      .eq('id', checkinId)
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('FitRank: updatePostPrivacy', error.message);
+      return false;
+    }
+
+    setFeed((prev) =>
+      prev.map((item) => (item.id === checkinId ? { ...item, ...allowed } : item))
+    );
+    return true;
+  }, [supabase, userId]);
+
   return {
     feed,
     feedLoading,
@@ -416,6 +442,7 @@ export function useSocialData({ supabase, session, profile }) {
     addComment,
     loadComments,
     deleteComment,
+    updatePostPrivacy,
     friends,
     friendsLoading,
     pendingRequests,

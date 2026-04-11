@@ -15,7 +15,8 @@ export function PublicProfileView({
   onAddComment,
   onLoadComments,
   onDeleteComment,
-  currentUserId
+  currentUserId,
+  onUpdatePrivacy
 }) {
   const { supabase } = useAuth();
   const [profile, setProfile] = useState(null);
@@ -69,10 +70,19 @@ export function PublicProfileView({
         likes_count: Number(c.likes_count ?? 0),
         comments_count: Number(c.comments_count ?? 0),
         has_liked: c.has_liked ?? false,
-        caption: c.feed_caption ?? null
+        caption: c.feed_caption ?? null,
+        allow_comments: c.allow_comments ?? true,
+        hide_likes_count: c.hide_likes_count ?? false
       }))
     );
   }, [profile, userId]);
+
+  const handleUpdatePrivacy = useCallback(async (checkinId, fields) => {
+    setPosts((prev) =>
+      prev.map((p) => (p.id === checkinId ? { ...p, ...fields } : p))
+    );
+    await onUpdatePrivacy?.(checkinId, fields);
+  }, [onUpdatePrivacy]);
 
   const handleToggleLike = useCallback((checkinId, currentlyLiked) => {
     setPosts((prev) =>
@@ -193,6 +203,7 @@ export function PublicProfileView({
               onToggleLike={handleToggleLike}
               onOpenComments={(id) => setCommentsOpen(id)}
               currentUserId={currentUserId}
+              onUpdatePrivacy={handleUpdatePrivacy}
             />
           ))}
         </div>

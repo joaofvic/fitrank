@@ -292,7 +292,7 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
   }, [supabase, userId, tenantId]);
 
   const insertCheckin = useCallback(
-    async (tipoTreino, fotoFile = null, feedVisible = true, feedCaption = null, allowComments = true, hideLikesCount = false) => {
+    async (tipoTreino, fotoFile = null, feedVisible = true, feedCaption = null) => {
       if (!supabase || !userId || !tenantId) {
         throw new Error('Sessão inválida');
       }
@@ -331,9 +331,7 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
         tipo_treino: tipoTreino,
         foto_url,
         feed_visible: feedVisible,
-        feed_caption: feedCaption?.trim() || null,
-        allow_comments: allowComments,
-        hide_likes_count: hideLikesCount
+        feed_caption: feedCaption?.trim() || null
       });
 
       if (insErr) {

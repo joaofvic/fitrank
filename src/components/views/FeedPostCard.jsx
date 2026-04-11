@@ -1,10 +1,21 @@
-import { useState } from 'react';
-import { Bookmark, Heart, MessageCircle, MoreHorizontal, Send, User } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Bookmark, Heart, MessageCircle, MessageCircleOff, MoreHorizontal, Send, User, EyeOff, Eye } from 'lucide-react';
 import { formatTimeAgo } from '../../lib/dates.js';
 import { workoutTypeIcon } from '../../lib/workout-icons.js';
 
-export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenProfile, currentUserId }) {
+export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenProfile, currentUserId, onUpdatePrivacy }) {
   const [animating, setAnimating] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  const isOwner = currentUserId === post.user_id;
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false); };
+    document.addEventListener('pointerdown', close);
+    return () => document.removeEventListener('pointerdown', close);
+  }, [menuOpen]);
 
   const TypeIcon = workoutTypeIcon(post.workout_type);
 
@@ -35,9 +46,56 @@ export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenProfile
           </div>
           <p className="text-[13px] font-semibold text-white truncate">{post.display_name}</p>
         </button>
-        <span className="text-[11px] text-zinc-600 shrink-0">
-          {formatTimeAgo(post.created_at)}
-        </span>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-[11px] text-zinc-600">
+            {formatTimeAgo(post.created_at)}
+          </span>
+          {isOwner && onUpdatePrivacy && (
+            <div className="relative" ref={menuRef}>
+              <button
+                type="button"
+                onClick={() => setMenuOpen((v) => !v)}
+                className="p-1 text-zinc-600 hover:text-white transition-colors"
+              >
+                <MoreHorizontal className="w-5 h-5" />
+              </button>
+              {menuOpen && (
+                <div className="absolute right-0 top-full mt-1 w-56 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl z-50 py-1 animate-in-fade">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onUpdatePrivacy(post.id, { allow_comments: !post.allow_comments });
+                      setMenuOpen(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-zinc-800 transition-colors"
+                  >
+                    {post.allow_comments !== false
+                      ? <MessageCircleOff size={16} className="text-zinc-400 shrink-0" />
+                      : <MessageCircle size={16} className="text-green-400 shrink-0" />}
+                    <span className="text-xs text-zinc-300">
+                      {post.allow_comments !== false ? 'Desativar comentários' : 'Ativar comentários'}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onUpdatePrivacy(post.id, { hide_likes_count: !post.hide_likes_count });
+                      setMenuOpen(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-zinc-800 transition-colors"
+                  >
+                    {post.hide_likes_count
+                      ? <Eye size={16} className="text-green-400 shrink-0" />
+                      : <EyeOff size={16} className="text-zinc-400 shrink-0" />}
+                    <span className="text-xs text-zinc-300">
+                      {post.hide_likes_count ? 'Mostrar curtidas' : 'Ocultar curtidas'}
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       <div onDoubleClick={handleDoubleTap} className="relative cursor-pointer">

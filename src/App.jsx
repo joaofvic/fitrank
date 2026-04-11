@@ -94,10 +94,10 @@ export default function App() {
     setTimeout(() => setMessage(null), 3000);
   };
 
-  const handleCheckin = async (workoutType = 'Treino Geral', fotoFile = null, feedVisible = true, feedCaption = null, allowComments = true, hideLikesCount = false) => {
+  const handleCheckin = async (workoutType = 'Treino Geral', fotoFile = null, feedVisible = true, feedCaption = null) => {
     if (useCloud) {
       try {
-        await cloud.insertCheckin(workoutType, fotoFile, feedVisible, feedCaption, allowComments, hideLikesCount);
+        await cloud.insertCheckin(workoutType, fotoFile, feedVisible, feedCaption);
         showToast('Check-in realizado! +10 pontos ⚡');
         setView('home');
       } catch (err) {
@@ -224,6 +224,7 @@ export default function App() {
             onOpenFriends={() => setView('friends')}
             onOpenProfile={useCloud ? openPublicProfile : undefined}
             currentUserId={localUser?.uid}
+            onUpdatePrivacy={social.updatePostPrivacy}
           />
         )}
         {view === 'challenges' && <ChallengesView />}
@@ -283,6 +284,7 @@ export default function App() {
             onLoadComments={social.loadComments}
             onDeleteComment={social.deleteComment}
             currentUserId={localUser?.uid}
+            onUpdatePrivacy={social.updatePostPrivacy}
           />
         )}
         {view === 'admin-tenants' && profile?.is_platform_master && (
