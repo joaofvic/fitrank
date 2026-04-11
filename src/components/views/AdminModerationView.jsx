@@ -1300,11 +1300,21 @@ export function AdminModerationView({ onBack }) {
                     {messageTemplates.length === 0 ? <option value="">(sem templates)</option> : null}
                     {messageTemplates.map((t) => (
                       <option key={t.code} value={t.code}>
-                        {t.code}
+                        {t.title || t.code}
                       </option>
                     ))}
                   </select>
                 </label>
+
+                {(() => {
+                  const selectedTpl = messageTemplates.find((t) => t.code === messageTemplateCode);
+                  return selectedTpl?.body ? (
+                    <div className="rounded-xl border border-zinc-800 bg-black/20 p-3 space-y-1">
+                      <p className="text-[10px] uppercase font-bold text-zinc-500">Preview do template</p>
+                      <p className="text-xs text-zinc-400 whitespace-pre-wrap leading-relaxed">{selectedTpl.body}</p>
+                    </div>
+                  ) : null;
+                })()}
 
                 <label className="space-y-1 block">
                   <span className="text-[10px] uppercase font-bold text-zinc-500">Editar mensagem (opcional)</span>
