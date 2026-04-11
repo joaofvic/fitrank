@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">FitRank</string>
+    <string name="title_activity_main">FitRank</string>
+    <string name="package_name">com.joaofvic.fitrank</string>
+    <string name="custom_url_scheme">com.joaofvic.fitrank</string>
+</resources>
