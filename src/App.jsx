@@ -7,7 +7,9 @@ import { ResetPasswordScreen } from './components/auth/ResetPasswordScreen.jsx';
 import { defaultUserData, loadFitRankState, saveFitRankState } from './lib/persist.js';
 import { profileToUserData } from './lib/profile-map.js';
 import { useFitCloudData } from './hooks/useFitCloudData.js';
+import { useSocialData } from './hooks/useSocialData.js';
 import { HomeView } from './components/views/HomeView.jsx';
+import { FriendsView } from './components/views/FriendsView.jsx';
 import { ProfileView } from './components/views/ProfileView.jsx';
 import { ChallengesView } from './components/views/ChallengesView.jsx';
 import { CheckinModal } from './components/views/CheckinModal.jsx';
@@ -41,9 +43,16 @@ export default function App() {
     refreshProfile: useCloud ? refreshProfile : undefined
   });
 
+  const social = useSocialData({
+    supabase: useCloud ? supabase : null,
+    session: useCloud ? session : null,
+    profile: useCloud ? profile : null
+  });
+
   const [userData, setUserData] = useState(() => loadFitRankState()?.userData ?? defaultUserData());
   const [checkins, setCheckins] = useState(() => loadFitRankState()?.checkins ?? []);
   const [view, setView] = useState('home');
+  const [homeTab, setHomeTab] = useState('ranking');
   const [message, setMessage] = useState(null);
 
   useEffect(() => {
@@ -179,6 +188,20 @@ export default function App() {
             onRankingPeriodChange={cloud.setRankingPeriod}
             rankingPeriodLabel={cloud.rankingPeriodLabel}
             onOpenCheckin={() => setView('checkin-modal')}
+            homeTab={homeTab}
+            onHomeTabChange={setHomeTab}
+            feedEnabled={useCloud}
+            feed={social.feed}
+            feedLoading={social.feedLoading}
+            feedHasMore={social.feedHasMore}
+            onLoadFeed={social.loadFeed}
+            onLoadMoreFeed={social.loadMoreFeed}
+            onRefreshFeed={social.refreshFeed}
+            onToggleLike={social.toggleLike}
+            onAddComment={social.addComment}
+            onLoadComments={social.loadComments}
+            onDeleteComment={social.deleteComment}
+            onOpenFriends={() => setView('friends')}
           />
         )}
         {view === 'challenges' && <ChallengesView />}
@@ -209,6 +232,7 @@ export default function App() {
             onOpenEngagement={profile?.is_platform_master ? () => setView('admin-engagement') : undefined}
             onOpenAudit={profile?.is_platform_master ? () => setView('admin-audit') : undefined}
             onRetryCheckin={useCloud ? cloud.retryCheckin : undefined}
+            onOpenFriends={useCloud ? () => setView('friends') : undefined}
             checkinPage={useCloud ? cloud.checkinPage : 0}
             checkinLimit={useCloud ? cloud.checkinLimit : 0}
             checkinCount={useCloud ? cloud.checkinCount : 0}
@@ -217,6 +241,23 @@ export default function App() {
             onPageChange={useCloud ? cloud.setCheckinPage : undefined}
             onLimitChange={useCloud ? cloud.setCheckinLimit : undefined}
             onSignOut={configured ? signOut : undefined}
+          />
+        )}
+        {view === 'friends' && useCloud && (
+          <FriendsView
+            friends={social.friends}
+            friendsLoading={social.friendsLoading}
+            pendingRequests={social.pendingRequests}
+            sentRequests={social.sentRequests}
+            onLoadFriends={social.loadFriends}
+            onLoadPendingRequests={social.loadPendingRequests}
+            onLoadSentRequests={social.loadSentRequests}
+            onSearch={social.searchUsers}
+            onSendRequest={social.sendFriendRequest}
+            onAccept={social.acceptFriendRequest}
+            onDecline={social.declineFriendRequest}
+            onRemove={social.removeFriend}
+            onBack={() => setView('home')}
           />
         )}
         {view === 'admin-tenants' && profile?.is_platform_master && (
@@ -261,7 +302,7 @@ export default function App() {
             }`}
           >
             <Trophy size={24} className={view === 'home' ? 'fill-green-500/10' : ''} />
-            <span className="text-[10px] font-bold uppercase">Ranking</span>
+            <span className="text-[10px] font-bold uppercase">Home</span>
           </button>
           <button
             type="button"

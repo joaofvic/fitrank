@@ -37,7 +37,7 @@ todos:
     status: pending
   - id: app-integration
     content: Integrar useSocialData, FriendsView e novas props no App.jsx
-    status: pending
+    status: completed
 isProject: false
 ---
 
