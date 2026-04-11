@@ -76,11 +76,12 @@ BEGIN
     v_checkin_tenant_id,
     'like',
     'Nova curtida',
-    v_liker_name || ' curtiu seu treino.',
+    'curtiu seu treino.',
     jsonb_build_object(
       'checkin_id', new.checkin_id,
       'liker_id', new.user_id,
-      'foto_url', v_foto_url
+      'foto_url', v_foto_url,
+      'actor_name', v_liker_name
     )
   );
 

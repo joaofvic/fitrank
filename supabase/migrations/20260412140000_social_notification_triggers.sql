@@ -25,11 +25,12 @@ begin
     new.addressee_id,
     new.tenant_id,
     'friend_request',
-    'Nova solicitação de amizade',
-    v_name || ' quer te seguir.',
+    'Solicitação de amizade',
+    'começou a seguir você.',
     jsonb_build_object(
       'friendship_id', new.id,
-      'requester_id', new.requester_id
+      'requester_id', new.requester_id,
+      'actor_name', v_name
     )
   );
 
@@ -70,11 +71,12 @@ begin
     new.requester_id,
     new.tenant_id,
     'friend_accepted',
-    'Solicitação aceita!',
-    v_name || ' aceitou sua solicitação.',
+    'Solicitação aceita',
+    'aceitou sua solicitação.',
     jsonb_build_object(
       'friendship_id', new.id,
-      'addressee_id', new.addressee_id
+      'addressee_id', new.addressee_id,
+      'actor_name', v_name
     )
   );
 
@@ -126,12 +128,13 @@ begin
     v_checkin_tenant_id,
     'comment',
     'Novo comentário',
-    v_commenter_name || ' comentou no seu treino.',
+    'comentou no seu treino.',
     jsonb_build_object(
       'comment_id', new.id,
       'checkin_id', new.checkin_id,
       'commenter_id', new.user_id,
-      'foto_url', v_foto_url
+      'foto_url', v_foto_url,
+      'actor_name', v_commenter_name
     )
   );
 

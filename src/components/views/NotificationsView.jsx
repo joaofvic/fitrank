@@ -5,40 +5,21 @@ import {
   Bell,
   BellOff,
   CheckCircle2,
-  Heart,
   ImageOff,
-  Info,
-  MessageCircle,
   RefreshCw,
-  UserPlus
+  User
 } from 'lucide-react';
 import { formatTimeAgo } from '../../lib/dates.js';
 
-const NOTIFICATION_ICONS = {
+const SOCIAL_TYPES = new Set(['like', 'comment', 'friend_request', 'friend_accepted']);
+
+const SYSTEM_ICONS = {
   checkin_rejected: AlertTriangle,
   checkin_approved: CheckCircle2,
   checkin_photo_rejected: ImageOff,
   photo_rejected: ImageOff,
-  friend_request: UserPlus,
-  friend_accepted: CheckCircle2,
-  comment: MessageCircle,
-  like: Heart,
   admin_message: Bell
 };
-
-const NOTIFICATION_COLORS = {
-  checkin_rejected: 'text-red-400 bg-red-500/10',
-  checkin_approved: 'text-green-400 bg-green-500/10',
-  checkin_photo_rejected: 'text-orange-400 bg-orange-500/10',
-  photo_rejected: 'text-orange-400 bg-orange-500/10',
-  friend_request: 'text-blue-400 bg-blue-500/10',
-  friend_accepted: 'text-green-400 bg-green-500/10',
-  comment: 'text-purple-400 bg-purple-500/10',
-  like: 'text-red-400 bg-red-500/10',
-  admin_message: 'text-yellow-400 bg-yellow-500/10'
-};
-
-const DEFAULT_ICON_CLASS = 'text-zinc-400 bg-zinc-800';
 
 function groupByTimePeriod(items) {
   const now = new Date();
@@ -71,34 +52,49 @@ function groupByTimePeriod(items) {
 }
 
 function NotificationItem({ notification, isNew }) {
-  const Icon = NOTIFICATION_ICONS[notification.type] || Info;
-  const colorClass = NOTIFICATION_COLORS[notification.type] || DEFAULT_ICON_CLASS;
+  const isSocial = SOCIAL_TYPES.has(notification.type);
+  const actorName = notification.data?.actor_name;
   const thumbUrl = notification.data?.foto_url ?? null;
+  const SystemIcon = !isSocial ? (SYSTEM_ICONS[notification.type] || Bell) : null;
 
   return (
     <div
       className={`flex items-center gap-3 px-4 py-3 transition-colors ${
-        isNew ? 'bg-zinc-800/40' : ''
+        isNew ? 'bg-zinc-800/30' : ''
       }`}
     >
-      <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${colorClass}`}>
-        <Icon size={16} />
-      </div>
+      {isSocial ? (
+        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-zinc-600 to-zinc-800 p-[2px] shrink-0">
+          <div className="w-full h-full rounded-full bg-zinc-900 flex items-center justify-center">
+            <User size={18} className="text-zinc-400" />
+          </div>
+        </div>
+      ) : (
+        <div className="w-11 h-11 rounded-full bg-zinc-800 flex items-center justify-center shrink-0">
+          <SystemIcon size={18} className="text-zinc-400" />
+        </div>
+      )}
+
       <div className="flex-1 min-w-0">
-        <p className="text-[13px] text-white font-semibold leading-tight">
-          {notification.title}
+        <p className="text-[13px] text-zinc-300 leading-[1.4]">
+          {actorName ? (
+            <>
+              <span className="font-bold text-white">{actorName}</span>
+              {' '}{notification.body}
+            </>
+          ) : (
+            <>
+              <span className="font-bold text-white">{notification.title}</span>
+              {notification.body && <>{' '}{notification.body}</>}
+            </>
+          )}
+          {'  '}
+          <span className="text-zinc-600">{formatTimeAgo(notification.created_at)}</span>
         </p>
-        {notification.body && (
-          <p className="text-[12px] text-zinc-400 mt-0.5 leading-snug line-clamp-2">
-            {notification.body}
-          </p>
-        )}
-        <span className="text-[10px] text-zinc-600 mt-0.5 block">
-          {formatTimeAgo(notification.created_at)}
-        </span>
       </div>
+
       {thumbUrl && (
-        <div className="w-11 h-11 rounded-lg overflow-hidden bg-zinc-800 shrink-0 border border-zinc-700/50">
+        <div className="w-11 h-11 rounded overflow-hidden bg-zinc-800 shrink-0">
           <img src={thumbUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
         </div>
       )}
