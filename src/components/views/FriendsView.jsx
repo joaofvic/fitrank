@@ -22,6 +22,7 @@ export function FriendsView({
   onAccept,
   onDecline,
   onRemove,
+  onOpenProfile,
   onBack
 }) {
   const [tab, setTab] = useState('friends');
@@ -80,37 +81,44 @@ export function FriendsView({
 
       <div className="px-4 pt-4">
         {tab === 'search' && (
-          <SearchTab onSearch={onSearch} onSendRequest={onSendRequest} sentRequests={sentRequests} />
+          <SearchTab onSearch={onSearch} onSendRequest={onSendRequest} sentRequests={sentRequests} onOpenProfile={onOpenProfile} />
         )}
         {tab === 'pending' && (
-          <PendingTab requests={pendingRequests} onAccept={onAccept} onDecline={onDecline} />
+          <PendingTab requests={pendingRequests} onAccept={onAccept} onDecline={onDecline} onOpenProfile={onOpenProfile} />
         )}
         {tab === 'friends' && (
-          <FriendsTab friends={friends} loading={friendsLoading} onRemove={onRemove} />
+          <FriendsTab friends={friends} loading={friendsLoading} onRemove={onRemove} onOpenProfile={onOpenProfile} />
         )}
       </div>
     </div>
   );
 }
 
-function UserRow({ children, name, subtitle }) {
+function UserRow({ children, name, subtitle, onClick }) {
   return (
     <div className="flex items-center gap-3 py-2">
-      <div className="w-11 h-11 rounded-full bg-gradient-to-br from-green-500/30 to-zinc-800 p-[2px] shrink-0">
-        <div className="w-full h-full rounded-full bg-zinc-900 flex items-center justify-center">
-          <User className="w-5 h-5 text-zinc-400" />
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={!onClick}
+        className={`flex items-center gap-3 min-w-0 flex-1 text-left ${onClick ? 'cursor-pointer' : ''}`}
+      >
+        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-green-500/30 to-zinc-800 p-[2px] shrink-0">
+          <div className="w-full h-full rounded-full bg-zinc-900 flex items-center justify-center">
+            <User className="w-5 h-5 text-zinc-400" />
+          </div>
         </div>
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-[13px] font-semibold text-white truncate">{name}</p>
-        {subtitle && <p className="text-[11px] text-zinc-500 truncate">{subtitle}</p>}
-      </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] font-semibold text-white truncate">{name}</p>
+          {subtitle && <p className="text-[11px] text-zinc-500 truncate">{subtitle}</p>}
+        </div>
+      </button>
       {children}
     </div>
   );
 }
 
-function SearchTab({ onSearch, onSendRequest, sentRequests }) {
+function SearchTab({ onSearch, onSendRequest, sentRequests, onOpenProfile }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -181,7 +189,7 @@ function SearchTab({ onSearch, onSendRequest, sentRequests }) {
             const alreadySent = sentIds.has(u.id) || u.friendship_status === 'pending';
             const alreadyFriend = u.friendship_status === 'accepted';
             return (
-              <UserRow key={u.id} name={u.display_name}>
+              <UserRow key={u.id} name={u.display_name} onClick={onOpenProfile ? () => onOpenProfile(u.id) : undefined}>
                 {alreadyFriend ? (
                   <span className="text-[12px] font-semibold text-zinc-500 px-3 py-1.5">
                     Amigos
@@ -213,7 +221,7 @@ function SearchTab({ onSearch, onSendRequest, sentRequests }) {
   );
 }
 
-function PendingTab({ requests, onAccept, onDecline }) {
+function PendingTab({ requests, onAccept, onDecline, onOpenProfile }) {
   const [processingId, setProcessingId] = useState(null);
 
   const handleAction = async (id, action) => {
@@ -241,7 +249,7 @@ function PendingTab({ requests, onAccept, onDecline }) {
         Solicitações de amizade
       </p>
       {requests.map((r) => (
-        <UserRow key={r.id} name={r.display_name} subtitle="Quer ser seu amigo">
+        <UserRow key={r.id} name={r.display_name} subtitle="Quer ser seu amigo" onClick={onOpenProfile ? () => onOpenProfile(r.user_id) : undefined}>
           <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
@@ -270,7 +278,7 @@ function PendingTab({ requests, onAccept, onDecline }) {
   );
 }
 
-function FriendsTab({ friends, loading, onRemove }) {
+function FriendsTab({ friends, loading, onRemove, onOpenProfile }) {
   const [menuOpen, setMenuOpen] = useState(null);
 
   const handleRemove = async (id) => {
@@ -304,7 +312,7 @@ function FriendsTab({ friends, loading, onRemove }) {
         {friends.length} {friends.length === 1 ? 'amigo' : 'amigos'}
       </p>
       {friends.map((f) => (
-        <UserRow key={f.id} name={f.display_name}>
+        <UserRow key={f.id} name={f.display_name} onClick={onOpenProfile ? () => onOpenProfile(f.user_id) : undefined}>
           <div className="relative">
             <button
               type="button"

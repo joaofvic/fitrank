@@ -17,7 +17,8 @@ export function HomeView({
   rankingFilterEnabled = false,
   rankingPeriod = 'month',
   onRankingPeriodChange,
-  rankingPeriodLabel = ''
+  rankingPeriodLabel = '',
+  onOpenProfile
 }) {
   return (
     <div className="space-y-6 animate-in-fade">
@@ -112,11 +113,15 @@ export function HomeView({
             allUsers.map((u, idx) => (
               <div
                 key={u.uid}
+                role={onOpenProfile ? 'button' : undefined}
+                tabIndex={onOpenProfile ? 0 : undefined}
+                onClick={onOpenProfile ? () => onOpenProfile(u.uid) : undefined}
+                onKeyDown={onOpenProfile ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenProfile(u.uid); } } : undefined}
                 className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
                   u.uid === user?.uid
                     ? 'bg-zinc-800/50 border-green-500/50 ring-1 ring-green-500/20'
                     : 'bg-zinc-900 border-zinc-800'
-                }`}
+                } ${onOpenProfile ? 'cursor-pointer hover:border-zinc-600 active:scale-[0.99]' : ''}`}
               >
                 <div className="flex items-center gap-4">
                   <div className="w-8 flex justify-center font-black text-zinc-600 italic">

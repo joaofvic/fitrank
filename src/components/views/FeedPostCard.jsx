@@ -3,7 +3,7 @@ import { Bookmark, Heart, MessageCircle, MoreHorizontal, Send, User } from 'luci
 import { formatTimeAgo } from '../../lib/dates.js';
 import { workoutTypeIcon } from '../../lib/workout-icons.js';
 
-export function FeedPostCard({ post, onToggleLike, onOpenComments }) {
+export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenProfile }) {
   const [animating, setAnimating] = useState(false);
 
   const TypeIcon = workoutTypeIcon(post.workout_type);
@@ -22,14 +22,19 @@ export function FeedPostCard({ post, onToggleLike, onOpenComments }) {
   return (
     <div className="bg-black border-b border-zinc-800/60">
       <div className="flex items-center gap-3 px-4 py-3">
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500/30 to-zinc-800 p-[2px]">
-          <div className="w-full h-full rounded-full bg-zinc-900 flex items-center justify-center">
-            <User className="w-3.5 h-3.5 text-zinc-400" />
+        <button
+          type="button"
+          onClick={onOpenProfile ? () => onOpenProfile(post.user_id) : undefined}
+          disabled={!onOpenProfile}
+          className={`flex items-center gap-3 min-w-0 flex-1 text-left ${onOpenProfile ? 'cursor-pointer' : ''}`}
+        >
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500/30 to-zinc-800 p-[2px] shrink-0">
+            <div className="w-full h-full rounded-full bg-zinc-900 flex items-center justify-center">
+              <User className="w-3.5 h-3.5 text-zinc-400" />
+            </div>
           </div>
-        </div>
-        <div className="min-w-0 flex-1">
           <p className="text-[13px] font-semibold text-white truncate">{post.display_name}</p>
-        </div>
+        </button>
         <span className="text-[11px] text-zinc-600 shrink-0">
           {formatTimeAgo(post.created_at)}
         </span>
@@ -98,7 +103,14 @@ export function FeedPostCard({ post, onToggleLike, onOpenComments }) {
           </p>
         )}
         <p className="text-[13px] text-zinc-300">
-          <span className="font-semibold text-white">{post.display_name}</span>
+          <span
+            role={onOpenProfile ? 'button' : undefined}
+            tabIndex={onOpenProfile ? 0 : undefined}
+            onClick={onOpenProfile ? () => onOpenProfile(post.user_id) : undefined}
+            className={`font-semibold text-white ${onOpenProfile ? 'cursor-pointer hover:underline' : ''}`}
+          >
+            {post.display_name}
+          </span>
           {' '}
           <span className="text-zinc-400">{post.caption || post.workout_type}</span>
         </p>

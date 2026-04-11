@@ -15,6 +15,7 @@ export function FeedView({
   onLoadComments,
   onDeleteComment,
   onOpenFriends,
+  onOpenProfile,
   currentUserId
 }) {
   const [commentsOpen, setCommentsOpen] = useState(null);
@@ -90,6 +91,7 @@ export function FeedView({
               post={post}
               onToggleLike={onToggleLike}
               onOpenComments={(id) => setCommentsOpen(id)}
+              onOpenProfile={onOpenProfile}
             />
           ))}
 
