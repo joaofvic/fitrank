@@ -1,13 +1,13 @@
 -- Adiciona configuracao de premiacao aos desafios:
 -- reward_winners_count: quantos usuarios serao premiados
--- reward_distribution_type: 'equal' (divisao igual) ou 'weighted' (media ponderada)
+-- reward_distribution_type: 'equal' (divisao igual) ou 'weighted' (proporcional ao ranking)
 
 -- =============================================================
 -- 1. Novas colunas
 -- =============================================================
 ALTER TABLE public.desafios
   ADD COLUMN IF NOT EXISTS reward_winners_count integer NOT NULL DEFAULT 3,
-  ADD COLUMN IF NOT EXISTS reward_distribution_type text NOT NULL DEFAULT 'equal';
+  ADD COLUMN IF NOT EXISTS reward_distribution_type text NOT NULL DEFAULT 'weighted';
 
 ALTER TABLE public.desafios
   ADD CONSTRAINT desafios_reward_distribution_check

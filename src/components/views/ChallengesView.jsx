@@ -284,7 +284,7 @@ export function ChallengesView() {
                       <span className="font-bold text-yellow-400">Top {d.reward_winners_count ?? 3}</span>
                       {' dividem o prêmio '}
                       <span className="text-yellow-500/70">
-                        ({d.reward_distribution_type === 'weighted' ? 'Média Ponderada' : 'Divisão Igual'})
+                        ({d.reward_distribution_type === 'weighted' ? 'Proporcional ao Ranking' : 'Divisão Igual'})
                       </span>
                     </span>
                   </div>

@@ -94,7 +94,7 @@ export function AdminChallengesView({ onBack }) {
     data_fim: '',
     max_participantes: '',
     reward_winners_count: 3,
-    reward_distribution_type: 'equal',
+    reward_distribution_type: 'weighted',
     status: 'rascunho'
   });
 
@@ -270,7 +270,7 @@ export function AdminChallengesView({ onBack }) {
       data_fim: '',
       max_participantes: '',
       reward_winners_count: 3,
-      reward_distribution_type: 'equal',
+      reward_distribution_type: 'weighted',
       status: 'rascunho'
     });
     setError(null);
@@ -288,7 +288,7 @@ export function AdminChallengesView({ onBack }) {
       data_fim: d.data_fim ?? '',
       max_participantes: d.max_participantes ?? '',
       reward_winners_count: d.reward_winners_count ?? 3,
-      reward_distribution_type: d.reward_distribution_type ?? 'equal',
+      reward_distribution_type: d.reward_distribution_type ?? 'weighted',
       status: d.status ?? 'rascunho'
     });
     setError(null);
@@ -450,8 +450,8 @@ export function AdminChallengesView({ onBack }) {
                   onChange={(e) => setFormData((p) => ({ ...p, reward_distribution_type: e.target.value }))}
                   className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-3 text-sm text-white focus:border-green-500/50 focus:outline-none disabled:opacity-40"
                 >
+                  <option value="weighted">Proporcional ao Ranking</option>
                   <option value="equal">Divisão Igual</option>
-                  <option value="weighted">Média Ponderada</option>
                 </select>
               </div>
             </div>
@@ -532,7 +532,7 @@ export function AdminChallengesView({ onBack }) {
           </div>
           <div className="flex items-center gap-2 text-xs text-yellow-500 pt-1 border-t border-zinc-800">
             <Trophy size={13} />
-            <span>Top {d.reward_winners_count ?? 3} — {d.reward_distribution_type === 'weighted' ? 'Média Ponderada' : 'Divisão Igual'}</span>
+            <span>Top {d.reward_winners_count ?? 3} — {d.reward_distribution_type === 'weighted' ? 'Proporcional ao Ranking' : 'Divisão Igual'}</span>
           </div>
         </Card>
 

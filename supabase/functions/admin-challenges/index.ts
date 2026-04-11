@@ -70,7 +70,7 @@ const createSchema = z.object({
   data_fim: z.string().regex(dateRegex),
   max_participantes: z.number().int().min(1).nullable().default(null),
   reward_winners_count: z.number().int().min(1).max(50).default(3),
-  reward_distribution_type: z.enum(['equal', 'weighted']).default('equal'),
+  reward_distribution_type: z.enum(['equal', 'weighted']).default('weighted'),
   status: z.enum(['rascunho', 'ativo']).default('rascunho')
 });
 
