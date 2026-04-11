@@ -13,7 +13,7 @@ todos:
     status: completed
   - id: epic-4-user-ui
     content: Exibir info de premiacao no ChallengesView.jsx com icone Trophy
-    status: pending
+    status: completed
   - id: epic-5-apply
     content: Aplicar migration no Supabase e verificar RPCs
     status: pending

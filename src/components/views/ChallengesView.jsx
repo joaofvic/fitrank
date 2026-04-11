@@ -57,7 +57,7 @@ export function ChallengesView() {
     try {
       const { data: rows, error: dErr } = await supabase
         .from('desafios')
-        .select('id, nome, descricao, status, tipo_treino, data_inicio, data_fim, max_participantes, mes_referencia')
+        .select('id, nome, descricao, status, tipo_treino, data_inicio, data_fim, max_participantes, mes_referencia, reward_winners_count, reward_distribution_type')
         .eq('tenant_id', tenantId)
         .eq('status', 'ativo')
         .order('data_inicio', { ascending: false });
@@ -276,6 +276,18 @@ export function ChallengesView() {
                       ))}
                     </div>
                   )}
+
+                  {/* Reward info */}
+                  <div className="flex items-center gap-2 bg-yellow-500/5 border border-yellow-500/20 rounded-xl px-3 py-2">
+                    <Trophy size={14} className="text-yellow-500 shrink-0" />
+                    <span className="text-xs text-yellow-200/80">
+                      <span className="font-bold text-yellow-400">Top {d.reward_winners_count ?? 3}</span>
+                      {' dividem o prêmio '}
+                      <span className="text-yellow-500/70">
+                        ({d.reward_distribution_type === 'weighted' ? 'Média Ponderada' : 'Divisão Igual'})
+                      </span>
+                    </span>
+                  </div>
 
                   {/* Enrollment action */}
                   {!isEnrolled ? (
