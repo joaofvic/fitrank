@@ -10,7 +10,7 @@ todos:
     status: completed
   - id: epic-3-app-integration
     content: "Atualizar App.jsx: passar props de interacao social (toggleLike, addComment, etc) para PublicProfileView"
-    status: pending
+    status: completed
   - id: epic-4-apply-db
     content: Aplicar migration no Supabase via MCP execute_sql
     status: pending

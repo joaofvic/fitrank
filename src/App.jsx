@@ -278,6 +278,11 @@ export default function App() {
             userId={publicProfileUserId}
             onBack={() => setView('home')}
             onSendFriendRequest={social.sendFriendRequest}
+            onToggleLike={social.toggleLike}
+            onAddComment={social.addComment}
+            onLoadComments={social.loadComments}
+            onDeleteComment={social.deleteComment}
+            currentUserId={localUser?.uid}
           />
         )}
         {view === 'admin-tenants' && profile?.is_platform_master && (
