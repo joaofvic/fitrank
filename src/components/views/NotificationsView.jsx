@@ -7,24 +7,32 @@ import {
   CheckCircle2,
   ImageOff,
   Info,
-  RefreshCw
+  MessageCircle,
+  RefreshCw,
+  UserPlus
 } from 'lucide-react';
 import { formatTimeAgo } from '../../lib/dates.js';
 
 const NOTIFICATION_ICONS = {
   checkin_rejected: AlertTriangle,
   checkin_approved: CheckCircle2,
+  checkin_photo_rejected: ImageOff,
   photo_rejected: ImageOff,
-  friend_request: Bell,
-  friend_accepted: CheckCircle2
+  friend_request: UserPlus,
+  friend_accepted: CheckCircle2,
+  comment: MessageCircle,
+  admin_message: Bell
 };
 
 const NOTIFICATION_COLORS = {
   checkin_rejected: 'text-red-400 bg-red-500/10',
   checkin_approved: 'text-green-400 bg-green-500/10',
+  checkin_photo_rejected: 'text-orange-400 bg-orange-500/10',
   photo_rejected: 'text-orange-400 bg-orange-500/10',
   friend_request: 'text-blue-400 bg-blue-500/10',
-  friend_accepted: 'text-green-400 bg-green-500/10'
+  friend_accepted: 'text-green-400 bg-green-500/10',
+  comment: 'text-purple-400 bg-purple-500/10',
+  admin_message: 'text-yellow-400 bg-yellow-500/10'
 };
 
 const DEFAULT_ICON_CLASS = 'text-zinc-400 bg-zinc-800';
