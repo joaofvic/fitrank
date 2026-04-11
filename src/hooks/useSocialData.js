@@ -27,7 +27,21 @@ export function useSocialData({ supabase, session, profile }) {
         console.error('FitRank: feed', error.message);
         return;
       }
-      const rows = Array.isArray(data) ? data : [];
+      const raw = Array.isArray(data) ? data : [];
+      const rows = raw.map((r) => ({
+        id: r.checkin_id,
+        user_id: r.user_id,
+        display_name: r.display_name,
+        date: r.checkin_local_date,
+        workout_type: r.tipo_treino,
+        foto_url: r.foto_url,
+        points_earned: r.points_awarded,
+        photo_review_status: r.photo_review_status,
+        created_at: r.created_at,
+        likes_count: Number(r.likes_count ?? 0),
+        comments_count: Number(r.comments_count ?? 0),
+        has_liked: r.has_liked ?? false
+      }));
       if (page === 0) {
         setFeed(rows);
       } else {
@@ -57,7 +71,7 @@ export function useSocialData({ supabase, session, profile }) {
 
     setFeed((prev) =>
       prev.map((item) =>
-        item.checkin_id === checkinId
+        item.id === checkinId
           ? {
               ...item,
               has_liked: !currentlyLiked,
@@ -85,7 +99,7 @@ export function useSocialData({ supabase, session, profile }) {
       console.error('FitRank: toggleLike', err.message);
       setFeed((prev) =>
         prev.map((item) =>
-          item.checkin_id === checkinId
+          item.id === checkinId
             ? {
                 ...item,
                 has_liked: currentlyLiked,
@@ -97,6 +111,19 @@ export function useSocialData({ supabase, session, profile }) {
     }
   }, [supabase, userId, tenantId]);
 
+  // --- Profile name resolver (used by comments & friendships) ---
+  const fetchProfileNames = useCallback(async (userIds) => {
+    if (!supabase || userIds.length === 0) return {};
+    const unique = [...new Set(userIds)];
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, display_name')
+      .in('id', unique);
+    const map = {};
+    for (const p of data ?? []) map[p.id] = p.display_name;
+    return map;
+  }, [supabase]);
+
   // --- Comments ---
   const addComment = useCallback(async (checkinId, content) => {
     if (!supabase || !userId || !tenantId) return null;
@@ -105,7 +132,7 @@ export function useSocialData({ supabase, session, profile }) {
 
     setFeed((prev) =>
       prev.map((item) =>
-        item.checkin_id === checkinId
+        item.id === checkinId
           ? { ...item, comments_count: item.comments_count + 1 }
           : item
       )
@@ -126,7 +153,7 @@ export function useSocialData({ supabase, session, profile }) {
       console.error('FitRank: addComment', error.message);
       setFeed((prev) =>
         prev.map((item) =>
-          item.checkin_id === checkinId
+          item.id === checkinId
             ? { ...item, comments_count: Math.max(0, item.comments_count - 1) }
             : item
         )
@@ -145,7 +172,7 @@ export function useSocialData({ supabase, session, profile }) {
     if (!supabase) return [];
     const { data, error } = await supabase
       .from('comments')
-      .select('id, user_id, content, created_at, profiles:user_id ( display_name )')
+      .select('id, user_id, content, created_at')
       .eq('checkin_id', checkinId)
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: true })
@@ -156,14 +183,17 @@ export function useSocialData({ supabase, session, profile }) {
       return [];
     }
 
-    return (data ?? []).map((c) => ({
+    const rows = data ?? [];
+    const names = await fetchProfileNames(rows.map((c) => c.user_id));
+
+    return rows.map((c) => ({
       id: c.id,
       user_id: c.user_id,
       content: c.content,
       created_at: c.created_at,
-      display_name: c.profiles?.display_name ?? 'Usuário'
+      display_name: names[c.user_id] ?? 'Usuário'
     }));
-  }, [supabase, tenantId]);
+  }, [supabase, tenantId, fetchProfileNames]);
 
   const deleteComment = useCallback(async (commentId, checkinId) => {
     if (!supabase || !userId) return false;
@@ -181,7 +211,7 @@ export function useSocialData({ supabase, session, profile }) {
     if (checkinId) {
       setFeed((prev) =>
         prev.map((item) =>
-          item.checkin_id === checkinId
+          item.id === checkinId
             ? { ...item, comments_count: Math.max(0, item.comments_count - 1) }
             : item
         )
@@ -202,11 +232,7 @@ export function useSocialData({ supabase, session, profile }) {
     try {
       const { data, error } = await supabase
         .from('friendships')
-        .select(`
-          id, requester_id, addressee_id, created_at,
-          requester:requester_id ( id, display_name ),
-          addressee:addressee_id ( id, display_name )
-        `)
+        .select('id, requester_id, addressee_id, created_at')
         .eq('tenant_id', tenantId)
         .eq('status', 'accepted')
         .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`);
@@ -216,14 +242,17 @@ export function useSocialData({ supabase, session, profile }) {
         return;
       }
 
+      const rows = data ?? [];
+      const friendIds = rows.map((f) => f.requester_id === userId ? f.addressee_id : f.requester_id);
+      const names = await fetchProfileNames(friendIds);
+
       setFriends(
-        (data ?? []).map((f) => {
-          const isRequester = f.requester_id === userId;
-          const friend = isRequester ? f.addressee : f.requester;
+        rows.map((f) => {
+          const friendId = f.requester_id === userId ? f.addressee_id : f.requester_id;
           return {
-            friendship_id: f.id,
-            user_id: friend?.id,
-            display_name: friend?.display_name ?? 'Usuário',
+            id: f.id,
+            user_id: friendId,
+            display_name: names[friendId] ?? 'Usuário',
             created_at: f.created_at
           };
         })
@@ -231,16 +260,13 @@ export function useSocialData({ supabase, session, profile }) {
     } finally {
       setFriendsLoading(false);
     }
-  }, [supabase, userId, tenantId]);
+  }, [supabase, userId, tenantId, fetchProfileNames]);
 
   const loadPendingRequests = useCallback(async () => {
     if (!supabase || !userId || !tenantId) return;
     const { data, error } = await supabase
       .from('friendships')
-      .select(`
-        id, requester_id, created_at,
-        requester:requester_id ( id, display_name )
-      `)
+      .select('id, requester_id, created_at')
       .eq('tenant_id', tenantId)
       .eq('status', 'pending')
       .eq('addressee_id', userId)
@@ -251,24 +277,24 @@ export function useSocialData({ supabase, session, profile }) {
       return;
     }
 
+    const rows = data ?? [];
+    const names = await fetchProfileNames(rows.map((f) => f.requester_id));
+
     setPendingRequests(
-      (data ?? []).map((f) => ({
-        friendship_id: f.id,
-        user_id: f.requester?.id ?? f.requester_id,
-        display_name: f.requester?.display_name ?? 'Usuário',
+      rows.map((f) => ({
+        id: f.id,
+        user_id: f.requester_id,
+        display_name: names[f.requester_id] ?? 'Usuário',
         created_at: f.created_at
       }))
     );
-  }, [supabase, userId, tenantId]);
+  }, [supabase, userId, tenantId, fetchProfileNames]);
 
   const loadSentRequests = useCallback(async () => {
     if (!supabase || !userId || !tenantId) return;
     const { data, error } = await supabase
       .from('friendships')
-      .select(`
-        id, addressee_id, created_at,
-        addressee:addressee_id ( id, display_name )
-      `)
+      .select('id, addressee_id, created_at')
       .eq('tenant_id', tenantId)
       .eq('status', 'pending')
       .eq('requester_id', userId)
@@ -279,15 +305,18 @@ export function useSocialData({ supabase, session, profile }) {
       return;
     }
 
+    const rows = data ?? [];
+    const names = await fetchProfileNames(rows.map((f) => f.addressee_id));
+
     setSentRequests(
-      (data ?? []).map((f) => ({
-        friendship_id: f.id,
-        user_id: f.addressee?.id ?? f.addressee_id,
-        display_name: f.addressee?.display_name ?? 'Usuário',
+      rows.map((f) => ({
+        id: f.id,
+        addressee_id: f.addressee_id,
+        display_name: names[f.addressee_id] ?? 'Usuário',
         created_at: f.created_at
       }))
     );
-  }, [supabase, userId, tenantId]);
+  }, [supabase, userId, tenantId, fetchProfileNames]);
 
   const searchUsers = useCallback(async (query) => {
     if (!supabase || !userId || !query?.trim()) return [];
@@ -298,7 +327,12 @@ export function useSocialData({ supabase, session, profile }) {
       console.error('FitRank: searchUsers', error.message);
       return [];
     }
-    return Array.isArray(data) ? data : [];
+    const raw = Array.isArray(data) ? data : [];
+    return raw.map((r) => ({
+      id: r.user_id,
+      display_name: r.display_name,
+      friendship_status: r.friendship_status
+    }));
   }, [supabase, userId]);
 
   const sendFriendRequest = useCallback(async (addresseeId) => {

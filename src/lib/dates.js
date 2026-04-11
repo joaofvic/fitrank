@@ -65,6 +65,16 @@ function parseLocalDate(iso) {
 }
 
 /** Rótulo curto para o filtro do ranking (pt-BR). */
+/** Tempo relativo humanizado em pt-BR (ex: "agora", "há 2 min", "há 3h"). */
+export function formatTimeAgo(dateStr) {
+  const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (seconds < 60) return 'agora';
+  if (seconds < 3600) return `há ${Math.floor(seconds / 60)} min`;
+  if (seconds < 86400) return `há ${Math.floor(seconds / 3600)}h`;
+  if (seconds < 604800) return `há ${Math.floor(seconds / 86400)}d`;
+  return new Date(dateStr).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' });
+}
+
 export function rankingPeriodRangeLabel(period, startISO, endISO) {
   const sameDay = startISO === endISO;
   if (period === 'day' || sameDay) {

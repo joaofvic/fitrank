@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Trophy, TrendingUp, Plus, User, Zap } from 'lucide-react';
+import { Home, Newspaper, Plus, TrendingUp, User, Zap } from 'lucide-react';
 
 import { useAuth } from './components/auth/AuthProvider.jsx';
 import { AuthScreen } from './components/auth/AuthScreen.jsx';
@@ -9,6 +9,7 @@ import { profileToUserData } from './lib/profile-map.js';
 import { useFitCloudData } from './hooks/useFitCloudData.js';
 import { useSocialData } from './hooks/useSocialData.js';
 import { HomeView } from './components/views/HomeView.jsx';
+import { FeedView } from './components/views/FeedView.jsx';
 import { FriendsView } from './components/views/FriendsView.jsx';
 import { ProfileView } from './components/views/ProfileView.jsx';
 import { ChallengesView } from './components/views/ChallengesView.jsx';
@@ -52,7 +53,6 @@ export default function App() {
   const [userData, setUserData] = useState(() => loadFitRankState()?.userData ?? defaultUserData());
   const [checkins, setCheckins] = useState(() => loadFitRankState()?.checkins ?? []);
   const [view, setView] = useState('home');
-  const [homeTab, setHomeTab] = useState('ranking');
   const [message, setMessage] = useState(null);
 
   useEffect(() => {
@@ -188,9 +188,10 @@ export default function App() {
             onRankingPeriodChange={cloud.setRankingPeriod}
             rankingPeriodLabel={cloud.rankingPeriodLabel}
             onOpenCheckin={() => setView('checkin-modal')}
-            homeTab={homeTab}
-            onHomeTabChange={setHomeTab}
-            feedEnabled={useCloud}
+          />
+        )}
+        {view === 'feed' && useCloud && (
+          <FeedView
             feed={social.feed}
             feedLoading={social.feedLoading}
             feedHasMore={social.feedHasMore}
@@ -202,6 +203,7 @@ export default function App() {
             onLoadComments={social.loadComments}
             onDeleteComment={social.deleteComment}
             onOpenFriends={() => setView('friends')}
+            currentUserId={localUser?.uid}
           />
         )}
         {view === 'challenges' && <ChallengesView />}
@@ -298,21 +300,21 @@ export default function App() {
             type="button"
             onClick={() => setView('home')}
             className={`flex flex-col items-center gap-1 transition-colors ${
-              view === 'home' ? 'text-green-500' : 'text-zinc-600'
+              view === 'home' ? 'text-white' : 'text-zinc-600'
             }`}
           >
-            <Trophy size={24} className={view === 'home' ? 'fill-green-500/10' : ''} />
+            <Home size={24} className={view === 'home' ? 'fill-white/10' : ''} />
             <span className="text-[10px] font-bold uppercase">Home</span>
           </button>
           <button
             type="button"
-            onClick={() => setView('challenges')}
+            onClick={() => setView('feed')}
             className={`flex flex-col items-center gap-1 transition-colors ${
-              view === 'challenges' ? 'text-green-500' : 'text-zinc-600'
+              view === 'feed' ? 'text-white' : 'text-zinc-600'
             }`}
           >
-            <TrendingUp size={24} />
-            <span className="text-[10px] font-bold uppercase">Desafios</span>
+            <Newspaper size={24} className={view === 'feed' ? 'fill-white/10' : ''} />
+            <span className="text-[10px] font-bold uppercase">Feed</span>
           </button>
           <button
             type="button"
@@ -325,19 +327,22 @@ export default function App() {
           </button>
           <button
             type="button"
-            className="flex flex-col items-center gap-1 text-zinc-600 opacity-50 grayscale cursor-not-allowed"
+            onClick={() => setView('challenges')}
+            className={`flex flex-col items-center gap-1 transition-colors ${
+              view === 'challenges' ? 'text-white' : 'text-zinc-600'
+            }`}
           >
-            <Zap size={24} />
-            <span className="text-[10px] font-bold uppercase">Store</span>
+            <TrendingUp size={24} />
+            <span className="text-[10px] font-bold uppercase">Desafios</span>
           </button>
           <button
             type="button"
             onClick={() => setView('profile')}
             className={`flex flex-col items-center gap-1 transition-colors ${
-              view === 'profile' ? 'text-green-500' : 'text-zinc-600'
+              view === 'profile' ? 'text-white' : 'text-zinc-600'
             }`}
           >
-            <User size={24} className={view === 'profile' ? 'fill-green-500/10' : ''} />
+            <User size={24} className={view === 'profile' ? 'fill-white/10' : ''} />
             <span className="text-[10px] font-bold uppercase">Perfil</span>
           </button>
         </div>

@@ -19,22 +19,22 @@ todos:
     status: completed
   - id: extract-workout-icons
     content: Extrair workoutTypeIcon para src/lib/workout-icons.js e importar no ProfileView
-    status: pending
+    status: completed
   - id: format-time-ago
     content: Adicionar formatTimeAgo ao src/lib/dates.js
-    status: pending
+    status: completed
   - id: friends-view
     content: Criar FriendsView.jsx com busca, solicitacoes e lista de amigos
-    status: pending
+    status: completed
   - id: home-tabs
     content: Adicionar tabs Ranking/Feed na HomeView com estado homeTab no App.jsx
-    status: pending
+    status: completed
   - id: feed-post-card
     content: Criar FeedPostCard.jsx com header, foto, tipo, pontos, like otimista e botao de comentarios
-    status: pending
+    status: completed
   - id: comments-drawer
     content: Criar CommentsDrawer.jsx (bottom sheet) com lista de comentarios e input
-    status: pending
+    status: completed
   - id: app-integration
     content: Integrar useSocialData, FriendsView e novas props no App.jsx
     status: completed

@@ -2,11 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   User, Camera, Flame, Zap, Calendar, CheckCircle2, Crown, RefreshCw,
   Settings, X, Building2, Trophy, Users, Shield, SlidersHorizontal, BarChart3, ScrollText, LogOut,
-  Dumbbell, Activity, HeartPulse, Footprints, Clock, Check, ChevronLeft, ChevronRight, Loader2
+  Clock, Check, ChevronLeft, ChevronRight, Loader2
 } from 'lucide-react';
 import { Card } from '../ui/Card.jsx';
 import { Button } from '../ui/Button.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
+import { workoutTypeIcon } from '../../lib/workout-icons.js';
 
 export function ProfileView({
   userData,
@@ -91,20 +92,6 @@ export function ProfileView({
     },
     [reasonLabelMap]
   );
-
-  const WORKOUT_ICON_MAP = {
-    musculacao: Dumbbell,
-    crossfit: Zap,
-    funcional: Activity,
-    cardio: HeartPulse,
-    corrida: Footprints,
-    outro: Flame,
-  };
-
-  function workoutTypeIcon(type) {
-    const key = (type ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    return WORKOUT_ICON_MAP[key] ?? CheckCircle2;
-  }
 
   function formatDateLabel(dateStr) {
     const d = new Date(dateStr + 'T12:00:00');
