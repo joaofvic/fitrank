@@ -7,7 +7,7 @@ todos:
     status: completed
   - id: epic-2-edge-fn
     content: "Atualizar Edge Function admin-challenges: schemas Zod + insert/update"
-    status: pending
+    status: completed
   - id: epic-3-admin-ui
     content: Adicionar campos de premiacao no AdminChallengesView.jsx
     status: pending

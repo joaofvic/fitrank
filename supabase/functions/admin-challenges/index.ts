@@ -69,6 +69,8 @@ const createSchema = z.object({
   data_inicio: z.string().regex(dateRegex),
   data_fim: z.string().regex(dateRegex),
   max_participantes: z.number().int().min(1).nullable().default(null),
+  reward_winners_count: z.number().int().min(1).max(50).default(3),
+  reward_distribution_type: z.enum(['equal', 'weighted']).default('equal'),
   status: z.enum(['rascunho', 'ativo']).default('rascunho')
 });
 
@@ -80,7 +82,9 @@ const updateSchema = z.object({
   tipo_treino: z.array(z.string().min(1).max(100)).optional(),
   data_inicio: z.string().regex(dateRegex).optional(),
   data_fim: z.string().regex(dateRegex).optional(),
-  max_participantes: z.number().int().min(1).nullable().optional()
+  max_participantes: z.number().int().min(1).nullable().optional(),
+  reward_winners_count: z.number().int().min(1).max(50).optional(),
+  reward_distribution_type: z.enum(['equal', 'weighted']).optional()
 });
 
 const lifecycleSchema = z.object({
@@ -255,7 +259,9 @@ Deno.serve(async (req) => {
           ativo: d.status === 'ativo',
           status: d.status,
           criado_por: user.id,
-          max_participantes: d.max_participantes
+          max_participantes: d.max_participantes,
+          reward_winners_count: d.reward_winners_count,
+          reward_distribution_type: d.reward_distribution_type
         })
         .select('*')
         .single();
@@ -440,6 +446,8 @@ Deno.serve(async (req) => {
         }
         if (upd.data_fim !== undefined) fields.data_fim = upd.data_fim;
         if (upd.max_participantes !== undefined) fields.max_participantes = upd.max_participantes;
+        if (upd.reward_winners_count !== undefined) fields.reward_winners_count = upd.reward_winners_count;
+        if (upd.reward_distribution_type !== undefined) fields.reward_distribution_type = upd.reward_distribution_type;
 
         if (Object.keys(fields).length === 0) {
           return jsonResponse({ error: 'Nenhum campo para atualizar' }, 400);
