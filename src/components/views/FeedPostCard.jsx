@@ -100,7 +100,7 @@ export function FeedPostCard({ post, onToggleLike, onOpenComments }) {
         <p className="text-[13px] text-zinc-300">
           <span className="font-semibold text-white">{post.display_name}</span>
           {' '}
-          <span className="text-zinc-400">{post.workout_type}</span>
+          <span className="text-zinc-400">{post.caption || post.workout_type}</span>
         </p>
         {(post.comments_count ?? 0) > 0 && (
           <button

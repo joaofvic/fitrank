@@ -40,7 +40,8 @@ export function useSocialData({ supabase, session, profile }) {
         created_at: r.created_at,
         likes_count: Number(r.likes_count ?? 0),
         comments_count: Number(r.comments_count ?? 0),
-        has_liked: r.has_liked ?? false
+        has_liked: r.has_liked ?? false,
+        caption: r.feed_caption ?? null
       }));
       if (page === 0) {
         setFeed(rows);
