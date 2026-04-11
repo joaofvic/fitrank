@@ -21,6 +21,7 @@ import { AdminUsersView } from './components/views/AdminUsersView.jsx';
 import { AdminEngagementView } from './components/views/AdminEngagementView.jsx';
 import { AdminAuditView } from './components/views/AdminAuditView.jsx';
 import { AdminChallengesView } from './components/views/AdminChallengesView.jsx';
+import { PublicProfileView } from './components/views/PublicProfileView.jsx';
 
 export default function App() {
   const {
@@ -53,7 +54,17 @@ export default function App() {
   const [userData, setUserData] = useState(() => loadFitRankState()?.userData ?? defaultUserData());
   const [checkins, setCheckins] = useState(() => loadFitRankState()?.checkins ?? []);
   const [view, setView] = useState('home');
+  const [publicProfileUserId, setPublicProfileUserId] = useState(null);
   const [message, setMessage] = useState(null);
+
+  const openPublicProfile = (userId) => {
+    if (userId === localUser?.uid) {
+      setView('profile');
+      return;
+    }
+    setPublicProfileUserId(userId);
+    setView('public-profile');
+  };
 
   useEffect(() => {
     if (!useCloud) {
@@ -188,6 +199,7 @@ export default function App() {
             onRankingPeriodChange={cloud.setRankingPeriod}
             rankingPeriodLabel={cloud.rankingPeriodLabel}
             onOpenCheckin={() => setView('checkin-modal')}
+            onOpenProfile={useCloud ? openPublicProfile : undefined}
           />
         )}
         {view === 'feed' && useCloud && (
@@ -203,6 +215,7 @@ export default function App() {
             onLoadComments={social.loadComments}
             onDeleteComment={social.deleteComment}
             onOpenFriends={() => setView('friends')}
+            onOpenProfile={useCloud ? openPublicProfile : undefined}
             currentUserId={localUser?.uid}
           />
         )}
@@ -259,7 +272,15 @@ export default function App() {
             onAccept={social.acceptFriendRequest}
             onDecline={social.declineFriendRequest}
             onRemove={social.removeFriend}
+            onOpenProfile={openPublicProfile}
             onBack={() => setView('home')}
+          />
+        )}
+        {view === 'public-profile' && publicProfileUserId && useCloud && (
+          <PublicProfileView
+            userId={publicProfileUserId}
+            onBack={() => setView('home')}
+            onSendFriendRequest={social.sendFriendRequest}
           />
         )}
         {view === 'admin-tenants' && profile?.is_platform_master && (
