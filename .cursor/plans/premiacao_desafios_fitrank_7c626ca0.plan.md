@@ -10,7 +10,7 @@ todos:
     status: completed
   - id: epic-3-admin-ui
     content: Adicionar campos de premiacao no AdminChallengesView.jsx
-    status: pending
+    status: completed
   - id: epic-4-user-ui
     content: Exibir info de premiacao no ChallengesView.jsx com icone Trophy
     status: pending

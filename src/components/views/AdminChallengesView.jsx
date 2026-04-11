@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, ChevronLeft, Users, Calendar, Search, X, Trash2 } from 'lucide-react';
+import { Plus, ChevronLeft, Users, Calendar, Search, X, Trash2, Trophy } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Card } from '../ui/Card.jsx';
@@ -93,6 +93,8 @@ export function AdminChallengesView({ onBack }) {
     data_inicio: '',
     data_fim: '',
     max_participantes: '',
+    reward_winners_count: 3,
+    reward_distribution_type: 'equal',
     status: 'rascunho'
   });
 
@@ -160,6 +162,8 @@ export function AdminChallengesView({ onBack }) {
       data_inicio: formData.data_inicio,
       data_fim: formData.data_fim,
       max_participantes: formData.max_participantes ? Number(formData.max_participantes) : null,
+      reward_winners_count: Number(formData.reward_winners_count) || 3,
+      reward_distribution_type: formData.reward_distribution_type,
       status: formData.status
     };
     const { data, error: fnError } = await invokeEdge('admin-challenges', supabase, {
@@ -184,7 +188,9 @@ export function AdminChallengesView({ onBack }) {
       tipo_treino: formData.tipo_treino,
       data_inicio: formData.data_inicio,
       data_fim: formData.data_fim,
-      max_participantes: formData.max_participantes ? Number(formData.max_participantes) : null
+      max_participantes: formData.max_participantes ? Number(formData.max_participantes) : null,
+      reward_winners_count: Number(formData.reward_winners_count) || 3,
+      reward_distribution_type: formData.reward_distribution_type
     };
     const { data, error: fnError } = await invokeEdge('admin-challenges', supabase, {
       method: 'PATCH',
@@ -263,6 +269,8 @@ export function AdminChallengesView({ onBack }) {
       data_inicio: todayISO(),
       data_fim: '',
       max_participantes: '',
+      reward_winners_count: 3,
+      reward_distribution_type: 'equal',
       status: 'rascunho'
     });
     setError(null);
@@ -279,6 +287,8 @@ export function AdminChallengesView({ onBack }) {
       data_inicio: d.data_inicio ?? '',
       data_fim: d.data_fim ?? '',
       max_participantes: d.max_participantes ?? '',
+      reward_winners_count: d.reward_winners_count ?? 3,
+      reward_distribution_type: d.reward_distribution_type ?? 'equal',
       status: d.status ?? 'rascunho'
     });
     setError(null);
@@ -412,6 +422,46 @@ export function AdminChallengesView({ onBack }) {
             />
           </div>
 
+          <div className="border-t border-zinc-800 pt-4 mt-2">
+            <div className="flex items-center gap-2 mb-3">
+              <Trophy size={14} className="text-yellow-500" />
+              <span className="text-xs text-zinc-400 font-bold uppercase">Premiação</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="ch-winners" className="text-xs text-zinc-400 font-bold uppercase block mb-1">Qtd. premiados</label>
+                <input
+                  id="ch-winners"
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={formData.reward_winners_count}
+                  disabled={!canEditFields}
+                  onChange={(e) => setFormData((p) => ({ ...p, reward_winners_count: e.target.value }))}
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-3 text-sm text-white placeholder:text-zinc-600 focus:border-green-500/50 focus:outline-none disabled:opacity-40"
+                />
+              </div>
+              <div>
+                <label htmlFor="ch-dist" className="text-xs text-zinc-400 font-bold uppercase block mb-1">Tipo de divisão</label>
+                <select
+                  id="ch-dist"
+                  value={formData.reward_distribution_type}
+                  disabled={!canEditFields}
+                  onChange={(e) => setFormData((p) => ({ ...p, reward_distribution_type: e.target.value }))}
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-3 text-sm text-white focus:border-green-500/50 focus:outline-none disabled:opacity-40"
+                >
+                  <option value="equal">Divisão Igual</option>
+                  <option value="weighted">Média Ponderada</option>
+                </select>
+              </div>
+            </div>
+            <p className="text-[10px] text-zinc-600 mt-1.5">
+              {formData.reward_distribution_type === 'equal'
+                ? 'O prêmio será dividido igualmente entre os premiados.'
+                : 'O 1º lugar recebe mais, decrescendo proporcionalmente.'}
+            </p>
+          </div>
+
           {!isEditing && (
             <div>
               <label htmlFor="ch-status" className="text-xs text-zinc-400 font-bold uppercase block mb-1">Status inicial</label>
@@ -479,6 +529,10 @@ export function AdminChallengesView({ onBack }) {
           <div className="flex items-center gap-4 text-xs text-zinc-500">
             <span className="flex items-center gap-1"><Users size={12} /> {d.participantes_count ?? 0} participante{(d.participantes_count ?? 0) !== 1 ? 's' : ''}</span>
             {d.max_participantes && <span>Max: {d.max_participantes}</span>}
+          </div>
+          <div className="flex items-center gap-2 text-xs text-yellow-500 pt-1 border-t border-zinc-800">
+            <Trophy size={13} />
+            <span>Top {d.reward_winners_count ?? 3} — {d.reward_distribution_type === 'weighted' ? 'Média Ponderada' : 'Divisão Igual'}</span>
           </div>
         </Card>
 
