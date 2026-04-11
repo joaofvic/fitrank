@@ -4,15 +4,27 @@ import {
 } from 'lucide-react';
 import { Card } from '../ui/Card.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
-import { workoutTypeIcon } from '../../lib/workout-icons.js';
+import { FeedPostCard } from './FeedPostCard.jsx';
+import { CommentsDrawer } from './CommentsDrawer.jsx';
 
-export function PublicProfileView({ userId, onBack, onSendFriendRequest }) {
+export function PublicProfileView({
+  userId,
+  onBack,
+  onSendFriendRequest,
+  onToggleLike,
+  onAddComment,
+  onLoadComments,
+  onDeleteComment,
+  currentUserId
+}) {
   const { supabase } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sendingRequest, setSendingRequest] = useState(false);
   const [localFriendshipStatus, setLocalFriendshipStatus] = useState(null);
+  const [posts, setPosts] = useState([]);
+  const [commentsOpen, setCommentsOpen] = useState(null);
 
   const loadProfile = useCallback(async () => {
     if (!supabase || !userId) return;
@@ -42,6 +54,36 @@ export function PublicProfileView({ userId, onBack, onSendFriendRequest }) {
   useEffect(() => {
     loadProfile();
   }, [loadProfile]);
+
+  useEffect(() => {
+    if (!profile?.recent_checkins) { setPosts([]); return; }
+    setPosts(
+      profile.recent_checkins.map((c) => ({
+        id: c.id,
+        user_id: c.user_id ?? userId,
+        display_name: profile.display_name,
+        workout_type: c.tipo_treino,
+        foto_url: c.foto_url,
+        points_earned: c.points_awarded,
+        created_at: c.created_at,
+        likes_count: Number(c.likes_count ?? 0),
+        comments_count: Number(c.comments_count ?? 0),
+        has_liked: c.has_liked ?? false,
+        caption: c.feed_caption ?? null
+      }))
+    );
+  }, [profile, userId]);
+
+  const handleToggleLike = useCallback((checkinId, currentlyLiked) => {
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === checkinId
+          ? { ...p, has_liked: !currentlyLiked, likes_count: p.likes_count + (currentlyLiked ? -1 : 1) }
+          : p
+      )
+    );
+    onToggleLike?.(checkinId, currentlyLiked);
+  }, [onToggleLike]);
 
   const handleSendRequest = async () => {
     if (!onSendFriendRequest || sendingRequest) return;
@@ -79,9 +121,6 @@ export function PublicProfileView({ userId, onBack, onSendFriendRequest }) {
   const created = profile.created_at
     ? new Date(profile.created_at).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
     : '—';
-
-  const checkins = Array.isArray(profile.recent_checkins) ? profile.recent_checkins : [];
-  const groups = groupCheckinsByDate(checkins);
 
   return (
     <div className="space-y-6 animate-in-fade">
@@ -142,44 +181,37 @@ export function PublicProfileView({ userId, onBack, onSendFriendRequest }) {
         onSend={handleSendRequest}
       />
 
-      {checkins.length > 0 && (
-        <div className="space-y-4">
-          <h3 className="font-bold text-sm text-zinc-400 uppercase tracking-wider">Treinos recentes</h3>
-          <div className="space-y-5">
-            {groups.map((group) => (
-              <div key={group.date} className="space-y-2">
-                <p className="text-[11px] font-bold uppercase text-zinc-500 tracking-wider px-1">
-                  {group.label}
-                </p>
-                <div className="space-y-2">
-                  {group.items.map((c) => {
-                    const TypeIcon = workoutTypeIcon(c.tipo_treino);
-                    return (
-                      <div
-                        key={c.id}
-                        className="bg-zinc-900/50 border border-zinc-800 border-l-[3px] border-l-green-500 rounded-xl p-3 flex items-center justify-between gap-3"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-12 h-12 rounded-xl bg-zinc-800 flex items-center justify-center overflow-hidden shrink-0">
-                            {c.foto_url ? (
-                              <img src={c.foto_url} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              <TypeIcon className="w-6 h-6 text-zinc-400" />
-                            )}
-                          </div>
-                          <p className="font-bold text-sm text-white truncate">{c.tipo_treino}</p>
-                        </div>
-                        <span className="shrink-0 px-2 py-1 rounded-lg text-xs font-bold tabular-nums bg-green-500/10 text-green-500">
-                          +{c.points_awarded ?? 0} PTS
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
+      {posts.length > 0 && (
+        <div className="space-y-px -mx-4">
+          <h3 className="font-bold text-sm text-zinc-400 uppercase tracking-wider px-4 mb-3">
+            Postagens
+          </h3>
+          {posts.map((post) => (
+            <FeedPostCard
+              key={post.id}
+              post={post}
+              onToggleLike={handleToggleLike}
+              onOpenComments={(id) => setCommentsOpen(id)}
+            />
+          ))}
         </div>
+      )}
+
+      {posts.length === 0 && !loading && (
+        <div className="text-center py-10 border-2 border-dashed border-zinc-800 rounded-2xl">
+          <p className="text-sm text-zinc-500">Nenhuma postagem ainda</p>
+        </div>
+      )}
+
+      {commentsOpen && (
+        <CommentsDrawer
+          checkinId={commentsOpen}
+          onClose={() => setCommentsOpen(null)}
+          onLoadComments={onLoadComments}
+          onAddComment={onAddComment}
+          onDeleteComment={onDeleteComment}
+          currentUserId={currentUserId}
+        />
       )}
     </div>
   );
@@ -225,32 +257,3 @@ function FriendshipButton({ status, sending, onSend }) {
   );
 }
 
-function formatDateLabel(dateStr) {
-  const d = new Date(dateStr + 'T12:00:00');
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const diff = Math.round((today - target) / 86400000);
-  if (diff === 0) return 'Hoje';
-  if (diff === 1) return 'Ontem';
-  const day = d.getDate();
-  const month = d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
-  if (d.getFullYear() === now.getFullYear()) return `${day} ${month}`;
-  return `${day} ${month} ${d.getFullYear()}`;
-}
-
-function groupCheckinsByDate(list) {
-  const groups = [];
-  let currentKey = null;
-  let currentGroup = null;
-  for (const c of list) {
-    const date = c.date ?? c.checkin_local_date;
-    if (date !== currentKey) {
-      currentKey = date;
-      currentGroup = { date, label: formatDateLabel(date), items: [] };
-      groups.push(currentGroup);
-    }
-    currentGroup.items.push(c);
-  }
-  return groups;
-}

@@ -7,7 +7,7 @@ todos:
     status: completed
   - id: epic-2-public-profile
     content: "Atualizar PublicProfileView.jsx: substituir lista simples por FeedPostCard + CommentsDrawer"
-    status: pending
+    status: completed
   - id: epic-3-app-integration
     content: "Atualizar App.jsx: passar props de interacao social (toggleLike, addComment, etc) para PublicProfileView"
     status: pending
