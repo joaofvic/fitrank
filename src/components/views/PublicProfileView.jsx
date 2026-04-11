@@ -192,6 +192,7 @@ export function PublicProfileView({
               post={post}
               onToggleLike={handleToggleLike}
               onOpenComments={(id) => setCommentsOpen(id)}
+              currentUserId={currentUserId}
             />
           ))}
         </div>
@@ -211,6 +212,7 @@ export function PublicProfileView({
           onAddComment={onAddComment}
           onDeleteComment={onDeleteComment}
           currentUserId={currentUserId}
+          allowComments={posts.find((p) => p.id === commentsOpen)?.allow_comments !== false}
         />
       )}
     </div>

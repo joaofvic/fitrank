@@ -8,7 +8,8 @@ export function CommentsDrawer({
   onLoadComments,
   onAddComment,
   onDeleteComment,
-  currentUserId
+  currentUserId,
+  allowComments = true
 }) {
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -126,29 +127,37 @@ export function CommentsDrawer({
           )}
         </div>
 
-        <div className="shrink-0 border-t border-zinc-800 px-4 py-3 flex items-center gap-2">
-          <input
-            type="text"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Escreva um comentário..."
-            maxLength={500}
-            className="flex-1 bg-zinc-800 border border-zinc-700 rounded-full px-4 py-2 text-sm text-white placeholder-zinc-500 outline-none focus:border-green-500/50 transition-colors"
-          />
-          <button
-            type="button"
-            onClick={handleSend}
-            disabled={!text.trim() || sending}
-            className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-black shrink-0 disabled:opacity-40 disabled:cursor-not-allowed active:scale-90 transition-transform"
-          >
-            {sending ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Send className="w-4 h-4" />
-            )}
-          </button>
-        </div>
+        {allowComments ? (
+          <div className="shrink-0 border-t border-zinc-800 px-4 py-3 flex items-center gap-2">
+            <input
+              type="text"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Escreva um comentário..."
+              maxLength={500}
+              className="flex-1 bg-zinc-800 border border-zinc-700 rounded-full px-4 py-2 text-sm text-white placeholder-zinc-500 outline-none focus:border-green-500/50 transition-colors"
+            />
+            <button
+              type="button"
+              onClick={handleSend}
+              disabled={!text.trim() || sending}
+              className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-black shrink-0 disabled:opacity-40 disabled:cursor-not-allowed active:scale-90 transition-transform"
+            >
+              {sending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
+            </button>
+          </div>
+        ) : (
+          <div className="shrink-0 border-t border-zinc-800 px-4 py-4">
+            <p className="text-sm text-zinc-500 text-center">
+              Os comentários estão desativados para esta publicação.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

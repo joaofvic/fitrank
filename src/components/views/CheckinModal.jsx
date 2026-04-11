@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthProvider.jsx';
-import { CheckCircle2, Camera, Plus, ChevronLeft, Globe } from 'lucide-react';
+import { CheckCircle2, Camera, Plus, ChevronLeft, Globe, MessageCircle, EyeOff } from 'lucide-react';
 import { Button } from '../ui/Button.jsx';
 import { CHECKIN_GRID_WORKOUT_TYPES } from '../../lib/workout-types.js';
 
@@ -18,6 +18,8 @@ export function CheckinModal({ onClose, onCheckin }) {
   const [selectedType, setSelectedType] = useState(null);
   const [feedVisible, setFeedVisible] = useState(true);
   const [caption, setCaption] = useState('');
+  const [allowComments, setAllowComments] = useState(true);
+  const [hideLikesCount, setHideLikesCount] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -63,6 +65,8 @@ export function CheckinModal({ onClose, onCheckin }) {
     setSelectedType(null);
     setCaption('');
     setFeedVisible(true);
+    setAllowComments(true);
+    setHideLikesCount(false);
   };
 
   const handleConfirm = async () => {
@@ -72,7 +76,7 @@ export function CheckinModal({ onClose, onCheckin }) {
     try {
       setError(null);
       const trimmed = caption.trim() || null;
-      await Promise.resolve(onCheckin(selectedType, canSkipPhoto ? null : foto, feedVisible, trimmed));
+      await Promise.resolve(onCheckin(selectedType, canSkipPhoto ? null : foto, feedVisible, trimmed, allowComments, hideLikesCount));
     } catch (err) {
       setError(err.message ?? 'Falha ao registrar check-in.');
     } finally {
@@ -87,6 +91,8 @@ export function CheckinModal({ onClose, onCheckin }) {
     setStep('select-type');
     setSelectedType(null);
     setCaption('');
+    setAllowComments(true);
+    setHideLikesCount(false);
     onClose();
   };
 
@@ -201,7 +207,7 @@ export function CheckinModal({ onClose, onCheckin }) {
               </button>
 
               {feedVisible && (
-                <div className="space-y-2 animate-in-fade">
+                <div className="space-y-3 animate-in-fade">
                   <div className="relative">
                     <textarea
                       value={caption}
@@ -213,6 +219,38 @@ export function CheckinModal({ onClose, onCheckin }) {
                     <span className={`absolute bottom-2 right-3 text-[10px] ${caption.length >= CAPTION_MAX ? 'text-red-400' : 'text-zinc-600'}`}>
                       {caption.length}/{CAPTION_MAX}
                     </span>
+                  </div>
+
+                  <div className="border-t border-zinc-800 pt-3 space-y-2">
+                    <p className="text-[10px] text-zinc-600 uppercase font-bold tracking-wide">Configurações avançadas</p>
+
+                    <button
+                      type="button"
+                      onClick={() => setAllowComments((v) => !v)}
+                      className="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border transition-colors bg-zinc-800/40 border-zinc-700/50 hover:border-zinc-600"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <MessageCircle size={16} className={allowComments ? 'text-green-400' : 'text-zinc-600'} />
+                        <p className="text-xs font-semibold text-zinc-300">Permitir comentários</p>
+                      </div>
+                      <div className={`w-9 h-5 rounded-full relative transition-colors ${allowComments ? 'bg-green-500' : 'bg-zinc-700'}`}>
+                        <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${allowComments ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setHideLikesCount((v) => !v)}
+                      className="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border transition-colors bg-zinc-800/40 border-zinc-700/50 hover:border-zinc-600"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <EyeOff size={16} className={hideLikesCount ? 'text-amber-400' : 'text-zinc-600'} />
+                        <p className="text-xs font-semibold text-zinc-300">Ocultar curtidas</p>
+                      </div>
+                      <div className={`w-9 h-5 rounded-full relative transition-colors ${hideLikesCount ? 'bg-amber-500' : 'bg-zinc-700'}`}>
+                        <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${hideLikesCount ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+                      </div>
+                    </button>
                   </div>
                 </div>
               )}

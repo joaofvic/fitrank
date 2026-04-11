@@ -3,7 +3,7 @@ import { Bookmark, Heart, MessageCircle, MoreHorizontal, Send, User } from 'luci
 import { formatTimeAgo } from '../../lib/dates.js';
 import { workoutTypeIcon } from '../../lib/workout-icons.js';
 
-export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenProfile }) {
+export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenProfile, currentUserId }) {
   const [animating, setAnimating] = useState(false);
 
   const TypeIcon = workoutTypeIcon(post.workout_type);
@@ -78,7 +78,12 @@ export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenProfile
                 } ${animating ? 'scale-125' : ''}`}
               />
             </button>
-            <button type="button" onClick={() => onOpenComments?.(post.id)} className="group p-1">
+            <button
+              type="button"
+              onClick={post.allow_comments !== false ? () => onOpenComments?.(post.id) : undefined}
+              disabled={post.allow_comments === false}
+              className={`group p-1 ${post.allow_comments === false ? 'opacity-30 cursor-not-allowed' : ''}`}
+            >
               <MessageCircle className="w-6 h-6 text-white group-hover:text-zinc-400 transition-colors" />
             </button>
             <button type="button" className="group p-1">
@@ -97,7 +102,7 @@ export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenProfile
       </div>
 
       <div className="px-4 pb-3 space-y-1">
-        {(post.likes_count ?? 0) > 0 && (
+        {(post.likes_count ?? 0) > 0 && !(post.hide_likes_count && currentUserId !== post.user_id) && (
           <p className="text-[13px] font-semibold text-white">
             {post.likes_count} curtida{post.likes_count !== 1 ? 's' : ''}
           </p>
@@ -114,7 +119,9 @@ export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenProfile
           {' '}
           <span className="text-zinc-400">{post.caption || post.workout_type}</span>
         </p>
-        {(post.comments_count ?? 0) > 0 && (
+        {post.allow_comments === false ? (
+          <p className="text-[11px] text-zinc-600 italic">Comentários desativados</p>
+        ) : (post.comments_count ?? 0) > 0 ? (
           <button
             type="button"
             onClick={() => onOpenComments?.(post.id)}
@@ -122,7 +129,7 @@ export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenProfile
           >
             Ver {post.comments_count > 1 ? `todos os ${post.comments_count} comentários` : '1 comentário'}
           </button>
-        )}
+        ) : null}
       </div>
     </div>
   );

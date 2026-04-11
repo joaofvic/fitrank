@@ -92,6 +92,7 @@ export function FeedView({
               onToggleLike={onToggleLike}
               onOpenComments={(id) => setCommentsOpen(id)}
               onOpenProfile={onOpenProfile}
+              currentUserId={currentUserId}
             />
           ))}
 
@@ -120,6 +121,7 @@ export function FeedView({
           onAddComment={onAddComment}
           onDeleteComment={onDeleteComment}
           currentUserId={currentUserId}
+          allowComments={feed.find((p) => p.id === commentsOpen)?.allow_comments !== false}
         />
       )}
     </div>
