@@ -5,6 +5,7 @@ import {
   Bell,
   BellOff,
   CheckCircle2,
+  Heart,
   ImageOff,
   Info,
   MessageCircle,
@@ -21,6 +22,7 @@ const NOTIFICATION_ICONS = {
   friend_request: UserPlus,
   friend_accepted: CheckCircle2,
   comment: MessageCircle,
+  like: Heart,
   admin_message: Bell
 };
 
@@ -32,6 +34,7 @@ const NOTIFICATION_COLORS = {
   friend_request: 'text-blue-400 bg-blue-500/10',
   friend_accepted: 'text-green-400 bg-green-500/10',
   comment: 'text-purple-400 bg-purple-500/10',
+  like: 'text-red-400 bg-red-500/10',
   admin_message: 'text-yellow-400 bg-yellow-500/10'
 };
 
