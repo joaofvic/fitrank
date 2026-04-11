@@ -13,7 +13,7 @@ todos:
     status: completed
   - id: epic-4-cleanup
     content: Remover secao de notificacoes do ProfileView.jsx
-    status: pending
+    status: completed
 isProject: false
 ---
 

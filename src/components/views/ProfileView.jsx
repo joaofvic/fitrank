@@ -12,8 +12,6 @@ import { workoutTypeIcon } from '../../lib/workout-icons.js';
 export function ProfileView({
   userData,
   checkins,
-  notifications = [],
-  onMarkNotificationRead,
   cloudTenant = null,
   cloudDisplayName = null,
   isPlatformMaster = false,
@@ -126,39 +124,6 @@ export function ProfileView({
 
   return (
     <div className="space-y-6 animate-in-fade">
-      {Array.isArray(notifications) && notifications.length > 0 ? (
-        <Card className="bg-zinc-900/50 border border-zinc-800">
-          <h4 className="font-bold mb-3 flex items-center gap-2">
-            <span className="text-xs uppercase text-zinc-500 font-black">Notificações</span>
-            <span className="text-[10px] px-2 py-1 rounded-full bg-red-500/10 text-red-300 border border-red-900/40">
-              {notifications.length} nova(s)
-            </span>
-          </h4>
-          <div className="space-y-3">
-            {notifications.map((n) => (
-              <div key={n.id} className="rounded-xl border border-zinc-800 bg-black/20 p-4 space-y-2">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-black text-white truncate">{n.title}</p>
-                    {n.body ? <p className="text-xs text-zinc-400 mt-1">{n.body}</p> : null}
-                  </div>
-                  {onMarkNotificationRead ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      className="text-[10px] px-2 py-1 h-auto"
-                      onClick={() => onMarkNotificationRead(n.id)}
-                    >
-                      Marcar como lida
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      ) : null}
-
       <div className="text-center space-y-3 rounded-2xl bg-gradient-to-b from-green-500/5 to-transparent pt-8 pb-5 px-4 -mx-1">
         <div className="relative inline-block">
           <div className="w-24 h-24 rounded-full bg-zinc-800 ring-2 ring-green-500/30 flex items-center justify-center mx-auto shadow-2xl shadow-green-500/10">
