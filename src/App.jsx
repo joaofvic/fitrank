@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Home, Newspaper, Plus, TrendingUp, User, Zap } from 'lucide-react';
+import { Bell, Home, Newspaper, Plus, TrendingUp, User, Zap } from 'lucide-react';
 
 import { useAuth } from './components/auth/AuthProvider.jsx';
 import { AuthScreen } from './components/auth/AuthScreen.jsx';
@@ -22,6 +22,7 @@ import { AdminEngagementView } from './components/views/AdminEngagementView.jsx'
 import { AdminAuditView } from './components/views/AdminAuditView.jsx';
 import { AdminChallengesView } from './components/views/AdminChallengesView.jsx';
 import { PublicProfileView } from './components/views/PublicProfileView.jsx';
+import { NotificationsView } from './components/views/NotificationsView.jsx';
 
 export default function App() {
   const {
@@ -182,9 +183,15 @@ export default function App() {
           </h1>
           <button
             type="button"
-            className="w-10 h-10 bg-zinc-900 border border-zinc-800 rounded-full flex items-center justify-center"
+            onClick={() => setView('notifications')}
+            className="relative w-10 h-10 bg-zinc-900 border border-zinc-800 rounded-full flex items-center justify-center hover:bg-zinc-800 transition-colors"
           >
-            <User size={20} className="text-zinc-400" />
+            <Bell size={20} className={view === 'notifications' ? 'text-white' : 'text-zinc-400'} />
+            {useCloud && cloud.notifications.length > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-red-500 rounded-full text-[10px] font-bold flex items-center justify-center text-white px-1">
+                {cloud.notifications.length > 9 ? '9+' : cloud.notifications.length}
+              </span>
+            )}
           </button>
         </div>
 
@@ -224,16 +231,6 @@ export default function App() {
           <ProfileView
             userData={displayUserData}
             checkins={displayCheckins}
-            notifications={useCloud ? cloud.notifications : []}
-            onMarkNotificationRead={
-              useCloud
-                ? async (id) => {
-                    if (!id) return;
-                    await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', id);
-                    await cloud.refreshNotifications?.();
-                  }
-                : undefined
-            }
             cloudTenant={tenant}
             cloudDisplayName={profile?.display_name}
             isPlatformMaster={profile?.is_platform_master}
@@ -303,6 +300,15 @@ export default function App() {
         )}
         {view === 'admin-audit' && profile?.is_platform_master && (
           <AdminAuditView onBack={() => setView('profile')} />
+        )}
+
+        {view === 'notifications' && useCloud && (
+          <NotificationsView
+            notifications={cloud.notifications}
+            readNotifications={cloud.readNotifications}
+            onMarkAllRead={cloud.markAllNotificationsRead}
+            onBack={() => setView('home')}
+          />
         )}
 
         {view === 'checkin-modal' && (

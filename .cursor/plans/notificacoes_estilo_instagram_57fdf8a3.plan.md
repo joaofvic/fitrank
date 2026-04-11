@@ -10,7 +10,7 @@ todos:
     status: completed
   - id: epic-3-app
     content: "Integrar no App.jsx: icone Bell com badge no header, roteamento para notifications view"
-    status: pending
+    status: completed
   - id: epic-4-cleanup
     content: Remover secao de notificacoes do ProfileView.jsx
     status: pending
