@@ -4,10 +4,10 @@ overview: Corrigir bug onde o streak não é recalculado quando um check-in rete
 todos:
   - id: migration-fix
     content: Criar migration SQL corrigindo on_checkin_rejected_revert_points (recompute streak na re-rejeicao), retry_rejected_checkin (recompute streak no retry), e backfill de streaks
-    status: pending
+    status: completed
   - id: db-push
     content: Aplicar migration no Supabase via db push
-    status: pending
+    status: completed
 isProject: false
 ---
 
