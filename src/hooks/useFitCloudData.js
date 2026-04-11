@@ -25,6 +25,7 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
   const [leaderboard, setLeaderboard] = useState([]);
   const [checkins, setCheckins] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [readNotifications, setReadNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -133,12 +134,39 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
     setNotifications(Array.isArray(data) ? data : []);
   }, [supabase, userId]);
 
+  const refreshReadNotifications = useCallback(async () => {
+    if (!supabase || !userId) return;
+    const { data, error: nErr } = await supabase
+      .from('notifications')
+      .select('id, type, title, body, data, created_at, read_at')
+      .eq('user_id', userId)
+      .not('read_at', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (nErr) {
+      console.error('FitRank: readNotifications', nErr.message);
+      return;
+    }
+    setReadNotifications(Array.isArray(data) ? data : []);
+  }, [supabase, userId]);
+
+  const markAllNotificationsRead = useCallback(async () => {
+    if (!supabase || !userId) return;
+    await supabase
+      .from('notifications')
+      .update({ read_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .is('read_at', null);
+    await refreshNotifications();
+    await refreshReadNotifications();
+  }, [supabase, userId, refreshNotifications, refreshReadNotifications]);
+
   const refreshAll = useCallback(async () => {
     if (!supabase || !userId) return;
     setError(null);
-    await Promise.all([refreshLeaderboard(), refreshCheckins(), refreshNotifications()]);
+    await Promise.all([refreshLeaderboard(), refreshCheckins(), refreshNotifications(), refreshReadNotifications()]);
     if (refreshProfile) await refreshProfile();
-  }, [supabase, userId, refreshLeaderboard, refreshCheckins, refreshNotifications, refreshProfile]);
+  }, [supabase, userId, refreshLeaderboard, refreshCheckins, refreshNotifications, refreshReadNotifications, refreshProfile]);
 
   const refreshLeaderboardRef = useRef(refreshLeaderboard);
   refreshLeaderboardRef.current = refreshLeaderboard;
@@ -355,6 +383,7 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
     leaderboard,
     checkins,
     notifications,
+    readNotifications,
     loading,
     leaderboardLoading,
     error,
@@ -363,6 +392,8 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
     refreshLeaderboard,
     refreshCheckins,
     refreshNotifications,
+    refreshReadNotifications,
+    markAllNotificationsRead,
     insertCheckin,
     retryCheckin,
     rankingPeriod,
