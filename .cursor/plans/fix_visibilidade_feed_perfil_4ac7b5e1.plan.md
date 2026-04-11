@@ -13,7 +13,7 @@ todos:
     status: completed
   - id: epic-4-apply-db
     content: Aplicar migration no Supabase via MCP execute_sql
-    status: pending
+    status: completed
 isProject: false
 ---
 
