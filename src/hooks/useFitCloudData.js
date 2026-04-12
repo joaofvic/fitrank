@@ -379,6 +379,68 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
     [supabase, userId, tenantId, refreshAll]
   );
 
+  const uploadAvatar = useCallback(
+    async (file) => {
+      if (!supabase || !userId) return null;
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const path = `${userId}/avatar.${ext}`;
+      const { error: upErr } = await supabase.storage.from('avatars').upload(path, file, {
+        upsert: true,
+        contentType: file.type || 'image/jpeg'
+      });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
+      return `${pub.publicUrl}?t=${Date.now()}`;
+    },
+    [supabase, userId]
+  );
+
+  const updateProfile = useCallback(
+    async (fields) => {
+      if (!supabase || !userId) return { error: 'Não autenticado' };
+      const allowed = {};
+      if (fields.display_name !== undefined) allowed.display_name = fields.display_name;
+      if (fields.username !== undefined) allowed.username = fields.username || null;
+      if (fields.avatar_url !== undefined) allowed.avatar_url = fields.avatar_url;
+      if (Object.keys(allowed).length === 0) return { error: 'Nenhum campo para atualizar' };
+
+      const { error: dbErr } = await supabase
+        .from('profiles')
+        .update(allowed)
+        .eq('id', userId);
+
+      if (dbErr) return { error: dbErr.message };
+      await refreshProfile?.();
+      return { error: null };
+    },
+    [supabase, userId, refreshProfile]
+  );
+
+  const checkUsernameAvailable = useCallback(
+    async (username) => {
+      if (!supabase) return false;
+      const { data, error: rpcErr } = await supabase.rpc('check_username_available', {
+        p_username: username
+      });
+      if (rpcErr) {
+        console.error('FitRank: checkUsername', rpcErr.message);
+        return false;
+      }
+      return data === true;
+    },
+    [supabase]
+  );
+
+  const updatePassword = useCallback(
+    async (newPassword) => {
+      if (!supabase) return { error: 'Não autenticado' };
+      const { error: authErr } = await supabase.auth.updateUser({ password: newPassword });
+      if (authErr) return { error: authErr.message };
+      return { error: null };
+    },
+    [supabase]
+  );
+
   return {
     leaderboard,
     checkins,
@@ -405,6 +467,10 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
     setCheckinLimit,
     checkinCount,
     checkinApprovedCount,
-    checkinsLoading
+    checkinsLoading,
+    uploadAvatar,
+    updateProfile,
+    checkUsernameAvailable,
+    updatePassword
   };
 }

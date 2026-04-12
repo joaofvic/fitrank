@@ -21,6 +21,8 @@ export function profileToUserData(profile, userId) {
   return {
     uid: userId,
     nome: profile.display_name || profile.nome || 'Atleta',
+    username: profile.username || null,
+    avatar_url: profile.avatar_url || null,
     pontos: profile.pontos ?? 0,
     streak: isStreakAlive(profile.last_checkin_date) ? dbStreak : 0,
     is_pro: profile.is_pro ?? false,

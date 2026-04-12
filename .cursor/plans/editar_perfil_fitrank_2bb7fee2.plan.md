@@ -10,7 +10,7 @@ todos:
     status: pending
   - id: epic-2-hooks
     content: "Epic 2: Atualizar AuthProvider select + criar funcoes updateProfile/uploadAvatar/checkUsername/updatePassword"
-    status: pending
+    status: completed
   - id: epic-3-ui
     content: "Epic 3: Criar EditProfileView.jsx com avatar, nome, username, senha"
     status: pending
