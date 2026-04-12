@@ -432,8 +432,17 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
   );
 
   const updatePassword = useCallback(
-    async (newPassword) => {
+    async (currentPassword, newPassword) => {
       if (!supabase) return { error: 'Não autenticado' };
+      const email = (await supabase.auth.getUser()).data?.user?.email;
+      if (!email) return { error: 'E-mail do usuário não encontrado' };
+
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email,
+        password: currentPassword
+      });
+      if (signInErr) return { error: 'A senha atual está incorreta' };
+
       const { error: authErr } = await supabase.auth.updateUser({ password: newPassword });
       if (authErr) return { error: authErr.message };
       return { error: null };

@@ -7,7 +7,7 @@ todos:
     status: completed
   - id: epic-5-apply
     content: "Epic 5: Aplicar migration no Supabase via MCP"
-    status: pending
+    status: completed
   - id: epic-2-hooks
     content: "Epic 2: Atualizar AuthProvider select + criar funcoes updateProfile/uploadAvatar/checkUsername/updatePassword"
     status: completed

@@ -15,7 +15,7 @@ export function EditProfileView({
   const fileRef = useRef(null);
   const debounceRef = useRef(null);
 
-  const [displayName, setDisplayName] = useState(profile?.display_name || '');
+  const [displayName, setDisplayName] = useState(profile?.display_name || profile?.nome || '');
   const [username, setUsername] = useState(profile?.username || '');
   const [avatarPreview, setAvatarPreview] = useState(profile?.avatar_url || null);
   const [avatarFile, setAvatarFile] = useState(null);
@@ -24,6 +24,7 @@ export function EditProfileView({
   const [usernameChecking, setUsernameChecking] = useState(false);
 
   const [passwordOpen, setPasswordOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -78,19 +79,22 @@ export function EditProfileView({
     };
   }, [username, profile?.username, onCheckUsername]);
 
+  const originalName = profile?.display_name || profile?.nome || '';
   const hasProfileChanges =
-    displayName.trim() !== (profile?.display_name || '') ||
+    displayName.trim() !== originalName ||
     username.trim() !== (profile?.username || '') ||
     avatarFile !== null;
 
-  const hasPasswordInput = newPassword.length > 0 || confirmPassword.length > 0;
+  const hasPasswordInput = currentPassword.length > 0 || newPassword.length > 0 || confirmPassword.length > 0;
 
   const passwordsMatch = newPassword === confirmPassword;
   const passwordValid = newPassword.length >= 6;
+  const passwordFormComplete = currentPassword.length > 0 && passwordValid && passwordsMatch;
 
   const canSave =
     !saving &&
-    (hasProfileChanges || (hasPasswordInput && passwordValid && passwordsMatch)) &&
+    (hasProfileChanges || passwordFormComplete) &&
+    (!hasPasswordInput || passwordFormComplete) &&
     usernameStatus !== 'taken' &&
     usernameStatus !== 'short' &&
     !usernameChecking;
@@ -114,7 +118,7 @@ export function EditProfileView({
 
       if (hasProfileChanges && onUpdateProfile) {
         const fields = {};
-        if (displayName.trim() !== (profile?.display_name || '')) {
+        if (displayName.trim() !== originalName) {
           fields.display_name = displayName.trim();
         }
         if (username.trim() !== (profile?.username || '')) {
@@ -135,16 +139,18 @@ export function EditProfileView({
         }
       }
 
-      if (hasPasswordInput && passwordValid && passwordsMatch && onUpdatePassword) {
-        const { error } = await onUpdatePassword(newPassword);
+      if (passwordFormComplete && onUpdatePassword) {
+        const { error } = await onUpdatePassword(currentPassword, newPassword);
         if (error) {
-          showToast(`Erro ao alterar senha: ${error}`, 'error');
+          showToast(error, 'error');
           setSaving(false);
           return;
         }
+        setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
         setPasswordOpen(false);
+        showToast('Senha alterada com sucesso!');
       }
 
       setAvatarFile(null);
@@ -298,6 +304,18 @@ export function EditProfileView({
 
         {passwordOpen && (
           <div className="space-y-3 animate-in-fade pl-1 pr-1">
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-zinc-400">Senha atual</label>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Digite sua senha atual"
+                maxLength={72}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none focus:border-green-500/50 transition-colors"
+              />
+            </div>
+
             <div className="space-y-1">
               <label className="text-xs font-semibold text-zinc-400">Nova senha</label>
               <div className="relative">
