@@ -24,6 +24,10 @@ export function ProfileView({
   onOpenAudit,
   onEditProfile,
   onRetryCheckin,
+  friends = [],
+  friendsLoading = false,
+  onLoadFriends,
+  onOpenProfile,
   checkinPage = 0,
   checkinLimit = 10,
   checkinCount = 0,
@@ -55,6 +59,10 @@ export function ProfileView({
   }, [supabase]);
 
   const [adminOpen, setAdminOpen] = useState(false);
+  const [friendsDrawerOpen, setFriendsDrawerOpen] = useState(false);
+
+  useEffect(() => { onLoadFriends?.(); }, [onLoadFriends]);
+
   const [retryingId, setRetryingId] = useState(null);
   const retryFileRef = useRef(null);
   const retryTargetRef = useRef(null);
@@ -168,7 +176,7 @@ export function ProfileView({
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <Card className="flex flex-col items-center justify-center py-4 border-orange-500/20">
           <Flame className="w-6 h-6 text-orange-500 fill-orange-500 mb-1.5" />
           <span className="text-xl font-black tabular-nums">{userData?.streak || 0}</span>
@@ -188,6 +196,15 @@ export function ProfileView({
           </span>
           <span className="text-[10px] text-zinc-500 uppercase">Treinos</span>
         </Card>
+        <button type="button" onClick={() => setFriendsDrawerOpen(true)} className="text-left">
+          <Card className="flex flex-col items-center justify-center py-4 border-purple-500/20 hover:bg-zinc-800/50 transition-colors cursor-pointer h-full">
+            <Users className="w-6 h-6 text-purple-500 mb-1.5" />
+            <span className="text-xl font-black tabular-nums">{friends.length}</span>
+            <span className="text-[10px] text-zinc-500 uppercase">
+              {friends.length === 1 ? 'Amigo' : 'Amigos'}
+            </span>
+          </Card>
+        </button>
       </div>
 
       {isPlatformMaster && (

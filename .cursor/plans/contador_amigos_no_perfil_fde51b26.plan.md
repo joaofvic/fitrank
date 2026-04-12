@@ -7,7 +7,7 @@ todos:
     status: completed
   - id: profile-counter
     content: "Fase 2: Adicionar card Amigos clicavel no grid de stats do ProfileView (grid-cols-2 sm:grid-cols-4)"
-    status: pending
+    status: completed
   - id: friends-drawer
     content: "Fase 3: Criar FriendsListDrawer.jsx seguindo padrao LikesDrawer e integrar no ProfileView"
     status: pending
