@@ -249,6 +249,10 @@ export default function App() {
             onEditProfile={useCloud ? () => setView('edit-profile') : undefined}
             onRetryCheckin={useCloud ? cloud.retryCheckin : undefined}
             onOpenFriends={useCloud ? () => setView('friends') : undefined}
+            friends={useCloud ? social.friends : []}
+            friendsLoading={useCloud ? social.friendsLoading : false}
+            onLoadFriends={useCloud ? social.loadFriends : undefined}
+            onOpenProfile={useCloud ? openPublicProfile : undefined}
             checkinPage={useCloud ? cloud.checkinPage : 0}
             checkinLimit={useCloud ? cloud.checkinLimit : 0}
             checkinCount={useCloud ? cloud.checkinCount : 0}
