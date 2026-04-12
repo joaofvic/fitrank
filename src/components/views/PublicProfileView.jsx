@@ -19,8 +19,7 @@ export function PublicProfileView({
   onDeleteComment,
   onLoadLikes,
   currentUserId,
-  onUpdatePrivacy,
-  onRemoveFriend
+  onUpdatePrivacy
 }) {
   const { supabase } = useAuth();
   const [profile, setProfile] = useState(null);
@@ -29,12 +28,7 @@ export function PublicProfileView({
   const [sendingRequest, setSendingRequest] = useState(false);
   const [removingFriend, setRemovingFriend] = useState(false);
   const [localFriendshipStatus, setLocalFriendshipStatus] = useState(null);
-<<<<<<< HEAD
-  const [localFriendshipId, setLocalFriendshipId] = useState(null);
-  const [removingFriend, setRemovingFriend] = useState(false);
-=======
   const [friendshipId, setFriendshipId] = useState(null);
->>>>>>> dev
   const [posts, setPosts] = useState([]);
   const [commentsOpen, setCommentsOpen] = useState(null);
   const [likesOpen, setLikesOpen] = useState(null);
@@ -57,11 +51,11 @@ export function PublicProfileView({
       }
       setProfile(data);
       setLocalFriendshipStatus(data.friendship_status ?? null);
-<<<<<<< HEAD
-      setLocalFriendshipId(data.friendship_id ?? null);
-=======
 
-      if (data.friendship_status === 'accepted' && currentUserId) {
+      // Unificação das duas lógicas (HEAD e dev) para pegar o ID da amizade
+      if (data.friendship_id) {
+        setFriendshipId(data.friendship_id);
+      } else if (data.friendship_status === 'accepted' && currentUserId) {
         const { data: fRow } = await supabase
           .from('friendships')
           .select('id')
@@ -71,13 +65,12 @@ export function PublicProfileView({
           .maybeSingle();
         setFriendshipId(fRow?.id ?? null);
       }
->>>>>>> dev
     } catch (err) {
       setError(err.message ?? 'Erro ao carregar perfil');
     } finally {
       setLoading(false);
     }
-  }, [supabase, userId]);
+  }, [supabase, userId, currentUserId]);
 
   useEffect(() => {
     loadProfile();
@@ -123,20 +116,6 @@ export function PublicProfileView({
     onToggleLike?.(checkinId, currentlyLiked);
   }, [onToggleLike]);
 
-  const handleRemoveFriend = async () => {
-    if (!onRemoveFriend || !friendshipId || removingFriend) return;
-    setRemovingFriend(true);
-    try {
-      const ok = await onRemoveFriend(friendshipId);
-      if (ok) {
-        setLocalFriendshipStatus(null);
-        setFriendshipId(null);
-      }
-    } finally {
-      setRemovingFriend(false);
-    }
-  };
-
   const handleSendRequest = async () => {
     if (!onSendFriendRequest || sendingRequest) return;
     setSendingRequest(true);
@@ -148,14 +127,14 @@ export function PublicProfileView({
     }
   };
 
-  const handleRemoveFriend = async () => {
-    if (!onRemoveFriend || !localFriendshipId || removingFriend) return;
+  const handleRemoveFriendAction = async () => {
+    if (!onRemoveFriend || !friendshipId || removingFriend) return;
     setRemovingFriend(true);
     try {
-      const ok = await onRemoveFriend(localFriendshipId);
+      const ok = await onRemoveFriend(friendshipId);
       if (ok) {
         setLocalFriendshipStatus(null);
-        setLocalFriendshipId(null);
+        setFriendshipId(null);
       }
     } finally {
       setRemovingFriend(false);
@@ -253,7 +232,7 @@ export function PublicProfileView({
         sending={sendingRequest}
         removing={removingFriend}
         onSend={handleSendRequest}
-        onRemove={handleRemoveFriend}
+        onRemove={handleRemoveFriendAction}
       />
 
       {posts.length > 0 && (
@@ -306,11 +285,7 @@ export function PublicProfileView({
 }
 
 function FriendshipButton({ status, sending, removing, onSend, onRemove }) {
-<<<<<<< HEAD
-  const [menuOpen, setMenuOpen] = useState(false);
-=======
   const [confirmOpen, setConfirmOpen] = useState(false);
->>>>>>> dev
 
   if (status === 'accepted') {
     if (confirmOpen) {
@@ -335,44 +310,12 @@ function FriendshipButton({ status, sending, removing, onSend, onRemove }) {
             ) : (
               <UserMinus className="w-4 h-4" />
             )}
-            {removing ? 'Removendo...' : 'Desfazer amizade'}
+            {removing ? 'Removendo...' : 'Desfazer'}
           </button>
         </div>
       );
     }
     return (
-<<<<<<< HEAD
-      <div className="relative">
-        <button
-          type="button"
-          onClick={() => setMenuOpen((v) => !v)}
-          disabled={removing}
-          className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-zinc-800/40 border border-zinc-700/50 text-zinc-400 hover:bg-zinc-800 transition-colors disabled:opacity-50"
-        >
-          {removing ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
-          ) : (
-            <UserCheck className="w-5 h-5" />
-          )}
-          <span className="text-sm font-bold">{removing ? 'Removendo...' : 'Amigos'}</span>
-        </button>
-        {menuOpen && !removing && (
-          <>
-            <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-            <div className="absolute left-0 right-0 top-full mt-1 z-20 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl py-1">
-              <button
-                type="button"
-                onClick={() => { setMenuOpen(false); onRemove?.(); }}
-                className="w-full flex items-center gap-2 px-4 py-2.5 text-[13px] text-red-400 hover:bg-zinc-700/50 transition-colors"
-              >
-                <UserMinus className="w-4 h-4" />
-                Desfazer amizade
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-=======
       <button
         type="button"
         onClick={() => setConfirmOpen(true)}
@@ -381,7 +324,6 @@ function FriendshipButton({ status, sending, removing, onSend, onRemove }) {
         <UserCheck className="w-5 h-5" />
         <span className="text-sm font-bold">Amigos</span>
       </button>
->>>>>>> dev
     );
   }
 
@@ -414,4 +356,3 @@ function FriendshipButton({ status, sending, removing, onSend, onRemove }) {
     </button>
   );
 }
-
