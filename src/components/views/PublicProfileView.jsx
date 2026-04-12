@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  ArrowLeft, Building2, CheckCircle2, Crown, Flame, Loader2, User, UserCheck, UserPlus, Zap
+  ArrowLeft, Building2, CheckCircle2, Crown, Flame, Loader2, User, UserCheck, UserMinus, UserPlus, Zap
 } from 'lucide-react';
 import { Card } from '../ui/Card.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
@@ -18,14 +18,17 @@ export function PublicProfileView({
   onDeleteComment,
   onLoadLikes,
   currentUserId,
-  onUpdatePrivacy
+  onUpdatePrivacy,
+  onRemoveFriend
 }) {
   const { supabase } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sendingRequest, setSendingRequest] = useState(false);
+  const [removingFriend, setRemovingFriend] = useState(false);
   const [localFriendshipStatus, setLocalFriendshipStatus] = useState(null);
+  const [friendshipId, setFriendshipId] = useState(null);
   const [posts, setPosts] = useState([]);
   const [commentsOpen, setCommentsOpen] = useState(null);
   const [likesOpen, setLikesOpen] = useState(null);
@@ -48,6 +51,17 @@ export function PublicProfileView({
       }
       setProfile(data);
       setLocalFriendshipStatus(data.friendship_status ?? null);
+
+      if (data.friendship_status === 'accepted' && currentUserId) {
+        const { data: fRow } = await supabase
+          .from('friendships')
+          .select('id')
+          .eq('status', 'accepted')
+          .or(`and(requester_id.eq.${userId},addressee_id.eq.${currentUserId}),and(requester_id.eq.${currentUserId},addressee_id.eq.${userId})`)
+          .limit(1)
+          .maybeSingle();
+        setFriendshipId(fRow?.id ?? null);
+      }
     } catch (err) {
       setError(err.message ?? 'Erro ao carregar perfil');
     } finally {
@@ -98,6 +112,20 @@ export function PublicProfileView({
     );
     onToggleLike?.(checkinId, currentlyLiked);
   }, [onToggleLike]);
+
+  const handleRemoveFriend = async () => {
+    if (!onRemoveFriend || !friendshipId || removingFriend) return;
+    setRemovingFriend(true);
+    try {
+      const ok = await onRemoveFriend(friendshipId);
+      if (ok) {
+        setLocalFriendshipStatus(null);
+        setFriendshipId(null);
+      }
+    } finally {
+      setRemovingFriend(false);
+    }
+  };
 
   const handleSendRequest = async () => {
     if (!onSendFriendRequest || sendingRequest) return;
@@ -199,7 +227,9 @@ export function PublicProfileView({
       <FriendshipButton
         status={localFriendshipStatus}
         sending={sendingRequest}
+        removing={removingFriend}
         onSend={handleSendRequest}
+        onRemove={handleRemoveFriend}
       />
 
       {posts.length > 0 && (
@@ -251,13 +281,46 @@ export function PublicProfileView({
   );
 }
 
-function FriendshipButton({ status, sending, onSend }) {
+function FriendshipButton({ status, sending, removing, onSend, onRemove }) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
   if (status === 'accepted') {
+    if (confirmOpen) {
+      return (
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setConfirmOpen(false)}
+            disabled={removing}
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-zinc-800 border border-zinc-700 text-zinc-300 font-bold text-sm hover:bg-zinc-700 transition-colors disabled:opacity-50"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => { onRemove?.(); setConfirmOpen(false); }}
+            disabled={removing}
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 font-bold text-sm hover:bg-red-500/20 transition-colors disabled:opacity-50"
+          >
+            {removing ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <UserMinus className="w-4 h-4" />
+            )}
+            {removing ? 'Removendo...' : 'Desfazer amizade'}
+          </button>
+        </div>
+      );
+    }
     return (
-      <div className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-zinc-800/40 border border-zinc-700/50 text-zinc-400">
+      <button
+        type="button"
+        onClick={() => setConfirmOpen(true)}
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-zinc-800/40 border border-zinc-700/50 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300 transition-colors"
+      >
         <UserCheck className="w-5 h-5" />
         <span className="text-sm font-bold">Amigos</span>
-      </div>
+      </button>
     );
   }
 

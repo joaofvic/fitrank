@@ -1,6 +1,14 @@
-import { Loader2, User, Users, X } from 'lucide-react';
+import { useState } from 'react';
+import { Loader2, MoreHorizontal, User, Users, X } from 'lucide-react';
 
-export function FriendsListDrawer({ friends = [], loading = false, onClose, onOpenProfile }) {
+export function FriendsListDrawer({ friends = [], loading = false, onClose, onOpenProfile, onRemove }) {
+  const [menuOpen, setMenuOpen] = useState(null);
+
+  const handleRemove = async (friendshipId) => {
+    setMenuOpen(null);
+    await onRemove?.(friendshipId);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end">
       <div
@@ -41,28 +49,58 @@ export function FriendsListDrawer({ friends = [], loading = false, onClose, onOp
                 {friends.length} amigo{friends.length !== 1 ? 's' : ''}
               </p>
               {friends.map((friend) => (
-                <button
+                <div
                   key={friend.user_id}
-                  type="button"
-                  onClick={() => { onOpenProfile?.(friend.user_id); onClose(); }}
-                  className="w-full flex items-center gap-3 py-1.5 hover:bg-zinc-800/50 -mx-2 px-2 rounded-xl transition-colors"
+                  className="flex items-center gap-3 py-1.5 -mx-2 px-2 rounded-xl hover:bg-zinc-800/50 transition-colors"
                 >
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500/30 to-zinc-800 p-[2px] shrink-0">
-                    <div className="w-full h-full rounded-full bg-zinc-900 overflow-hidden flex items-center justify-center">
-                      {friend.avatar_url ? (
-                        <img src={friend.avatar_url} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <User className="w-4 h-4 text-zinc-400" />
+                  <button
+                    type="button"
+                    onClick={() => { onOpenProfile?.(friend.user_id); onClose(); }}
+                    className="flex items-center gap-3 flex-1 min-w-0"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500/30 to-zinc-800 p-[2px] shrink-0">
+                      <div className="w-full h-full rounded-full bg-zinc-900 overflow-hidden flex items-center justify-center">
+                        {friend.avatar_url ? (
+                          <img src={friend.avatar_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <User className="w-4 h-4 text-zinc-400" />
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0 text-left">
+                      <p className="text-sm font-semibold text-white truncate">{friend.display_name}</p>
+                      {friend.username && (
+                        <p className="text-xs text-zinc-500 truncate">@{friend.username}</p>
                       )}
                     </div>
-                  </div>
-                  <div className="flex-1 min-w-0 text-left">
-                    <p className="text-sm font-semibold text-white truncate">{friend.display_name}</p>
-                    {friend.username && (
-                      <p className="text-xs text-zinc-500 truncate">@{friend.username}</p>
-                    )}
-                  </div>
-                </button>
+                  </button>
+
+                  {onRemove && (
+                    <div className="relative shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setMenuOpen(menuOpen === friend.id ? null : friend.id)}
+                        className="p-2 text-zinc-500 hover:text-white transition-colors"
+                      >
+                        <MoreHorizontal className="w-5 h-5" />
+                      </button>
+                      {menuOpen === friend.id && (
+                        <>
+                          <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(null)} />
+                          <div className="absolute right-0 top-full mt-1 z-20 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl py-1 min-w-[160px]">
+                            <button
+                              type="button"
+                              onClick={() => handleRemove(friend.id)}
+                              className="w-full text-left px-4 py-2.5 text-[13px] text-red-400 hover:bg-zinc-700/50 transition-colors"
+                            >
+                              Remover amigo
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               ))}
             </>
           )}
