@@ -252,6 +252,7 @@ export default function App() {
             friends={useCloud ? social.friends : []}
             friendsLoading={useCloud ? social.friendsLoading : false}
             onLoadFriends={useCloud ? social.loadFriends : undefined}
+            onRemoveFriend={useCloud ? social.removeFriend : undefined}
             onOpenProfile={useCloud ? openPublicProfile : undefined}
             checkinPage={useCloud ? cloud.checkinPage : 0}
             checkinLimit={useCloud ? cloud.checkinLimit : 0}

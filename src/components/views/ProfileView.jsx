@@ -28,6 +28,7 @@ export function ProfileView({
   friends = [],
   friendsLoading = false,
   onLoadFriends,
+  onRemoveFriend,
   onOpenProfile,
   checkinPage = 0,
   checkinLimit = 10,
@@ -272,6 +273,7 @@ export function ProfileView({
           loading={friendsLoading}
           onClose={() => setFriendsDrawerOpen(false)}
           onOpenProfile={onOpenProfile}
+          onRemove={onRemoveFriend}
         />
       )}
 
