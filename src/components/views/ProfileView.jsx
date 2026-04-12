@@ -22,6 +22,7 @@ export function ProfileView({
   onOpenUsers,
   onOpenEngagement,
   onOpenAudit,
+  onEditProfile,
   onRetryCheckin,
   checkinPage = 0,
   checkinLimit = 10,
@@ -126,15 +127,28 @@ export function ProfileView({
     <div className="space-y-6 animate-in-fade">
       <div className="text-center space-y-3 rounded-2xl bg-gradient-to-b from-green-500/5 to-transparent pt-8 pb-5 px-4 -mx-1">
         <div className="relative inline-block">
-          <div className="w-24 h-24 rounded-full bg-zinc-800 ring-2 ring-green-500/30 flex items-center justify-center mx-auto shadow-2xl shadow-green-500/10">
-            <User size={48} className="text-zinc-500" />
+          <div className="w-24 h-24 rounded-full bg-zinc-800 ring-2 ring-green-500/30 overflow-hidden flex items-center justify-center mx-auto shadow-2xl shadow-green-500/10">
+            {userData?.avatar_url ? (
+              <img src={userData.avatar_url} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <User size={48} className="text-zinc-500" />
+            )}
           </div>
-          <div className="absolute bottom-0 right-0 bg-green-500 p-1.5 rounded-full ring-4 ring-black">
-            <Camera size={14} className="text-black" />
-          </div>
+          {onEditProfile && (
+            <button
+              type="button"
+              onClick={onEditProfile}
+              className="absolute bottom-0 right-0 bg-green-500 p-1.5 rounded-full ring-4 ring-black"
+            >
+              <Camera size={14} className="text-black" />
+            </button>
+          )}
         </div>
         <div className="space-y-1">
           <h2 className="text-2xl font-black">{displayNome}</h2>
+          {userData?.username && (
+            <p className="text-sm text-zinc-400">@{userData.username}</p>
+          )}
           <p className="text-sm text-zinc-500">Desde {created}</p>
           {cloudTenant && (
             <span className="inline-flex items-center gap-1.5 mt-1 px-3 py-1 rounded-full text-[11px] font-semibold bg-zinc-800/60 text-zinc-400 border border-zinc-700/50">
@@ -143,6 +157,15 @@ export function ProfileView({
             </span>
           )}
         </div>
+        {onEditProfile && (
+          <button
+            type="button"
+            onClick={onEditProfile}
+            className="mt-2 px-6 py-1.5 rounded-lg text-sm font-bold bg-zinc-800 border border-zinc-700 text-white hover:bg-zinc-700 transition-colors"
+          >
+            Editar perfil
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-3 gap-2">

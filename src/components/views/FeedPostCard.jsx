@@ -40,8 +40,12 @@ export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenLikes, 
           className={`flex items-center gap-3 min-w-0 flex-1 text-left ${onOpenProfile ? 'cursor-pointer' : ''}`}
         >
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500/30 to-zinc-800 p-[2px] shrink-0">
-            <div className="w-full h-full rounded-full bg-zinc-900 flex items-center justify-center">
-              <User className="w-3.5 h-3.5 text-zinc-400" />
+            <div className="w-full h-full rounded-full bg-zinc-900 overflow-hidden flex items-center justify-center">
+              {post.avatar_url ? (
+                <img src={post.avatar_url} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <User className="w-3.5 h-3.5 text-zinc-400" />
+              )}
             </div>
           </div>
           <p className="text-[13px] font-semibold text-white truncate">{post.display_name}</p>

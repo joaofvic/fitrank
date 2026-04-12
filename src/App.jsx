@@ -23,6 +23,7 @@ import { AdminAuditView } from './components/views/AdminAuditView.jsx';
 import { AdminChallengesView } from './components/views/AdminChallengesView.jsx';
 import { PublicProfileView } from './components/views/PublicProfileView.jsx';
 import { NotificationsView } from './components/views/NotificationsView.jsx';
+import { EditProfileView } from './components/views/EditProfileView.jsx';
 
 export default function App() {
   const {
@@ -245,6 +246,7 @@ export default function App() {
             }
             onOpenEngagement={profile?.is_platform_master ? () => setView('admin-engagement') : undefined}
             onOpenAudit={profile?.is_platform_master ? () => setView('admin-audit') : undefined}
+            onEditProfile={useCloud ? () => setView('edit-profile') : undefined}
             onRetryCheckin={useCloud ? cloud.retryCheckin : undefined}
             onOpenFriends={useCloud ? () => setView('friends') : undefined}
             checkinPage={useCloud ? cloud.checkinPage : 0}
@@ -255,6 +257,16 @@ export default function App() {
             onPageChange={useCloud ? cloud.setCheckinPage : undefined}
             onLimitChange={useCloud ? cloud.setCheckinLimit : undefined}
             onSignOut={configured ? signOut : undefined}
+          />
+        )}
+        {view === 'edit-profile' && useCloud && (
+          <EditProfileView
+            profile={profile}
+            onBack={() => setView('profile')}
+            onUploadAvatar={cloud.uploadAvatar}
+            onUpdateProfile={cloud.updateProfile}
+            onCheckUsername={cloud.checkUsernameAvailable}
+            onUpdatePassword={cloud.updatePassword}
           />
         )}
         {view === 'friends' && useCloud && (

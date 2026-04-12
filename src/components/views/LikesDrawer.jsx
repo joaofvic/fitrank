@@ -66,8 +66,12 @@ export function LikesDrawer({ checkinId, onClose, onLoadLikes, onOpenProfile }) 
                   className="w-full flex items-center gap-3 py-1.5 hover:bg-zinc-800/50 -mx-2 px-2 rounded-xl transition-colors"
                 >
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500/30 to-zinc-800 p-[2px] shrink-0">
-                    <div className="w-full h-full rounded-full bg-zinc-900 flex items-center justify-center">
-                      <User className="w-4 h-4 text-zinc-400" />
+                    <div className="w-full h-full rounded-full bg-zinc-900 overflow-hidden flex items-center justify-center">
+                      {like.avatar_url ? (
+                        <img src={like.avatar_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <User className="w-4 h-4 text-zinc-400" />
+                      )}
                     </div>
                   </div>
                   <div className="flex-1 min-w-0 text-left">

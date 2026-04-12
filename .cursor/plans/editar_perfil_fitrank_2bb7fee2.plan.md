@@ -16,7 +16,7 @@ todos:
     status: completed
   - id: epic-4-integration
     content: "Epic 4: Integrar no App.jsx, adicionar botao no ProfileView, exibir avatares reais em todos os componentes"
-    status: pending
+    status: completed
 isProject: false
 ---
 

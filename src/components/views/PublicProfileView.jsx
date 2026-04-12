@@ -66,6 +66,7 @@ export function PublicProfileView({
         id: c.id,
         user_id: c.user_id ?? userId,
         display_name: profile.display_name,
+        avatar_url: profile.avatar_url ?? null,
         workout_type: c.tipo_treino,
         foto_url: c.foto_url,
         points_earned: c.points_awarded,
@@ -144,8 +145,12 @@ export function PublicProfileView({
 
       <div className="text-center space-y-3 rounded-2xl bg-gradient-to-b from-green-500/5 to-transparent pt-8 pb-5 px-4 -mx-1">
         <div className="relative inline-block">
-          <div className="w-24 h-24 rounded-full bg-zinc-800 ring-2 ring-green-500/30 flex items-center justify-center mx-auto shadow-2xl shadow-green-500/10">
-            <User size={48} className="text-zinc-500" />
+          <div className="w-24 h-24 rounded-full bg-zinc-800 ring-2 ring-green-500/30 overflow-hidden flex items-center justify-center mx-auto shadow-2xl shadow-green-500/10">
+            {profile.avatar_url ? (
+              <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <User size={48} className="text-zinc-500" />
+            )}
           </div>
           {profile.is_pro && (
             <div className="absolute -top-1 -right-1 bg-yellow-500 p-1.5 rounded-full ring-4 ring-black">
@@ -158,6 +163,9 @@ export function PublicProfileView({
             {profile.display_name}
             {profile.is_pro && <Crown className="w-5 h-5 text-yellow-500 fill-yellow-500" />}
           </h2>
+          {profile.username && (
+            <p className="text-sm text-zinc-400">@{profile.username}</p>
+          )}
           <p className="text-sm text-zinc-500">Desde {created}</p>
           {profile.academia && (
             <span className="inline-flex items-center gap-1.5 mt-1 px-3 py-1 rounded-full text-[11px] font-semibold bg-zinc-800/60 text-zinc-400 border border-zinc-700/50">

@@ -32,6 +32,7 @@ export function useSocialData({ supabase, session, profile }) {
         id: r.checkin_id,
         user_id: r.user_id,
         display_name: r.display_name,
+        avatar_url: r.avatar_url ?? null,
         date: r.checkin_local_date,
         workout_type: r.tipo_treino,
         foto_url: r.foto_url,
@@ -120,10 +121,10 @@ export function useSocialData({ supabase, session, profile }) {
     const unique = [...new Set(userIds)];
     const { data } = await supabase
       .from('profiles')
-      .select('id, display_name')
+      .select('id, display_name, avatar_url')
       .in('id', unique);
     const map = {};
-    for (const p of data ?? []) map[p.id] = p.display_name;
+    for (const p of data ?? []) map[p.id] = { display_name: p.display_name, avatar_url: p.avatar_url };
     return map;
   }, [supabase]);
 
@@ -167,9 +168,10 @@ export function useSocialData({ supabase, session, profile }) {
     return {
       ...data,
       user_id: userId,
-      display_name: profile?.display_name ?? 'Você'
+      display_name: profile?.display_name ?? 'Você',
+      avatar_url: profile?.avatar_url ?? null
     };
-  }, [supabase, userId, tenantId, profile?.display_name]);
+  }, [supabase, userId, tenantId, profile?.display_name, profile?.avatar_url]);
 
   const loadComments = useCallback(async (checkinId) => {
     if (!supabase) return [];
@@ -194,7 +196,8 @@ export function useSocialData({ supabase, session, profile }) {
       user_id: c.user_id,
       content: c.content,
       created_at: c.created_at,
-      display_name: names[c.user_id] ?? 'Usuário'
+      display_name: names[c.user_id]?.display_name ?? 'Usuário',
+      avatar_url: names[c.user_id]?.avatar_url ?? null
     }));
   }, [supabase, tenantId, fetchProfileNames]);
 
@@ -218,7 +221,8 @@ export function useSocialData({ supabase, session, profile }) {
     return rows.map((l) => ({
       user_id: l.user_id,
       created_at: l.created_at,
-      display_name: names[l.user_id] ?? 'Usuário'
+      display_name: names[l.user_id]?.display_name ?? 'Usuário',
+      avatar_url: names[l.user_id]?.avatar_url ?? null
     }));
   }, [supabase, fetchProfileNames]);
 
@@ -279,7 +283,8 @@ export function useSocialData({ supabase, session, profile }) {
           return {
             id: f.id,
             user_id: friendId,
-            display_name: names[friendId] ?? 'Usuário',
+            display_name: names[friendId]?.display_name ?? 'Usuário',
+            avatar_url: names[friendId]?.avatar_url ?? null,
             created_at: f.created_at
           };
         })
@@ -311,7 +316,8 @@ export function useSocialData({ supabase, session, profile }) {
       rows.map((f) => ({
         id: f.id,
         user_id: f.requester_id,
-        display_name: names[f.requester_id] ?? 'Usuário',
+        display_name: names[f.requester_id]?.display_name ?? 'Usuário',
+        avatar_url: names[f.requester_id]?.avatar_url ?? null,
         created_at: f.created_at
       }))
     );
@@ -339,7 +345,8 @@ export function useSocialData({ supabase, session, profile }) {
       rows.map((f) => ({
         id: f.id,
         addressee_id: f.addressee_id,
-        display_name: names[f.addressee_id] ?? 'Usuário',
+        display_name: names[f.addressee_id]?.display_name ?? 'Usuário',
+        avatar_url: names[f.addressee_id]?.avatar_url ?? null,
         created_at: f.created_at
       }))
     );
