@@ -121,10 +121,10 @@ export function useSocialData({ supabase, session, profile }) {
     const unique = [...new Set(userIds)];
     const { data } = await supabase
       .from('profiles')
-      .select('id, display_name, avatar_url')
+      .select('id, display_name, avatar_url, username')
       .in('id', unique);
     const map = {};
-    for (const p of data ?? []) map[p.id] = { display_name: p.display_name, avatar_url: p.avatar_url };
+    for (const p of data ?? []) map[p.id] = { display_name: p.display_name, avatar_url: p.avatar_url, username: p.username };
     return map;
   }, [supabase]);
 
@@ -285,6 +285,7 @@ export function useSocialData({ supabase, session, profile }) {
             user_id: friendId,
             display_name: names[friendId]?.display_name ?? 'Usuário',
             avatar_url: names[friendId]?.avatar_url ?? null,
+            username: names[friendId]?.username ?? null,
             created_at: f.created_at
           };
         })
