@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  ArrowLeft, Building2, CheckCircle2, Crown, Flame, Loader2, User, UserCheck, UserPlus, Zap
+  ArrowLeft, Building2, CheckCircle2, Crown, Flame, Loader2, User, UserCheck, UserMinus, UserPlus, Zap
 } from 'lucide-react';
 import { Card } from '../ui/Card.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
@@ -12,6 +12,7 @@ export function PublicProfileView({
   userId,
   onBack,
   onSendFriendRequest,
+  onRemoveFriend,
   onToggleLike,
   onAddComment,
   onLoadComments,
@@ -26,6 +27,8 @@ export function PublicProfileView({
   const [error, setError] = useState(null);
   const [sendingRequest, setSendingRequest] = useState(false);
   const [localFriendshipStatus, setLocalFriendshipStatus] = useState(null);
+  const [localFriendshipId, setLocalFriendshipId] = useState(null);
+  const [removingFriend, setRemovingFriend] = useState(false);
   const [posts, setPosts] = useState([]);
   const [commentsOpen, setCommentsOpen] = useState(null);
   const [likesOpen, setLikesOpen] = useState(null);
@@ -48,6 +51,7 @@ export function PublicProfileView({
       }
       setProfile(data);
       setLocalFriendshipStatus(data.friendship_status ?? null);
+      setLocalFriendshipId(data.friendship_id ?? null);
     } catch (err) {
       setError(err.message ?? 'Erro ao carregar perfil');
     } finally {
@@ -107,6 +111,20 @@ export function PublicProfileView({
       if (ok) setLocalFriendshipStatus('pending');
     } finally {
       setSendingRequest(false);
+    }
+  };
+
+  const handleRemoveFriend = async () => {
+    if (!onRemoveFriend || !localFriendshipId || removingFriend) return;
+    setRemovingFriend(true);
+    try {
+      const ok = await onRemoveFriend(localFriendshipId);
+      if (ok) {
+        setLocalFriendshipStatus(null);
+        setLocalFriendshipId(null);
+      }
+    } finally {
+      setRemovingFriend(false);
     }
   };
 
@@ -199,7 +217,9 @@ export function PublicProfileView({
       <FriendshipButton
         status={localFriendshipStatus}
         sending={sendingRequest}
+        removing={removingFriend}
         onSend={handleSendRequest}
+        onRemove={handleRemoveFriend}
       />
 
       {posts.length > 0 && (
@@ -251,12 +271,40 @@ export function PublicProfileView({
   );
 }
 
-function FriendshipButton({ status, sending, onSend }) {
+function FriendshipButton({ status, sending, removing, onSend, onRemove }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
   if (status === 'accepted') {
     return (
-      <div className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-zinc-800/40 border border-zinc-700/50 text-zinc-400">
-        <UserCheck className="w-5 h-5" />
-        <span className="text-sm font-bold">Amigos</span>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setMenuOpen((v) => !v)}
+          disabled={removing}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-zinc-800/40 border border-zinc-700/50 text-zinc-400 hover:bg-zinc-800 transition-colors disabled:opacity-50"
+        >
+          {removing ? (
+            <Loader2 className="w-5 h-5 animate-spin" />
+          ) : (
+            <UserCheck className="w-5 h-5" />
+          )}
+          <span className="text-sm font-bold">{removing ? 'Removendo...' : 'Amigos'}</span>
+        </button>
+        {menuOpen && !removing && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+            <div className="absolute left-0 right-0 top-full mt-1 z-20 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl py-1">
+              <button
+                type="button"
+                onClick={() => { setMenuOpen(false); onRemove?.(); }}
+                className="w-full flex items-center gap-2 px-4 py-2.5 text-[13px] text-red-400 hover:bg-zinc-700/50 transition-colors"
+              >
+                <UserMinus className="w-4 h-4" />
+                Desfazer amizade
+              </button>
+            </div>
+          </>
+        )}
       </div>
     );
   }

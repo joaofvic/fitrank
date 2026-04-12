@@ -296,6 +296,7 @@ export default function App() {
             userId={publicProfileUserId}
             onBack={() => setView('home')}
             onSendFriendRequest={social.sendFriendRequest}
+            onRemoveFriend={social.removeFriend}
             onToggleLike={social.toggleLike}
             onAddComment={social.addComment}
             onLoadComments={social.loadComments}
