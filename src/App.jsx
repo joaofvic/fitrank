@@ -221,6 +221,7 @@ export default function App() {
             onAddComment={social.addComment}
             onLoadComments={social.loadComments}
             onDeleteComment={social.deleteComment}
+            onLoadLikes={social.loadLikes}
             onOpenFriends={() => setView('friends')}
             onOpenProfile={useCloud ? openPublicProfile : undefined}
             currentUserId={localUser?.uid}
@@ -283,6 +284,7 @@ export default function App() {
             onAddComment={social.addComment}
             onLoadComments={social.loadComments}
             onDeleteComment={social.deleteComment}
+            onLoadLikes={social.loadLikes}
             currentUserId={localUser?.uid}
             onUpdatePrivacy={social.updatePostPrivacy}
           />

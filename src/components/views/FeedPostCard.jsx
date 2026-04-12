@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
-import { Bookmark, Heart, MessageCircle, MessageCircleOff, MoreHorizontal, Send, User, EyeOff, Eye } from 'lucide-react';
+import { Heart, MessageCircle, MessageCircleOff, MoreHorizontal, User, EyeOff, Eye } from 'lucide-react';
 import { formatTimeAgo } from '../../lib/dates.js';
 import { workoutTypeIcon } from '../../lib/workout-icons.js';
 
-export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenProfile, currentUserId, onUpdatePrivacy }) {
+export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenLikes, onOpenProfile, currentUserId, onUpdatePrivacy }) {
   const [animating, setAnimating] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
@@ -141,26 +141,22 @@ export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenProfile
                 <MessageCircle className="w-6 h-6 text-white group-hover:text-zinc-400 transition-colors" />
               </button>
             )}
-            <button type="button" className="group p-1">
-              <Send className="w-[22px] h-[22px] text-white group-hover:text-zinc-400 transition-colors -rotate-[20deg]" />
-            </button>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-bold text-green-500 bg-green-500/10 px-2 py-0.5 rounded-full">
-              +{post.points_earned ?? 10} PTS
-            </span>
-            <button type="button" className="group p-1">
-              <Bookmark className="w-6 h-6 text-white group-hover:text-zinc-400 transition-colors" />
-            </button>
-          </div>
+          <span className="text-[11px] font-bold text-green-500 bg-green-500/10 px-2 py-0.5 rounded-full">
+            +{post.points_earned ?? 10} PTS
+          </span>
         </div>
       </div>
 
       <div className="px-4 pb-3 space-y-1">
         {(post.likes_count ?? 0) > 0 && !(post.hide_likes_count && currentUserId !== post.user_id) && (
-          <p className="text-[13px] font-semibold text-white">
-            {post.likes_count} curtida{post.likes_count !== 1 ? 's' : ''}
-          </p>
+          <button
+            type="button"
+            onClick={() => onOpenLikes?.(post.id)}
+            className="text-[13px] font-semibold text-white hover:text-zinc-300 transition-colors"
+          >
+            Curtidas
+          </button>
         )}
         <p className="text-[13px] text-zinc-300">
           <span

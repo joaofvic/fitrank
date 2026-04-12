@@ -198,6 +198,30 @@ export function useSocialData({ supabase, session, profile }) {
     }));
   }, [supabase, tenantId, fetchProfileNames]);
 
+  const loadLikes = useCallback(async (checkinId) => {
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from('likes')
+      .select('user_id, created_at')
+      .eq('checkin_id', checkinId)
+      .order('created_at', { ascending: false })
+      .limit(200);
+
+    if (error) {
+      console.error('FitRank: loadLikes', error.message);
+      return [];
+    }
+
+    const rows = data ?? [];
+    const names = await fetchProfileNames(rows.map((l) => l.user_id));
+
+    return rows.map((l) => ({
+      user_id: l.user_id,
+      created_at: l.created_at,
+      display_name: names[l.user_id] ?? 'Usuário'
+    }));
+  }, [supabase, fetchProfileNames]);
+
   const deleteComment = useCallback(async (commentId, checkinId) => {
     if (!supabase || !userId) return false;
     const { error } = await supabase
@@ -441,6 +465,7 @@ export function useSocialData({ supabase, session, profile }) {
     toggleLike,
     addComment,
     loadComments,
+    loadLikes,
     deleteComment,
     updatePostPrivacy,
     friends,

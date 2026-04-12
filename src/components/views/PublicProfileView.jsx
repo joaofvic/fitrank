@@ -6,6 +6,7 @@ import { Card } from '../ui/Card.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { FeedPostCard } from './FeedPostCard.jsx';
 import { CommentsDrawer } from './CommentsDrawer.jsx';
+import { LikesDrawer } from './LikesDrawer.jsx';
 
 export function PublicProfileView({
   userId,
@@ -15,6 +16,7 @@ export function PublicProfileView({
   onAddComment,
   onLoadComments,
   onDeleteComment,
+  onLoadLikes,
   currentUserId,
   onUpdatePrivacy
 }) {
@@ -26,6 +28,7 @@ export function PublicProfileView({
   const [localFriendshipStatus, setLocalFriendshipStatus] = useState(null);
   const [posts, setPosts] = useState([]);
   const [commentsOpen, setCommentsOpen] = useState(null);
+  const [likesOpen, setLikesOpen] = useState(null);
 
   const loadProfile = useCallback(async () => {
     if (!supabase || !userId) return;
@@ -202,6 +205,7 @@ export function PublicProfileView({
               post={post}
               onToggleLike={handleToggleLike}
               onOpenComments={(id) => setCommentsOpen(id)}
+              onOpenLikes={(id) => setLikesOpen(id)}
               currentUserId={currentUserId}
               onUpdatePrivacy={handleUpdatePrivacy}
             />
@@ -224,6 +228,15 @@ export function PublicProfileView({
           onDeleteComment={onDeleteComment}
           currentUserId={currentUserId}
           allowComments={posts.find((p) => p.id === commentsOpen)?.allow_comments !== false}
+        />
+      )}
+
+      {likesOpen && (
+        <LikesDrawer
+          checkinId={likesOpen}
+          onClose={() => setLikesOpen(null)}
+          onLoadLikes={onLoadLikes}
+          onOpenProfile={(uid) => { setLikesOpen(null); }}
         />
       )}
     </div>

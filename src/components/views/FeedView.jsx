@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Loader2, UserPlus, Users } from 'lucide-react';
 import { FeedPostCard } from './FeedPostCard.jsx';
 import { CommentsDrawer } from './CommentsDrawer.jsx';
+import { LikesDrawer } from './LikesDrawer.jsx';
 
 export function FeedView({
   feed = [],
@@ -14,12 +15,14 @@ export function FeedView({
   onAddComment,
   onLoadComments,
   onDeleteComment,
+  onLoadLikes,
   onOpenFriends,
   onOpenProfile,
   currentUserId,
   onUpdatePrivacy
 }) {
   const [commentsOpen, setCommentsOpen] = useState(null);
+  const [likesOpen, setLikesOpen] = useState(null);
   const feedLoaded = useRef(false);
   const sentinelRef = useRef(null);
 
@@ -92,6 +95,7 @@ export function FeedView({
               post={post}
               onToggleLike={onToggleLike}
               onOpenComments={(id) => setCommentsOpen(id)}
+              onOpenLikes={(id) => setLikesOpen(id)}
               onOpenProfile={onOpenProfile}
               currentUserId={currentUserId}
               onUpdatePrivacy={onUpdatePrivacy}
@@ -124,6 +128,15 @@ export function FeedView({
           onDeleteComment={onDeleteComment}
           currentUserId={currentUserId}
           allowComments={feed.find((p) => p.id === commentsOpen)?.allow_comments !== false}
+        />
+      )}
+
+      {likesOpen && (
+        <LikesDrawer
+          checkinId={likesOpen}
+          onClose={() => setLikesOpen(null)}
+          onLoadLikes={onLoadLikes}
+          onOpenProfile={onOpenProfile}
         />
       )}
     </div>
