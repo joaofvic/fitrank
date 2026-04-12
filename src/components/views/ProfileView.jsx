@@ -8,6 +8,7 @@ import { Card } from '../ui/Card.jsx';
 import { Button } from '../ui/Button.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { workoutTypeIcon } from '../../lib/workout-icons.js';
+import { FriendsListDrawer } from './FriendsListDrawer.jsx';
 
 export function ProfileView({
   userData,
@@ -263,6 +264,15 @@ export function ProfileView({
             </div>
           </div>
         </div>
+      )}
+
+      {friendsDrawerOpen && (
+        <FriendsListDrawer
+          friends={friends}
+          loading={friendsLoading}
+          onClose={() => setFriendsDrawerOpen(false)}
+          onOpenProfile={onOpenProfile}
+        />
       )}
 
       <div className="space-y-4">

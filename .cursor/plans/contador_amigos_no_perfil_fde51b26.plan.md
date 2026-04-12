@@ -10,7 +10,7 @@ todos:
     status: completed
   - id: friends-drawer
     content: "Fase 3: Criar FriendsListDrawer.jsx seguindo padrao LikesDrawer e integrar no ProfileView"
-    status: pending
+    status: completed
 isProject: false
 ---
 
