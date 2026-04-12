@@ -13,7 +13,7 @@ todos:
     status: completed
   - id: epic-3-ui
     content: "Epic 3: Criar EditProfileView.jsx com avatar, nome, username, senha"
-    status: pending
+    status: completed
   - id: epic-4-integration
     content: "Epic 4: Integrar no App.jsx, adicionar botao no ProfileView, exibir avatares reais em todos os componentes"
     status: pending
