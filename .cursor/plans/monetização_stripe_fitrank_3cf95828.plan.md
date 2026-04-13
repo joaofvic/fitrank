@@ -10,7 +10,7 @@ todos:
     status: completed
   - id: ef-stripe-checkout
     content: Criar Edge Function stripe-checkout (cria Checkout Session, busca/cria Customer)
-    status: pending
+    status: completed
   - id: ef-stripe-portal
     content: Criar Edge Function stripe-portal (cria Billing Portal session)
     status: pending
