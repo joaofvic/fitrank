@@ -57,7 +57,8 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
           pontos: r.pontos,
           streak: r.streak,
           is_pro: r.is_pro,
-          academia: r.academia || ''
+          academia: r.academia || '',
+          avatar_url: r.avatar_url || null
         }))
       );
     } finally {

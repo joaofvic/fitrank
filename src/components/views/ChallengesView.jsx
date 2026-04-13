@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Trophy, User, ChevronDown, ChevronUp, Calendar, Dumbbell, Users, DollarSign } from 'lucide-react';
+import { Trophy, ChevronDown, ChevronUp, Calendar, Dumbbell, Users, DollarSign } from 'lucide-react';
+import { UserAvatar } from '../ui/user-avatar.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { Card } from '../ui/Card.jsx';
 import { Button } from '../ui/Button.jsx';
@@ -385,7 +386,7 @@ export function ChallengesView() {
                                 <span className="text-zinc-600 font-black w-5 text-xs shrink-0">
                                   #{idx + 1}
                                 </span>
-                                <User className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+                                <UserAvatar src={row.avatar_url} size="sm" className="w-7 h-7 bg-zinc-800 border border-zinc-700" />
                                 <span
                                   className={`font-bold text-sm truncate ${row.is_me ? 'text-green-400' : 'text-white'}`}
                                 >

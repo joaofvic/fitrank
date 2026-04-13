@@ -1,6 +1,7 @@
-import { Trophy, Flame, User, Dumbbell, Crown, TrendingUp, Zap } from 'lucide-react';
+import { Trophy, Flame, Dumbbell, Crown, TrendingUp, Zap } from 'lucide-react';
 import { Card } from '../ui/Card.jsx';
 import { Button } from '../ui/Button.jsx';
+import { UserAvatar } from '../ui/user-avatar.jsx';
 
 const RANKING_PERIODS = [
   { id: 'day', label: 'Dia' },
@@ -127,9 +128,7 @@ export function HomeView({
                   <div className="w-8 flex justify-center font-black text-zinc-600 italic">
                     {idx + 1 === 1 ? '🥇' : idx + 1 === 2 ? '🥈' : idx + 1 === 3 ? '🥉' : `#${idx + 1}`}
                   </div>
-                  <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center border border-zinc-700">
-                    <User className="w-6 h-6 text-zinc-400" />
-                  </div>
+                  <UserAvatar src={u.avatar_url} size="lg" className="w-10 h-10 bg-zinc-800 border border-zinc-700" />
                   <div>
                     <p
                       className={`font-bold flex items-center gap-1.5 ${

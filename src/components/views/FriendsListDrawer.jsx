@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Loader2, MoreHorizontal, User, Users, X } from 'lucide-react';
+import { Loader2, MoreHorizontal, Users, X } from 'lucide-react';
+import { UserAvatar } from '../ui/user-avatar.jsx';
 
 export function FriendsListDrawer({ friends = [], loading = false, onClose, onOpenProfile, onRemove }) {
   const [menuOpen, setMenuOpen] = useState(null);
@@ -59,13 +60,7 @@ export function FriendsListDrawer({ friends = [], loading = false, onClose, onOp
                     className="flex items-center gap-3 flex-1 min-w-0"
                   >
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500/30 to-zinc-800 p-[2px] shrink-0">
-                      <div className="w-full h-full rounded-full bg-zinc-900 overflow-hidden flex items-center justify-center">
-                        {friend.avatar_url ? (
-                          <img src={friend.avatar_url} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <User className="w-4 h-4 text-zinc-400" />
-                        )}
-                      </div>
+                      <UserAvatar src={friend.avatar_url} size="md" className="w-full h-full bg-zinc-900" />
                     </div>
                     <div className="flex-1 min-w-0 text-left">
                       <p className="text-sm font-semibold text-white truncate">{friend.display_name}</p>

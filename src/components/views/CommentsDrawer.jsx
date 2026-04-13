@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, Send, Trash2, User, X } from 'lucide-react';
+import { Loader2, Send, Trash2, X } from 'lucide-react';
 import { formatTimeAgo } from '../../lib/dates.js';
+import { UserAvatar } from '../ui/user-avatar.jsx';
 
 export function CommentsDrawer({
   checkinId,
@@ -102,13 +103,7 @@ export function CommentsDrawer({
           ) : (
             comments.map((c) => (
               <div key={c.id} className="flex items-start gap-3 group">
-                <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 overflow-hidden flex items-center justify-center shrink-0 mt-0.5">
-                  {c.avatar_url ? (
-                    <img src={c.avatar_url} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <User className="w-3.5 h-3.5 text-zinc-400" />
-                  )}
-                </div>
+                <UserAvatar src={c.avatar_url} size="sm" className="w-8 h-8 bg-zinc-800 border border-zinc-700 mt-0.5" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-white">{c.display_name}</span>

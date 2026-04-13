@@ -366,7 +366,8 @@ export function useSocialData({ supabase, session, profile }) {
     return raw.map((r) => ({
       id: r.user_id,
       display_name: r.display_name,
-      friendship_status: r.friendship_status
+      friendship_status: r.friendship_status,
+      avatar_url: r.avatar_url ?? null
     }));
   }, [supabase, userId]);
 

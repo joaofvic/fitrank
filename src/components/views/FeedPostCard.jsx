@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { Heart, MessageCircle, MessageCircleOff, MoreHorizontal, User, EyeOff, Eye, Trash2 } from 'lucide-react';
+import { Heart, MessageCircle, MessageCircleOff, MoreHorizontal, EyeOff, Eye, Trash2 } from 'lucide-react';
 import { formatTimeAgo } from '../../lib/dates.js';
 import { workoutTypeIcon } from '../../lib/workout-icons.js';
+import { UserAvatar } from '../ui/user-avatar.jsx';
 
 export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenLikes, onOpenProfile, currentUserId, onUpdatePrivacy, onDeletePost }) {
   const [animating, setAnimating] = useState(false);
@@ -40,13 +41,7 @@ export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenLikes, 
           className={`flex items-center gap-3 min-w-0 flex-1 text-left ${onOpenProfile ? 'cursor-pointer' : ''}`}
         >
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500/30 to-zinc-800 p-[2px] shrink-0">
-            <div className="w-full h-full rounded-full bg-zinc-900 overflow-hidden flex items-center justify-center">
-              {post.avatar_url ? (
-                <img src={post.avatar_url} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <User className="w-3.5 h-3.5 text-zinc-400" />
-              )}
-            </div>
+            <UserAvatar src={post.avatar_url} size="sm" className="w-full h-full bg-zinc-900" />
           </div>
           <p className="text-[13px] font-semibold text-white truncate">{post.display_name}</p>
         </button>

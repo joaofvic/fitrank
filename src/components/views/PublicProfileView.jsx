@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  ArrowLeft, Building2, CheckCircle2, Crown, Flame, Loader2, User, UserCheck, UserMinus, UserPlus, Zap
+  ArrowLeft, Building2, CheckCircle2, Crown, Flame, Loader2, UserCheck, UserMinus, UserPlus, Zap
 } from 'lucide-react';
+import { UserAvatar } from '../ui/user-avatar.jsx';
 import { Card } from '../ui/Card.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { FeedPostCard } from './FeedPostCard.jsx';
@@ -183,13 +184,7 @@ export function PublicProfileView({
 
       <div className="text-center space-y-3 rounded-2xl bg-gradient-to-b from-green-500/5 to-transparent pt-8 pb-5 px-4 -mx-1">
         <div className="relative inline-block">
-          <div className="w-24 h-24 rounded-full bg-zinc-800 ring-2 ring-green-500/30 overflow-hidden flex items-center justify-center mx-auto shadow-2xl shadow-green-500/10">
-            {profile.avatar_url ? (
-              <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <User size={48} className="text-zinc-500" />
-            )}
-          </div>
+          <UserAvatar src={profile.avatar_url} size="xl" className="w-24 h-24 bg-zinc-800 ring-2 ring-green-500/30 mx-auto shadow-2xl shadow-green-500/10" />
           {profile.is_pro && (
             <div className="absolute -top-1 -right-1 bg-yellow-500 p-1.5 rounded-full ring-4 ring-black">
               <Crown size={12} className="text-black" />

@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft, Camera, Check, ChevronDown, ChevronUp, Eye, EyeOff,
-  Loader2, Lock, User, X
+  Loader2, Lock, X
 } from 'lucide-react';
+import { ImageCropper } from '../ui/image-cropper';
+import { UserAvatar } from '../ui/user-avatar.jsx';
 
 export function EditProfileView({
   profile,
@@ -29,6 +31,8 @@ export function EditProfileView({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
+  const [cropSrc, setCropSrc] = useState(null);
+
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
 
@@ -44,8 +48,18 @@ export function EditProfileView({
       showToast('A imagem deve ter no máximo 5MB', 'error');
       return;
     }
-    setAvatarFile(file);
-    setAvatarPreview(URL.createObjectURL(file));
+    setCropSrc(URL.createObjectURL(file));
+    e.target.value = '';
+  };
+
+  const handleCropConfirm = (croppedFile, previewUrl) => {
+    setAvatarFile(croppedFile);
+    setAvatarPreview(previewUrl);
+    setCropSrc(null);
+  };
+
+  const handleCropCancel = () => {
+    setCropSrc(null);
   };
 
   useEffect(() => {
@@ -192,19 +206,7 @@ export function EditProfileView({
           onClick={() => fileRef.current?.click()}
           className="relative group"
         >
-          <div className="w-24 h-24 rounded-full overflow-hidden ring-2 ring-zinc-700 group-hover:ring-green-500/50 transition-all">
-            {avatarPreview ? (
-              <img
-                src={avatarPreview}
-                alt="Avatar"
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full bg-zinc-800 flex items-center justify-center">
-                <User className="w-10 h-10 text-zinc-500" />
-              </div>
-            )}
-          </div>
+          <UserAvatar src={avatarPreview} size="xl" className="w-24 h-24 bg-zinc-800 ring-2 ring-zinc-700 group-hover:ring-green-500/50 transition-all" />
           <div className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-green-500 border-2 border-black flex items-center justify-center shadow-lg">
             <Camera className="w-3.5 h-3.5 text-black" />
           </div>
@@ -371,6 +373,14 @@ export function EditProfileView({
             {toast.message}
           </div>
         </div>
+      )}
+
+      {cropSrc && (
+        <ImageCropper
+          imageSrc={cropSrc}
+          onConfirm={handleCropConfirm}
+          onCancel={handleCropCancel}
+        />
       )}
     </div>
   );

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  User, Camera, Flame, Zap, Calendar, CheckCircle2, Crown, RefreshCw,
+  Camera, Flame, Zap, Calendar, CheckCircle2, Crown, RefreshCw,
   Settings, X, Building2, Trophy, Users, Shield, SlidersHorizontal, BarChart3, ScrollText, LogOut,
   Clock, Check, ChevronLeft, ChevronRight, Loader2, CreditCard
 } from 'lucide-react';
+import { UserAvatar } from '../ui/user-avatar.jsx';
 import { Card } from '../ui/Card.jsx';
 import { Button } from '../ui/Button.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
@@ -175,13 +176,7 @@ export function ProfileView({
     <div className="space-y-6 animate-in-fade">
       <div className="text-center space-y-3 rounded-2xl bg-gradient-to-b from-green-500/5 to-transparent pt-8 pb-5 px-4 -mx-1">
         <div className="relative inline-block">
-          <div className="w-24 h-24 rounded-full bg-zinc-800 ring-2 ring-green-500/30 overflow-hidden flex items-center justify-center mx-auto shadow-2xl shadow-green-500/10">
-            {userData?.avatar_url ? (
-              <img src={userData.avatar_url} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <User size={48} className="text-zinc-500" />
-            )}
-          </div>
+          <UserAvatar src={userData?.avatar_url} size="xl" className="w-24 h-24 bg-zinc-800 ring-2 ring-green-500/30 mx-auto shadow-2xl shadow-green-500/10" />
           {onEditProfile && (
             <button
               type="button"
