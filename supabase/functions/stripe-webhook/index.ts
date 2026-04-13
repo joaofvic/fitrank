@@ -111,6 +111,11 @@ async function handleCheckoutCompleted(
   session: Stripe.Checkout.Session,
   stripe: Stripe
 ) {
+  if (session.mode === 'payment' && session.metadata?.type === 'challenge_entry') {
+    await handleChallengePayment(admin, session);
+    return;
+  }
+
   if (session.mode !== 'subscription') return;
 
   const stripeCustomerId = typeof session.customer === 'string'
@@ -381,6 +386,79 @@ async function handleInvoicePayment(
     console.error('stripe-webhook: erro ao inserir pagamento', error.message);
     throw error;
   }
+}
+
+// ============================================================
+// Challenge entry payment
+// ============================================================
+
+async function handleChallengePayment(
+  admin: ReturnType<typeof createClient>,
+  session: Stripe.Checkout.Session
+) {
+  const userId = session.metadata?.user_id ?? session.client_reference_id;
+  const desafioId = session.metadata?.desafio_id;
+  const tenantId = session.metadata?.tenant_id;
+
+  if (!userId || !desafioId) {
+    console.error('stripe-webhook: challenge payment sem user_id ou desafio_id');
+    return;
+  }
+
+  const { data: desafio } = await admin
+    .from('desafios')
+    .select('id, status, tenant_id, entry_fee')
+    .eq('id', desafioId)
+    .maybeSingle();
+
+  if (!desafio) {
+    console.error('stripe-webhook: desafio não encontrado', desafioId);
+    return;
+  }
+
+  const { error: enrollErr } = await admin.rpc('internal_enroll_paid_challenge', {
+    p_desafio_id: desafioId,
+    p_user_id: userId,
+    p_tenant_id: desafio.tenant_id
+  });
+
+  if (enrollErr) {
+    console.error('stripe-webhook: erro ao inscrever participante via RPC', enrollErr.message);
+    throw enrollErr;
+  }
+
+  const checkoutSessionId = session.id;
+
+  const { data: existingPag } = await admin
+    .from('pagamentos')
+    .select('id')
+    .eq('id_externo', checkoutSessionId)
+    .maybeSingle();
+
+  if (!existingPag) {
+    const { error: pagErr } = await admin.from('pagamentos').insert({
+      user_id: userId,
+      tenant_id: desafio.tenant_id,
+      tipo: 'challenge_entry',
+      valor: (session.amount_total ?? desafio.entry_fee ?? 0) / 100,
+      status: 'paid',
+      id_externo: checkoutSessionId,
+      metadata: {
+        desafio_id: desafioId,
+        stripe_checkout_session_id: checkoutSessionId,
+        stripe_payment_intent: typeof session.payment_intent === 'string'
+          ? session.payment_intent
+          : session.payment_intent?.id ?? null
+      }
+    });
+
+    if (pagErr) {
+      console.error('stripe-webhook: erro ao registrar pagamento do desafio', pagErr.message);
+      throw pagErr;
+    }
+  }
+
+  console.log(`stripe-webhook: usuário ${userId} inscrito no desafio ${desafioId} via pagamento`);
 }
 
 // ============================================================

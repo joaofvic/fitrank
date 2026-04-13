@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Trophy, User, Info, ChevronDown, ChevronUp, Calendar, Dumbbell, Users } from 'lucide-react';
+import { Trophy, User, ChevronDown, ChevronUp, Calendar, Dumbbell, Users, DollarSign } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { Card } from '../ui/Card.jsx';
 import { Button } from '../ui/Button.jsx';
 import { todayLocalISODate } from '../../lib/dates.js';
+import { invokeEdge } from '../../lib/supabase/invoke-edge.js';
 
 function formatDateBR(iso) {
   if (!iso) return '—';
@@ -57,7 +58,7 @@ export function ChallengesView() {
     try {
       const { data: rows, error: dErr } = await supabase
         .from('desafios')
-        .select('id, nome, descricao, status, tipo_treino, data_inicio, data_fim, max_participantes, mes_referencia, reward_winners_count, reward_distribution_type')
+        .select('id, nome, descricao, status, tipo_treino, data_inicio, data_fim, max_participantes, mes_referencia, reward_winners_count, reward_distribution_type, entry_fee')
         .eq('tenant_id', tenantId)
         .eq('status', 'ativo')
         .order('data_inicio', { ascending: false });
@@ -134,29 +135,49 @@ export function ChallengesView() {
     [expandedId, rankings, loadRanking]
   );
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('challenge_checkout') === 'success') {
+      const did = params.get('desafio_id');
+      if (did) {
+        setEnrolledIds((prev) => new Set([...prev, did]));
+      }
+      const url = new URL(window.location.href);
+      url.searchParams.delete('challenge_checkout');
+      url.searchParams.delete('desafio_id');
+      url.searchParams.delete('session_id');
+      window.history.replaceState({}, '', url.pathname + (url.search || ''));
+      loadDesafios();
+    }
+  }, []);
+
   const handleParticipar = async (desafioId) => {
     if (!supabase || !tenantId || !userId || busyId) return;
     setBusyId(desafioId);
     setError(null);
     try {
-      const { error: insErr } = await supabase.from('desafio_participantes').insert({
-        desafio_id: desafioId,
-        user_id: userId,
-        tenant_id: tenantId
+      const { data, error: fnError } = await invokeEdge('challenge-enroll', supabase, {
+        method: 'POST',
+        body: { desafio_id: desafioId }
       });
-      if (insErr) {
-        if (insErr.code === '23505') {
-          setEnrolledIds((prev) => new Set([...prev, desafioId]));
-        } else {
-          throw insErr;
-        }
-      } else {
-        setEnrolledIds((prev) => new Set([...prev, desafioId]));
-        setParticipantCounts((prev) => ({ ...prev, [desafioId]: (prev[desafioId] ?? 0) + 1 }));
+
+      if (fnError) throw fnError;
+      if (data?.error) throw new Error(data.error);
+
+      if (data?.url) {
+        window.location.href = data.url;
+        return;
       }
-      await loadRanking(desafioId);
-      if (!expandedId) setExpandedId(desafioId);
-      if (refreshProfile) await refreshProfile();
+
+      if (data?.enrolled) {
+        setEnrolledIds((prev) => new Set([...prev, desafioId]));
+        if (!data.already) {
+          setParticipantCounts((prev) => ({ ...prev, [desafioId]: (prev[desafioId] ?? 0) + 1 }));
+        }
+        await loadRanking(desafioId);
+        if (!expandedId) setExpandedId(desafioId);
+        if (refreshProfile) await refreshProfile();
+      }
     } catch (e) {
       setError(e.message ?? 'Erro ao participar');
     } finally {
@@ -289,6 +310,19 @@ export function ChallengesView() {
                     </span>
                   </div>
 
+                  {/* Entry fee info */}
+                  {d.entry_fee > 0 && !isEnrolled && (
+                    <div className="flex items-center gap-2 bg-green-500/5 border border-green-500/20 rounded-xl px-3 py-2">
+                      <DollarSign size={14} className="text-green-500 shrink-0" />
+                      <span className="text-xs text-green-200/80">
+                        Taxa de inscrição:{' '}
+                        <span className="font-bold text-green-400">
+                          R$ {(d.entry_fee / 100).toFixed(2).replace('.', ',')}
+                        </span>
+                      </span>
+                    </div>
+                  )}
+
                   {/* Enrollment action */}
                   {!isEnrolled ? (
                     <Button
@@ -299,10 +333,12 @@ export function ChallengesView() {
                       className="w-full py-2.5 text-sm"
                     >
                       {busyId === d.id
-                        ? 'Inscrevendo…'
+                        ? 'Processando…'
                         : isFull
                           ? 'Vagas esgotadas'
-                          : 'Participar do desafio'}
+                          : d.entry_fee > 0
+                            ? `Inscrever-se — R$ ${(d.entry_fee / 100).toFixed(2).replace('.', ',')}`
+                            : 'Participar do desafio'}
                     </Button>
                   ) : (
                     <p className="text-green-400 text-sm font-bold">
@@ -378,13 +414,6 @@ export function ChallengesView() {
         </div>
       )}
 
-      <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-6 text-center space-y-3">
-        <Info className="w-8 h-8 text-orange-500 mx-auto" />
-        <h4 className="font-bold text-orange-500">Desafios pagos</h4>
-        <p className="text-sm text-zinc-400">
-          Torneios com premiação via PIX e outros formatos entram nas próximas fases do produto.
-        </p>
-      </div>
     </div>
   );
 }
