@@ -13,7 +13,7 @@ todos:
     status: completed
   - id: ef-stripe-portal
     content: Criar Edge Function stripe-portal (cria Billing Portal session)
-    status: pending
+    status: completed
   - id: ef-admin-billing
     content: Criar Edge Function admin-billing (CRUD planos + gestao assinaturas)
     status: pending
