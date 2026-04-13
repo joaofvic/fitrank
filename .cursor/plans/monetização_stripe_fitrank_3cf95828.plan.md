@@ -16,7 +16,7 @@ todos:
     status: completed
   - id: ef-admin-billing
     content: Criar Edge Function admin-billing (CRUD planos + gestao assinaturas)
-    status: pending
+    status: completed
   - id: config-toml
     content: Atualizar supabase/config.toml com as novas Edge Functions
     status: pending
