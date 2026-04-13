@@ -4,7 +4,7 @@ overview: "Implementar o Épico 6 (Monetização) integrando Stripe ao FitRank: 
 todos:
   - id: migration-plans
     content: Criar migration para tabelas subscription_plans e subscriptions com RLS
-    status: pending
+    status: completed
   - id: ef-stripe-webhook
     content: Criar Edge Function stripe-webhook (verificacao Stripe-Signature, eventos checkout/subscription/invoice)
     status: pending
