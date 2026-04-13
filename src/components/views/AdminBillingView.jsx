@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ChevronLeft, Plus, Pencil, Archive, X, CreditCard, Users, TrendingDown,
-  DollarSign, Pause, Play, RefreshCw, ArrowUpDown, Search, Loader2, Check,
-  AlertTriangle
+  DollarSign, RefreshCw, Search, Loader2, Check, AlertTriangle, Undo2
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { Button } from '../ui/Button.jsx';
@@ -93,7 +92,8 @@ export function AdminBillingView({ onBack }) {
     interval_count: 1,
     features: [''],
     limits: '{}',
-    sort_order: 0
+    sort_order: 0,
+    cakto_product_id: ''
   };
   const [formData, setFormData] = useState(defaultForm);
 
@@ -182,7 +182,8 @@ export function AdminBillingView({ onBack }) {
       interval_count: plan.interval_count,
       features: plan.features?.length ? plan.features : [''],
       limits: JSON.stringify(plan.limits || {}, null, 2),
-      sort_order: plan.sort_order ?? 0
+      sort_order: plan.sort_order ?? 0,
+      cakto_product_id: plan.cakto_product_id || ''
     });
     setSubView('form');
     setError(null);
@@ -229,7 +230,8 @@ export function AdminBillingView({ onBack }) {
         interval_count: Number(formData.interval_count),
         features,
         limits,
-        sort_order: Number(formData.sort_order)
+        sort_order: Number(formData.sort_order),
+        cakto_product_id: formData.cakto_product_id.trim()
       };
       const { data, error: err } = await invokeEdge('admin-billing', supabase, {
         method: 'POST',
@@ -299,16 +301,10 @@ export function AdminBillingView({ onBack }) {
         searchParams: { action: 'cancel-subscription' },
         body: { subscription_id: sub.id, immediate: true }
       });
-    } else if (actionType === 'pause') {
+    } else if (actionType === 'refund') {
       result = await invokeEdge('admin-billing', supabase, {
         method: 'POST',
-        searchParams: { action: 'pause-subscription' },
-        body: { subscription_id: sub.id }
-      });
-    } else if (actionType === 'resume') {
-      result = await invokeEdge('admin-billing', supabase, {
-        method: 'POST',
-        searchParams: { action: 'resume-subscription' },
+        searchParams: { action: 'refund-subscription' },
         body: { subscription_id: sub.id }
       });
     }
@@ -319,26 +315,10 @@ export function AdminBillingView({ onBack }) {
     if (result?.error) { setError(result.error.message); return; }
     if (result?.data?.error) { setError(result.data.error); return; }
 
-    const labels = { cancel: 'Cancelamento agendado', 'cancel-now': 'Assinatura cancelada', pause: 'Assinatura pausada', resume: 'Assinatura resumida' };
+    const labels = { cancel: 'Cancelamento agendado', 'cancel-now': 'Assinatura cancelada', refund: 'Reembolso processado' };
     showToast(labels[actionType] || 'Ação realizada');
     loadSubscriptions();
     loadMetrics();
-  };
-
-  const handleChangePlan = async (sub, newPriceId) => {
-    if (!edgeReady) return;
-    setBusy(true);
-    setError(null);
-    const { data, error: err } = await invokeEdge('admin-billing', supabase, {
-      method: 'PATCH',
-      searchParams: { action: 'change-plan' },
-      body: { subscription_id: sub.id, new_price_id: newPriceId }
-    });
-    setBusy(false);
-    if (err) { setError(err.message); return; }
-    if (data?.error) { setError(data.error); return; }
-    showToast(`Plano alterado para ${data?.new_plan ?? 'novo plano'}`);
-    loadSubscriptions();
   };
 
   // -------------------------------------------------------------------------
@@ -667,6 +647,22 @@ export function AdminBillingView({ onBack }) {
               />
             </div>
 
+            {!editingPlan && (
+              <div>
+                <label className="text-[10px] uppercase font-black text-zinc-500 block mb-1">Produto Cakto (ID)</label>
+                <input
+                  type="text"
+                  value={formData.cakto_product_id}
+                  onChange={e => setFormData(p => ({ ...p, cakto_product_id: e.target.value }))}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-green-500/50"
+                  placeholder="UUID do produto na Cakto"
+                />
+                <p className="text-[10px] text-zinc-600 mt-1">
+                  ID do produto de assinatura criado no painel Cakto.
+                </p>
+              </div>
+            )}
+
             <div>
               <label className="text-[10px] uppercase font-black text-zinc-500 block mb-1">Ordem de exibição</label>
               <input
@@ -681,7 +677,7 @@ export function AdminBillingView({ onBack }) {
           <div className="flex gap-3">
             <Button
               onClick={handleSavePlan}
-              disabled={busy || !formData.name.trim() || !formData.price_amount}
+              disabled={busy || !formData.name.trim() || !formData.price_amount || (!editingPlan && !formData.cakto_product_id.trim())}
               className="flex-1 py-3"
             >
               {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
@@ -754,13 +750,10 @@ export function AdminBillingView({ onBack }) {
                 <SubscriptionCard
                   key={sub.id}
                   sub={sub}
-                  plans={plans}
                   busy={busy}
                   onCancel={() => setConfirmAction({ actionType: 'cancel', sub })}
                   onCancelNow={() => setConfirmAction({ actionType: 'cancel-now', sub })}
-                  onPause={() => setConfirmAction({ actionType: 'pause', sub })}
-                  onResume={() => setConfirmAction({ actionType: 'resume', sub })}
-                  onChangePlan={(priceId) => handleChangePlan(sub, priceId)}
+                  onRefund={() => setConfirmAction({ actionType: 'refund', sub })}
                 />
               ))}
             </div>
@@ -779,8 +772,7 @@ export function AdminBillingView({ onBack }) {
             <p className="text-sm text-zinc-400">
               {confirmAction.actionType === 'cancel' && 'A assinatura será cancelada ao fim do período atual. O usuário mantém acesso até lá.'}
               {confirmAction.actionType === 'cancel-now' && 'A assinatura será cancelada imediatamente. O acesso PRO será removido agora.'}
-              {confirmAction.actionType === 'pause' && 'A assinatura será pausada. O acesso PRO será removido até que seja retomada.'}
-              {confirmAction.actionType === 'resume' && 'A assinatura será retomada e o acesso PRO restaurado.'}
+              {confirmAction.actionType === 'refund' && 'O pagamento será reembolsado via Cakto. A assinatura será cancelada e o acesso PRO removido.'}
             </p>
             <p className="text-xs text-zinc-500">
               Usuário: {confirmAction.sub.user_display_name || confirmAction.sub.user_email || '—'}
@@ -820,11 +812,8 @@ export function AdminBillingView({ onBack }) {
 // ---------------------------------------------------------------------------
 // Subscription Card sub-component
 // ---------------------------------------------------------------------------
-function SubscriptionCard({ sub, plans, busy, onCancel, onCancelNow, onPause, onResume, onChangePlan }) {
+function SubscriptionCard({ sub, busy, onCancel, onCancelNow, onRefund }) {
   const [showActions, setShowActions] = useState(false);
-  const [changePlanOpen, setChangePlanOpen] = useState(false);
-
-  const activePlans = plans.filter(p => p.is_active && p.stripe_price_id !== sub.stripe_price_id);
 
   return (
     <Card className="space-y-3">
@@ -901,42 +890,11 @@ function SubscriptionCard({ sub, plans, busy, onCancel, onCancelNow, onPause, on
                     className="flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 disabled:opacity-50">
                     <X className="w-3 h-3" /> Cancelar agora
                   </button>
-                  <button type="button" onClick={onPause} disabled={busy}
-                    className="flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-lg bg-zinc-500/10 text-zinc-400 border border-zinc-500/20 hover:bg-zinc-500/20 disabled:opacity-50">
-                    <Pause className="w-3 h-3" /> Pausar
+                  <button type="button" onClick={onRefund} disabled={busy}
+                    className="flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-lg bg-orange-500/10 text-orange-400 border border-orange-500/20 hover:bg-orange-500/20 disabled:opacity-50">
+                    <Undo2 className="w-3 h-3" /> Reembolsar
                   </button>
                 </>
-              )}
-
-              {sub.status === 'paused' && (
-                <button type="button" onClick={onResume} disabled={busy}
-                  className="flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-lg bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20 disabled:opacity-50">
-                  <Play className="w-3 h-3" /> Resumir
-                </button>
-              )}
-
-              {(sub.status === 'active' || sub.status === 'trialing') && activePlans.length > 0 && (
-                <div>
-                  <button type="button" onClick={() => setChangePlanOpen(o => !o)} disabled={busy}
-                    className="flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 disabled:opacity-50">
-                    <ArrowUpDown className="w-3 h-3" /> Trocar plano
-                  </button>
-                  {changePlanOpen && (
-                    <div className="mt-2 space-y-1">
-                      {activePlans.map(p => (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => { onChangePlan(p.stripe_price_id); setChangePlanOpen(false); }}
-                          disabled={busy}
-                          className="block w-full text-left text-[11px] px-3 py-1.5 rounded-lg bg-zinc-800/50 text-zinc-300 hover:bg-zinc-700/50 disabled:opacity-50"
-                        >
-                          {p.name} — {formatCurrency(p.price_amount, p.currency)}/{p.interval === 'year' ? 'ano' : 'mês'}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
               )}
             </div>
           )}

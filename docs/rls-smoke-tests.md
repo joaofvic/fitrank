@@ -22,7 +22,7 @@ Execute no SQL Editor (como postgres) ou via dois clientes autenticados (usuári
 
 4. **Escrita sensível em `profiles`**  
    Como A, tente `update profiles set pontos = 999 where id = auth.uid()`: deve falhar (trigger).  
-   Idem `is_pro = true`, `streak`, `stripe_customer_id`.
+   Idem `is_pro = true`, `streak`, `cakto_customer_email`.
 
 5. **Pagamentos**  
    Como A, sem service_role, tente `insert` em `pagamentos`: deve ser negado (sem política de insert).  

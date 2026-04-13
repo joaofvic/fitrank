@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
-import Stripe from 'https://esm.sh/stripe@17?target=deno';
+import { z } from 'npm:zod@3.24.2';
+import { CaktoClient } from '../_shared/cakto-client.ts';
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -14,6 +15,10 @@ function jsonResponse(body: unknown, status: number) {
   });
 }
 
+const checkoutSchema = z.object({
+  offer_id: z.string().min(1, 'offer_id obrigatório')
+});
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -23,12 +28,10 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'Método não permitido' }, 405);
   }
 
-  const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
-  const appUrl = Deno.env.get('APP_URL') || Deno.env.get('VITE_PUBLIC_APP_URL') || 'http://localhost:3000';
 
-  if (!stripeSecretKey || !supabaseUrl || !anonKey) {
+  if (!supabaseUrl || !anonKey) {
     return jsonResponse({ error: 'Configuração do servidor incompleta' }, 500);
   }
 
@@ -50,28 +53,24 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'Sessão inválida' }, 401);
   }
 
-  const { data: profile } = await userClient
-    .from('profiles')
-    .select('stripe_customer_id')
-    .eq('id', user.id)
-    .maybeSingle();
-
-  if (!profile?.stripe_customer_id) {
-    return jsonResponse({ error: 'Nenhuma assinatura encontrada. Assine um plano primeiro.' }, 404);
-  }
-
+  let body: unknown;
   try {
-    const stripe = new Stripe(stripeSecretKey, { apiVersion: '2024-12-18.acacia' });
-
-    const portalSession = await stripe.billingPortal.sessions.create({
-      customer: profile.stripe_customer_id,
-      return_url: `${appUrl}?portal=return`
-    });
-
-    return jsonResponse({ url: portalSession.url }, 200);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Erro ao criar sessão do portal';
-    console.error('stripe-portal:', message);
-    return jsonResponse({ error: message }, 500);
+    body = await req.json();
+  } catch {
+    return jsonResponse({ error: 'JSON inválido' }, 400);
   }
+
+  const parsed = checkoutSchema.safeParse(body);
+  if (!parsed.success) {
+    return jsonResponse({ error: 'Payload inválido', details: parsed.error.flatten() }, 400);
+  }
+
+  const { offer_id } = parsed.data;
+
+  const url = CaktoClient.checkoutUrl(offer_id, {
+    email: user.email,
+    sck: user.id
+  });
+
+  return jsonResponse({ url }, 200);
 });

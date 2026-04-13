@@ -17,13 +17,10 @@ verify_jwt = false
 [functions.admin-billing]
 verify_jwt = false
 
-[functions.stripe-checkout]
+[functions.cakto-checkout]
 verify_jwt = false
 
-[functions.stripe-portal]
-verify_jwt = false
-
-[functions.stripe-webhook]
+[functions.cakto-webhook]
 verify_jwt = false
 
 [functions.challenge-enroll]

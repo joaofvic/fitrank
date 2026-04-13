@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
-import Stripe from 'https://esm.sh/stripe@17?target=deno';
 import { z } from 'npm:zod@3.24.2';
+import { createCaktoClient, CaktoClient } from '../_shared/cakto-client.ts';
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -31,8 +31,6 @@ Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
-  const appUrl = Deno.env.get('APP_URL') || Deno.env.get('VITE_PUBLIC_APP_URL') || 'http://localhost:3000';
 
   if (!supabaseUrl || !anonKey || !serviceKey) {
     return jsonResponse({ error: 'Configuração do servidor incompleta' }, 500);
@@ -76,7 +74,7 @@ Deno.serve(async (req) => {
 
   const { data: desafio, error: dErr } = await admin
     .from('desafios')
-    .select('id, nome, tenant_id, status, entry_fee, max_participantes')
+    .select('id, nome, tenant_id, status, entry_fee, max_participantes, cakto_offer_id, cakto_checkout_url')
     .eq('id', desafio_id)
     .maybeSingle();
 
@@ -95,7 +93,7 @@ Deno.serve(async (req) => {
 
   const { data: profile } = await admin
     .from('profiles')
-    .select('tenant_id, stripe_customer_id, display_name')
+    .select('tenant_id, display_name')
     .eq('id', user.id)
     .maybeSingle();
 
@@ -147,61 +145,56 @@ Deno.serve(async (req) => {
     return jsonResponse({ enrolled: true }, 200);
   }
 
-  if (!stripeSecretKey) {
-    return jsonResponse({ error: 'Stripe não configurado' }, 500);
+  // Desafio pago: gerar URL de checkout Cakto
+  if (desafio.cakto_offer_id) {
+    const sck = `${user.id}:${desafio_id}`;
+    const url = CaktoClient.checkoutUrl(desafio.cakto_offer_id, {
+      email: user.email,
+      sck
+    });
+    return jsonResponse({ url }, 200);
+  }
+
+  // Sem oferta pré-criada: criar oferta dinâmica via API Cakto
+  let cakto: CaktoClient;
+  try {
+    cakto = createCaktoClient();
+  } catch {
+    return jsonResponse({ error: 'Provedor de pagamento não configurado' }, 500);
+  }
+
+  const caktoProductId = Deno.env.get('CAKTO_CHALLENGE_PRODUCT_ID') || Deno.env.get('CAKTO_PRO_PRODUCT_ID');
+  if (!caktoProductId) {
+    console.error('challenge-enroll: CAKTO_CHALLENGE_PRODUCT_ID ou CAKTO_PRO_PRODUCT_ID não configurado');
+    return jsonResponse({ error: 'Produto de desafio não configurado' }, 500);
   }
 
   try {
-    const stripe = new Stripe(stripeSecretKey, { apiVersion: '2024-12-18.acacia' });
-
-    let customerId = profile.stripe_customer_id;
-
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: user.email,
-        name: profile.display_name || undefined,
-        metadata: { user_id: user.id, tenant_id: profile.tenant_id }
-      });
-      customerId = customer.id;
-
-      await admin.rpc('internal_update_profile_stripe', {
-        p_user_id: user.id,
-        p_is_pro: false,
-        p_stripe_customer_id: customerId,
-        p_stripe_subscription_id: null
-      });
-    }
-
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      customer: customerId,
-      client_reference_id: user.id,
-      line_items: [
-        {
-          price_data: {
-            currency: 'brl',
-            product_data: {
-              name: `Inscrição: ${desafio.nome}`,
-              description: `Taxa de inscrição no desafio "${desafio.nome}"`
-            },
-            unit_amount: desafio.entry_fee
-          },
-          quantity: 1
-        }
-      ],
-      success_url: `${appUrl}?challenge_checkout=success&desafio_id=${desafio_id}&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}?challenge_checkout=cancel&desafio_id=${desafio_id}`,
-      metadata: {
-        type: 'challenge_entry',
-        user_id: user.id,
-        tenant_id: desafio.tenant_id,
-        desafio_id
-      }
+    const offer = await cakto.createOffer({
+      name: `Inscrição: ${desafio.nome}`,
+      price: CaktoClient.centsToReais(desafio.entry_fee),
+      product: caktoProductId,
+      type: 'unique',
+      status: 'active'
     });
 
-    return jsonResponse({ url: session.url }, 200);
+    await admin
+      .from('desafios')
+      .update({
+        cakto_offer_id: offer.id,
+        cakto_checkout_url: CaktoClient.checkoutUrl(offer.id)
+      })
+      .eq('id', desafio_id);
+
+    const sck = `${user.id}:${desafio_id}`;
+    const url = CaktoClient.checkoutUrl(offer.id, {
+      email: user.email,
+      sck
+    });
+
+    return jsonResponse({ url }, 200);
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Erro ao criar sessão de checkout';
+    const message = err instanceof Error ? err.message : 'Erro ao criar oferta de pagamento';
     console.error('challenge-enroll:', message);
     return jsonResponse({ error: message }, 500);
   }

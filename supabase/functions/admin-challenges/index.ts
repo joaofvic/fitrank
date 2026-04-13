@@ -452,7 +452,11 @@ Deno.serve(async (req) => {
         if (upd.max_participantes !== undefined) fields.max_participantes = upd.max_participantes;
         if (upd.reward_winners_count !== undefined) fields.reward_winners_count = upd.reward_winners_count;
         if (upd.reward_distribution_type !== undefined) fields.reward_distribution_type = upd.reward_distribution_type;
-        if (upd.entry_fee !== undefined) fields.entry_fee = upd.entry_fee;
+        if (upd.entry_fee !== undefined) {
+          fields.entry_fee = upd.entry_fee;
+          fields.cakto_offer_id = null;
+          fields.cakto_checkout_url = null;
+        }
 
         if (Object.keys(fields).length === 0) {
           return jsonResponse({ error: 'Nenhum campo para atualizar' }, 400);

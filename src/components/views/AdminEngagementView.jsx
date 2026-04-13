@@ -1117,12 +1117,12 @@ export function AdminEngagementView({ onBack }) {
               onChange={(e) => setPlanFilter(e.target.value)}
             >
               <option value="all">Todos</option>
-              <option value="free">Gratuito (sem assinatura Stripe)</option>
+              <option value="free">Gratuito (sem assinatura)</option>
               <option value="paid">Pago (Pro ou assinatura)</option>
             </select>
             <p className="text-[9px] text-zinc-600 leading-snug">
               Pago considera <span className="font-mono text-zinc-500">is_pro</span> ou{' '}
-              <span className="font-mono text-zinc-500">stripe_subscription_id</span> preenchido.
+              <span className="font-mono text-zinc-500">cakto_order_id</span> preenchido.
             </p>
           </div>
         </div>

@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
-import Stripe from 'https://esm.sh/stripe@17?target=deno';
 import { z } from 'npm:zod@3.24.2';
+import { createCaktoClient, CaktoClient } from '../_shared/cakto-client.ts';
 
 // ============================================================
 // Schemas
@@ -16,7 +16,8 @@ const createPlanSchema = z.object({
   features: z.array(z.string()).default([]),
   limits: z.record(z.unknown()).default({}),
   sort_order: z.number().int().default(0),
-  metadata: z.record(z.unknown()).default({})
+  metadata: z.record(z.unknown()).default({}),
+  cakto_product_id: z.string().min(1, 'cakto_product_id obrigatório')
 });
 
 const updatePlanSchema = z.object({
@@ -50,11 +51,6 @@ const cancelSubscriptionSchema = z.object({
   immediate: z.boolean().default(false)
 });
 
-const changeSubscriptionPlanSchema = z.object({
-  subscription_id: z.string().uuid(),
-  new_price_id: z.string().min(1)
-});
-
 // ============================================================
 // Helpers
 // ============================================================
@@ -72,8 +68,10 @@ function jsonResponse(body: unknown, status: number) {
   });
 }
 
+type AdminClient = ReturnType<typeof createClient>;
+
 async function insertPlatformAudit(
-  admin: ReturnType<typeof createClient>,
+  admin: AdminClient,
   row: {
     actor_id: string;
     action: string;
@@ -94,6 +92,13 @@ async function insertPlatformAudit(
   if (error) console.error('platform_admin_audit_log', error);
 }
 
+function mapInterval(interval: string, intervalCount: number): { intervalType: 'month' | 'year'; interval: number } {
+  if (interval === 'year') {
+    return { intervalType: 'year', interval: intervalCount };
+  }
+  return { intervalType: 'month', interval: intervalCount };
+}
+
 // ============================================================
 // Main handler
 // ============================================================
@@ -103,12 +108,11 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-  if (!stripeSecretKey || !supabaseUrl || !anonKey || !serviceKey) {
+  if (!supabaseUrl || !anonKey || !serviceKey) {
     return jsonResponse({ error: 'Configuração do servidor incompleta' }, 500);
   }
 
@@ -144,7 +148,13 @@ Deno.serve(async (req) => {
     auth: { persistSession: false, autoRefreshToken: false }
   });
 
-  const stripe = new Stripe(stripeSecretKey, { apiVersion: '2024-12-18.acacia' });
+  let cakto: CaktoClient;
+  try {
+    cakto = createCaktoClient();
+  } catch (e) {
+    console.error('admin-billing: Cakto não configurado', e);
+    return jsonResponse({ error: 'Provedor de pagamento não configurado' }, 500);
+  }
 
   const url = new URL(req.url);
   const action = url.searchParams.get('action');
@@ -157,15 +167,15 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'create-plan' && req.method === 'POST') {
-      return await createPlan(admin, stripe, req, user.id);
+      return await createPlan(admin, cakto, req, user.id);
     }
 
     if (action === 'update-plan' && req.method === 'PATCH') {
-      return await updatePlan(admin, stripe, req, user.id);
+      return await updatePlan(admin, cakto, req, user.id);
     }
 
     if (action === 'archive-plan' && req.method === 'DELETE') {
-      return await archivePlan(admin, stripe, req, user.id);
+      return await archivePlan(admin, cakto, req, user.id);
     }
 
     // ========== ASSINATURAS ==========
@@ -175,19 +185,11 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'cancel-subscription' && req.method === 'POST') {
-      return await cancelSubscription(admin, stripe, req, user.id);
+      return await cancelSubscription(admin, req, user.id);
     }
 
-    if (action === 'pause-subscription' && req.method === 'POST') {
-      return await pauseSubscription(admin, stripe, req, user.id);
-    }
-
-    if (action === 'resume-subscription' && req.method === 'POST') {
-      return await resumeSubscription(admin, stripe, req, user.id);
-    }
-
-    if (action === 'change-plan' && req.method === 'PATCH') {
-      return await changeSubscriptionPlan(admin, stripe, req, user.id);
+    if (action === 'refund-subscription' && req.method === 'POST') {
+      return await refundSubscription(admin, cakto, req, user.id);
     }
 
     // ========== MÉTRICAS ==========
@@ -208,15 +210,15 @@ Deno.serve(async (req) => {
 // Planos
 // ============================================================
 
-async function listPlans(admin: ReturnType<typeof createClient>) {
+async function listPlans(admin: AdminClient) {
   const { data, error } = await admin.rpc('admin_list_subscription_plans');
   if (error) throw error;
   return jsonResponse({ plans: data ?? [] }, 200);
 }
 
 async function createPlan(
-  admin: ReturnType<typeof createClient>,
-  stripe: Stripe,
+  admin: AdminClient,
+  cakto: CaktoClient,
   req: Request,
   actorId: string
 ) {
@@ -227,28 +229,26 @@ async function createPlan(
   }
   const input = parsed.data;
 
-  const product = await stripe.products.create({
+  const { intervalType, interval } = mapInterval(input.interval, input.interval_count);
+
+  const offer = await cakto.createOffer({
     name: input.name,
-    description: input.description || undefined,
-    metadata: { source: 'fitrank_admin' }
+    price: CaktoClient.centsToReais(input.price_amount),
+    product: input.cakto_product_id,
+    type: 'subscription',
+    status: 'active',
+    intervalType,
+    interval
   });
 
-  const price = await stripe.prices.create({
-    product: product.id,
-    unit_amount: input.price_amount,
-    currency: input.currency,
-    recurring: {
-      interval: input.interval,
-      interval_count: input.interval_count
-    },
-    metadata: { source: 'fitrank_admin' }
-  });
+  const checkoutUrl = CaktoClient.checkoutUrl(offer.id);
 
   const { data: plan, error } = await admin
     .from('subscription_plans')
     .insert({
-      stripe_product_id: product.id,
-      stripe_price_id: price.id,
+      cakto_product_id: input.cakto_product_id,
+      cakto_offer_id: offer.id,
+      cakto_checkout_url: checkoutUrl,
       name: input.name,
       description: input.description ?? null,
       price_amount: input.price_amount,
@@ -271,15 +271,15 @@ async function createPlan(
     target_type: 'plan',
     target_id: plan.id,
     tenant_id: null,
-    payload: { name: input.name, price_amount: input.price_amount, stripe_product_id: product.id }
+    payload: { name: input.name, price_amount: input.price_amount, cakto_offer_id: offer.id }
   });
 
   return jsonResponse({ plan }, 201);
 }
 
 async function updatePlan(
-  admin: ReturnType<typeof createClient>,
-  stripe: Stripe,
+  admin: AdminClient,
+  cakto: CaktoClient,
   req: Request,
   actorId: string
 ) {
@@ -299,13 +299,6 @@ async function updatePlan(
   if (fetchErr) throw fetchErr;
   if (!existing) return jsonResponse({ error: 'Plano não encontrado' }, 404);
 
-  if (fields.name !== undefined || fields.metadata !== undefined) {
-    const productUpdate: Record<string, unknown> = {};
-    if (fields.name !== undefined) productUpdate.name = fields.name;
-    if (fields.metadata !== undefined) productUpdate.metadata = fields.metadata;
-    await stripe.products.update(existing.stripe_product_id, productUpdate);
-  }
-
   const dbUpdate: Record<string, unknown> = {};
   if (fields.name !== undefined) dbUpdate.name = fields.name;
   if (fields.description !== undefined) dbUpdate.description = fields.description;
@@ -315,34 +308,41 @@ async function updatePlan(
   if (fields.sort_order !== undefined) dbUpdate.sort_order = fields.sort_order;
   if (fields.metadata !== undefined) dbUpdate.metadata = fields.metadata;
 
-  const needsNewPrice = price_amount !== undefined || currency !== undefined ||
-    interval !== undefined || interval_count !== undefined;
+  const needsNewOffer = price_amount !== undefined || interval !== undefined || interval_count !== undefined;
 
-  if (needsNewPrice) {
-    await stripe.prices.update(existing.stripe_price_id, { active: false });
+  if (needsNewOffer && existing.cakto_offer_id) {
+    await cakto.disableOffer(existing.cakto_offer_id);
 
-    const newPrice = await stripe.prices.create({
-      product: existing.stripe_product_id,
-      unit_amount: price_amount ?? existing.price_amount,
-      currency: currency ?? existing.currency,
-      recurring: {
-        interval: interval ?? existing.interval,
-        interval_count: interval_count ?? existing.interval_count
-      },
-      metadata: { source: 'fitrank_admin' }
+    const { intervalType: iType, interval: iVal } = mapInterval(
+      interval ?? existing.interval,
+      interval_count ?? existing.interval_count
+    );
+
+    const newOffer = await cakto.createOffer({
+      name: fields.name ?? existing.name,
+      price: CaktoClient.centsToReais(price_amount ?? existing.price_amount),
+      product: existing.cakto_product_id,
+      type: 'subscription',
+      status: 'active',
+      intervalType: iType,
+      interval: iVal
     });
 
-    dbUpdate.stripe_price_id = newPrice.id;
+    dbUpdate.cakto_offer_id = newOffer.id;
+    dbUpdate.cakto_checkout_url = CaktoClient.checkoutUrl(newOffer.id);
     dbUpdate.price_amount = price_amount ?? existing.price_amount;
     dbUpdate.currency = currency ?? existing.currency;
     dbUpdate.interval = interval ?? existing.interval;
     dbUpdate.interval_count = interval_count ?? existing.interval_count;
-  }
+  } else if (existing.cakto_offer_id) {
+    const offerUpdate: Record<string, unknown> = {};
+    if (fields.name !== undefined) offerUpdate.name = fields.name;
+    if (fields.is_active === false) offerUpdate.status = 'disabled';
+    else if (fields.is_active === true) offerUpdate.status = 'active';
 
-  if (fields.is_active === false) {
-    await stripe.products.update(existing.stripe_product_id, { active: false });
-  } else if (fields.is_active === true) {
-    await stripe.products.update(existing.stripe_product_id, { active: true });
+    if (Object.keys(offerUpdate).length > 0) {
+      await cakto.updateOffer(existing.cakto_offer_id, offerUpdate as Parameters<typeof cakto.updateOffer>[1]);
+    }
   }
 
   if (Object.keys(dbUpdate).length === 0) {
@@ -364,15 +364,15 @@ async function updatePlan(
     target_type: 'plan',
     target_id: plan_id,
     tenant_id: null,
-    payload: { changes: Object.keys(dbUpdate), new_price: needsNewPrice }
+    payload: { changes: Object.keys(dbUpdate), new_offer: needsNewOffer }
   });
 
   return jsonResponse({ plan: updated }, 200);
 }
 
 async function archivePlan(
-  admin: ReturnType<typeof createClient>,
-  stripe: Stripe,
+  admin: AdminClient,
+  cakto: CaktoClient,
   req: Request,
   actorId: string
 ) {
@@ -385,15 +385,20 @@ async function archivePlan(
 
   const { data: existing, error: fetchErr } = await admin
     .from('subscription_plans')
-    .select('id, stripe_product_id, stripe_price_id, name')
+    .select('id, cakto_product_id, cakto_offer_id, name')
     .eq('id', plan_id)
     .maybeSingle();
 
   if (fetchErr) throw fetchErr;
   if (!existing) return jsonResponse({ error: 'Plano não encontrado' }, 404);
 
-  await stripe.prices.update(existing.stripe_price_id, { active: false });
-  await stripe.products.update(existing.stripe_product_id, { active: false });
+  if (existing.cakto_offer_id) {
+    try {
+      await cakto.disableOffer(existing.cakto_offer_id);
+    } catch (e) {
+      console.error('admin-billing: falha ao desabilitar oferta Cakto', e);
+    }
+  }
 
   const { error: updateErr } = await admin
     .from('subscription_plans')
@@ -418,7 +423,7 @@ async function archivePlan(
 // Assinaturas
 // ============================================================
 
-async function listSubscriptions(admin: ReturnType<typeof createClient>, url: URL) {
+async function listSubscriptions(admin: AdminClient, url: URL) {
   const params = Object.fromEntries(url.searchParams.entries());
   const parsed = listSubscriptionsSchema.safeParse(params);
   if (!parsed.success) {
@@ -438,8 +443,7 @@ async function listSubscriptions(admin: ReturnType<typeof createClient>, url: UR
 }
 
 async function cancelSubscription(
-  admin: ReturnType<typeof createClient>,
-  stripe: Stripe,
+  admin: AdminClient,
   req: Request,
   actorId: string
 ) {
@@ -452,21 +456,32 @@ async function cancelSubscription(
 
   const { data: sub } = await admin
     .from('subscriptions')
-    .select('stripe_subscription_id, user_id, tenant_id')
+    .select('cakto_order_id, user_id, tenant_id')
     .eq('id', subscription_id)
     .maybeSingle();
 
-  if (!sub?.stripe_subscription_id) {
+  if (!sub) {
     return jsonResponse({ error: 'Assinatura não encontrada' }, 404);
   }
 
   if (immediate) {
-    await stripe.subscriptions.cancel(sub.stripe_subscription_id);
-  } else {
-    await stripe.subscriptions.update(sub.stripe_subscription_id, {
-      cancel_at_period_end: true
-    });
+    await admin
+      .from('subscriptions')
+      .update({
+        status: 'canceled',
+        canceled_at: new Date().toISOString()
+      })
+      .eq('id', subscription_id);
 
+    if (sub.user_id) {
+      await admin.rpc('internal_update_profile_cakto', {
+        p_user_id: sub.user_id,
+        p_is_pro: false,
+        p_cakto_customer_email: null,
+        p_cakto_order_id: sub.cakto_order_id
+      });
+    }
+  } else {
     await admin
       .from('subscriptions')
       .update({ cancel_at_period_end: true })
@@ -479,15 +494,15 @@ async function cancelSubscription(
     target_type: 'subscription',
     target_id: subscription_id,
     tenant_id: sub.tenant_id,
-    payload: { user_id: sub.user_id, stripe_subscription_id: sub.stripe_subscription_id }
+    payload: { user_id: sub.user_id, cakto_order_id: sub.cakto_order_id }
   });
 
   return jsonResponse({ success: true, immediate }, 200);
 }
 
-async function pauseSubscription(
-  admin: ReturnType<typeof createClient>,
-  stripe: Stripe,
+async function refundSubscription(
+  admin: AdminClient,
+  cakto: CaktoClient,
   req: Request,
   actorId: string
 ) {
@@ -500,174 +515,55 @@ async function pauseSubscription(
 
   const { data: sub } = await admin
     .from('subscriptions')
-    .select('stripe_subscription_id, user_id, tenant_id, status')
+    .select('cakto_order_id, user_id, tenant_id')
     .eq('id', subscription_id)
     .maybeSingle();
 
-  if (!sub?.stripe_subscription_id) {
-    return jsonResponse({ error: 'Assinatura não encontrada' }, 404);
+  if (!sub?.cakto_order_id) {
+    return jsonResponse({ error: 'Assinatura não encontrada ou sem ID Cakto' }, 404);
   }
 
-  if (sub.status !== 'active' && sub.status !== 'trialing') {
-    return jsonResponse({ error: 'Apenas assinaturas ativas podem ser pausadas' }, 400);
-  }
-
-  await stripe.subscriptions.update(sub.stripe_subscription_id, {
-    pause_collection: { behavior: 'void' }
-  });
+  const result = await cakto.refundOrder(sub.cakto_order_id);
 
   await admin
     .from('subscriptions')
-    .update({ status: 'paused' })
+    .update({
+      status: 'canceled',
+      canceled_at: new Date().toISOString()
+    })
     .eq('id', subscription_id);
 
   if (sub.user_id) {
-    await admin.rpc('internal_update_profile_stripe', {
+    await admin.rpc('internal_update_profile_cakto', {
       p_user_id: sub.user_id,
-      p_is_pro: false
+      p_is_pro: false,
+      p_cakto_customer_email: null,
+      p_cakto_order_id: sub.cakto_order_id
     });
   }
 
-  await insertPlatformAudit(admin, {
-    actor_id: actorId,
-    action: 'billing.subscription_paused',
-    target_type: 'subscription',
-    target_id: subscription_id,
-    tenant_id: sub.tenant_id,
-    payload: { user_id: sub.user_id }
-  });
-
-  return jsonResponse({ success: true }, 200);
-}
-
-async function resumeSubscription(
-  admin: ReturnType<typeof createClient>,
-  stripe: Stripe,
-  req: Request,
-  actorId: string
-) {
-  const body = await req.json();
-  const parsed = subscriptionActionSchema.safeParse(body);
-  if (!parsed.success) {
-    return jsonResponse({ error: 'Payload inválido', details: parsed.error.flatten() }, 400);
-  }
-  const { subscription_id } = parsed.data;
-
-  const { data: sub } = await admin
-    .from('subscriptions')
-    .select('stripe_subscription_id, user_id, tenant_id, status')
-    .eq('id', subscription_id)
-    .maybeSingle();
-
-  if (!sub?.stripe_subscription_id) {
-    return jsonResponse({ error: 'Assinatura não encontrada' }, 404);
-  }
-
-  if (sub.status !== 'paused') {
-    return jsonResponse({ error: 'Apenas assinaturas pausadas podem ser resumidas' }, 400);
-  }
-
-  await stripe.subscriptions.update(sub.stripe_subscription_id, {
-    pause_collection: null
-  });
-
   await admin
-    .from('subscriptions')
-    .update({ status: 'active' })
-    .eq('id', subscription_id);
-
-  if (sub.user_id) {
-    await admin.rpc('internal_update_profile_stripe', {
-      p_user_id: sub.user_id,
-      p_is_pro: true
-    });
-  }
+    .from('pagamentos')
+    .update({ status: 'refunded' })
+    .eq('id_externo', sub.cakto_order_id);
 
   await insertPlatformAudit(admin, {
     actor_id: actorId,
-    action: 'billing.subscription_resumed',
+    action: 'billing.subscription_refunded',
     target_type: 'subscription',
     target_id: subscription_id,
     tenant_id: sub.tenant_id,
-    payload: { user_id: sub.user_id }
+    payload: { user_id: sub.user_id, cakto_order_id: sub.cakto_order_id, cakto_result: result }
   });
 
-  return jsonResponse({ success: true }, 200);
-}
-
-async function changeSubscriptionPlan(
-  admin: ReturnType<typeof createClient>,
-  stripe: Stripe,
-  req: Request,
-  actorId: string
-) {
-  const body = await req.json();
-  const parsed = changeSubscriptionPlanSchema.safeParse(body);
-  if (!parsed.success) {
-    return jsonResponse({ error: 'Payload inválido', details: parsed.error.flatten() }, 400);
-  }
-  const { subscription_id, new_price_id } = parsed.data;
-
-  const { data: sub } = await admin
-    .from('subscriptions')
-    .select('stripe_subscription_id, user_id, tenant_id, plan_id')
-    .eq('id', subscription_id)
-    .maybeSingle();
-
-  if (!sub?.stripe_subscription_id) {
-    return jsonResponse({ error: 'Assinatura não encontrada' }, 404);
-  }
-
-  const { data: newPlan } = await admin
-    .from('subscription_plans')
-    .select('id, name, stripe_price_id')
-    .eq('stripe_price_id', new_price_id)
-    .eq('is_active', true)
-    .maybeSingle();
-
-  if (!newPlan) {
-    return jsonResponse({ error: 'Plano destino não encontrado ou inativo' }, 404);
-  }
-
-  const stripeSub = await stripe.subscriptions.retrieve(sub.stripe_subscription_id);
-  const currentItemId = stripeSub.items.data[0]?.id;
-
-  if (!currentItemId) {
-    return jsonResponse({ error: 'Assinatura Stripe sem items' }, 500);
-  }
-
-  await stripe.subscriptions.update(sub.stripe_subscription_id, {
-    items: [{ id: currentItemId, price: new_price_id }],
-    proration_behavior: 'create_prorations'
-  });
-
-  await admin
-    .from('subscriptions')
-    .update({ plan_id: newPlan.id })
-    .eq('id', subscription_id);
-
-  await insertPlatformAudit(admin, {
-    actor_id: actorId,
-    action: 'billing.subscription_plan_changed',
-    target_type: 'subscription',
-    target_id: subscription_id,
-    tenant_id: sub.tenant_id,
-    payload: {
-      user_id: sub.user_id,
-      old_plan_id: sub.plan_id,
-      new_plan_id: newPlan.id,
-      new_plan_name: newPlan.name
-    }
-  });
-
-  return jsonResponse({ success: true, new_plan: newPlan.name }, 200);
+  return jsonResponse({ success: true, detail: result.detail }, 200);
 }
 
 // ============================================================
 // Métricas
 // ============================================================
 
-async function getMetrics(admin: ReturnType<typeof createClient>) {
+async function getMetrics(admin: AdminClient) {
   const { data, error } = await admin.rpc('admin_billing_metrics');
   if (error) throw error;
   return jsonResponse({ metrics: data }, 200);

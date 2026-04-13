@@ -1,0 +1,58 @@
+Configuração da Cakto (Pagamentos)
+
+1. Criar Conta
+   - Acesse https://app.cakto.com.br
+   - Crie uma conta ou faça login
+
+2. Obter Chaves da API
+   - No painel Cakto, vá em Configurações > API
+   - Copie o client_id e client_secret
+   - Salve como CAKTO_CLIENT_ID e CAKTO_CLIENT_SECRET
+
+3. Criar Produto de Assinatura PRO
+   - No painel, vá em Produtos > Criar Produto
+   - Tipo: subscription
+   - Nome: "Assinatura PRO FitRank" (ou similar)
+   - Copie o UUID do produto e salve como CAKTO_PRO_PRODUCT_ID
+   - (Opcional) Crie um produto separado para desafios e salve como CAKTO_CHALLENGE_PRODUCT_ID
+
+4. Configurar Webhook
+   - No painel Cakto, vá em Configurações > Webhooks
+   - Clique em Criar Webhook
+   - URL: https://pjlmemvwqhmpchiiqtol.supabase.co/functions/v1/cakto-webhook
+   - Eventos:
+     - purchase_approved
+     - subscription_created
+     - subscription_canceled
+     - subscription_renewed
+     - subscription_renewal_refused
+     - refund
+     - chargeback
+   - Copie o secret gerado e salve como CAKTO_WEBHOOK_SECRET
+
+5. Variáveis de Ambiente
+   Adicione ao .env.local (desenvolvimento) e ao Supabase (produção):
+
+   CAKTO_CLIENT_ID=seu_client_id
+   CAKTO_CLIENT_SECRET=seu_client_secret
+   CAKTO_WEBHOOK_SECRET=seu_webhook_secret
+   CAKTO_PRO_PRODUCT_ID=uuid_do_produto_pro
+   CAKTO_CHALLENGE_PRODUCT_ID=uuid_do_produto_desafios
+
+   No Supabase, configure via Dashboard > Settings > Edge Functions > Secrets
+   ou via CLI: supabase secrets set CAKTO_CLIENT_ID=xxx CAKTO_CLIENT_SECRET=xxx ...
+
+6. Fluxo de Pagamento
+   - Assinaturas PRO: Admin cria plano via painel → oferta criada na Cakto via API →
+     usuário clica "Assinar" → redirecionado para pay.cakto.com.br/OFFER_ID →
+     webhook notifica → assinatura ativada
+   - Desafios pagos: Admin define entry_fee → primeiro inscrito dispara criação de
+     oferta dinâmica na Cakto → próximos inscritos reutilizam a mesma oferta →
+     webhook notifica → inscrição confirmada
+
+7. Limitações da Cakto (vs Stripe)
+   - Sem portal de billing para o cliente
+   - Sem API para pausar/retomar assinatura
+   - Sem API para cancelar assinatura (apenas via refund ou dashboard)
+   - Sem troca de plano programática
+   - Checkout via URL estática por oferta (não sessão dinâmica)

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   User, Camera, Flame, Zap, Calendar, CheckCircle2, Crown, RefreshCw,
   Settings, X, Building2, Trophy, Users, Shield, SlidersHorizontal, BarChart3, ScrollText, LogOut,
-  Clock, Check, ChevronLeft, ChevronRight, Loader2, CreditCard, ExternalLink
+  Clock, Check, ChevronLeft, ChevronRight, Loader2, CreditCard
 } from 'lucide-react';
 import { Card } from '../ui/Card.jsx';
 import { Button } from '../ui/Button.jsx';
@@ -71,7 +71,7 @@ export function ProfileView({
     (async () => {
       const { data } = await supabase
         .from('subscription_plans')
-        .select('id, name, stripe_price_id, price_amount, currency, interval, interval_count, features')
+        .select('id, name, cakto_offer_id, price_amount, currency, interval, interval_count, features')
         .eq('is_active', true)
         .order('sort_order');
       if (!cancelled && data) setAvailablePlans(data);
@@ -79,13 +79,13 @@ export function ProfileView({
     return () => { cancelled = true; };
   }, [supabase, isPro]);
 
-  const handleSubscribe = useCallback(async (stripePriceId) => {
+  const handleSubscribe = useCallback(async (caktoOfferId) => {
     if (!supabase || proLoading) return;
     setProLoading(true);
     try {
-      const { data, error } = await invokeEdge('stripe-checkout', supabase, {
+      const { data, error } = await invokeEdge('cakto-checkout', supabase, {
         method: 'POST',
-        body: { price_id: stripePriceId }
+        body: { offer_id: caktoOfferId }
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -93,24 +93,6 @@ export function ProfileView({
     } catch (err) {
       console.error('FitRank: checkout failed', err.message);
       alert(err.message || 'Erro ao iniciar assinatura.');
-    } finally {
-      setProLoading(false);
-    }
-  }, [supabase, proLoading]);
-
-  const handleManageSubscription = useCallback(async () => {
-    if (!supabase || proLoading) return;
-    setProLoading(true);
-    try {
-      const { data, error } = await invokeEdge('stripe-portal', supabase, {
-        method: 'POST'
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      if (data?.url) window.location.href = data.url;
-    } catch (err) {
-      console.error('FitRank: portal failed', err.message);
-      alert(err.message || 'Erro ao abrir portal de assinatura.');
     } finally {
       setProLoading(false);
     }
@@ -559,16 +541,7 @@ export function ProfileView({
               Ativo
             </span>
           </div>
-          <p className="text-sm text-zinc-500 mb-4">Você tem acesso a todos os benefícios PRO.</p>
-          <Button
-            variant="secondary"
-            className="w-full py-2"
-            onClick={handleManageSubscription}
-            disabled={proLoading}
-          >
-            {proLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
-            Gerenciar Assinatura
-          </Button>
+          <p className="text-sm text-zinc-500">Você tem acesso a todos os benefícios PRO.</p>
         </Card>
       ) : (
         <Card className="bg-gradient-to-br from-yellow-500/5 via-transparent to-yellow-500/5 border-dashed border-yellow-500/20">
@@ -583,8 +556,8 @@ export function ProfileView({
                 <button
                   key={plan.id}
                   type="button"
-                  onClick={() => handleSubscribe(plan.stripe_price_id)}
-                  disabled={proLoading}
+                  onClick={() => handleSubscribe(plan.cakto_offer_id)}
+                  disabled={proLoading || !plan.cakto_offer_id}
                   className="w-full flex items-center justify-between gap-3 bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/50 rounded-xl px-4 py-3 transition-colors disabled:opacity-50"
                 >
                   <div className="text-left min-w-0">

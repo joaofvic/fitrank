@@ -145,7 +145,6 @@ export function ChallengesView() {
       const url = new URL(window.location.href);
       url.searchParams.delete('challenge_checkout');
       url.searchParams.delete('desafio_id');
-      url.searchParams.delete('session_id');
       window.history.replaceState({}, '', url.pathname + (url.search || ''));
       loadDesafios();
     }
