@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, ChevronLeft, Users, Calendar, Search, X, Trash2, Trophy } from 'lucide-react';
+import { Plus, ChevronLeft, Users, Calendar, Search, X, Trash2, Trophy, DollarSign } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Card } from '../ui/Card.jsx';
@@ -95,6 +95,7 @@ export function AdminChallengesView({ onBack }) {
     max_participantes: '',
     reward_winners_count: 3,
     reward_distribution_type: 'weighted',
+    entry_fee: '',
     status: 'rascunho'
   });
 
@@ -164,6 +165,7 @@ export function AdminChallengesView({ onBack }) {
       max_participantes: formData.max_participantes ? Number(formData.max_participantes) : null,
       reward_winners_count: Number(formData.reward_winners_count) || 3,
       reward_distribution_type: formData.reward_distribution_type,
+      entry_fee: formData.entry_fee !== '' ? Number(formData.entry_fee) : 0,
       status: formData.status
     };
     const { data, error: fnError } = await invokeEdge('admin-challenges', supabase, {
@@ -190,7 +192,8 @@ export function AdminChallengesView({ onBack }) {
       data_fim: formData.data_fim,
       max_participantes: formData.max_participantes ? Number(formData.max_participantes) : null,
       reward_winners_count: Number(formData.reward_winners_count) || 3,
-      reward_distribution_type: formData.reward_distribution_type
+      reward_distribution_type: formData.reward_distribution_type,
+      entry_fee: formData.entry_fee !== '' ? Number(formData.entry_fee) : 0
     };
     const { data, error: fnError } = await invokeEdge('admin-challenges', supabase, {
       method: 'PATCH',
@@ -271,6 +274,7 @@ export function AdminChallengesView({ onBack }) {
       max_participantes: '',
       reward_winners_count: 3,
       reward_distribution_type: 'weighted',
+      entry_fee: '',
       status: 'rascunho'
     });
     setError(null);
@@ -289,6 +293,7 @@ export function AdminChallengesView({ onBack }) {
       max_participantes: d.max_participantes ?? '',
       reward_winners_count: d.reward_winners_count ?? 3,
       reward_distribution_type: d.reward_distribution_type ?? 'weighted',
+      entry_fee: d.entry_fee ?? '',
       status: d.status ?? 'rascunho'
     });
     setError(null);
@@ -422,6 +427,31 @@ export function AdminChallengesView({ onBack }) {
             />
           </div>
 
+          <div>
+            <label htmlFor="ch-fee" className="text-xs text-zinc-400 font-bold uppercase block mb-1">
+              <span className="flex items-center gap-1"><DollarSign size={12} className="text-green-500" /> Valor de inscrição (R$)</span>
+            </label>
+            <input
+              id="ch-fee"
+              type="number"
+              min={0}
+              step={0.01}
+              value={formData.entry_fee !== '' ? (formData.entry_fee / 100).toFixed(2) : ''}
+              disabled={!canEditFields}
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (raw === '') {
+                  setFormData((p) => ({ ...p, entry_fee: '' }));
+                } else {
+                  setFormData((p) => ({ ...p, entry_fee: Math.round(parseFloat(raw) * 100) || 0 }));
+                }
+              }}
+              className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-3 text-sm text-white placeholder:text-zinc-600 focus:border-green-500/50 focus:outline-none disabled:opacity-40"
+              placeholder="0,00 (gratuito)"
+            />
+            <p className="text-[10px] text-zinc-600 mt-1">Deixe 0 ou vazio para desafio gratuito. Ex: 19,90 para R$&nbsp;19,90.</p>
+          </div>
+
           <div className="border-t border-zinc-800 pt-4 mt-2">
             <div className="flex items-center gap-2 mb-3">
               <Trophy size={14} className="text-yellow-500" />
@@ -529,6 +559,14 @@ export function AdminChallengesView({ onBack }) {
           <div className="flex items-center gap-4 text-xs text-zinc-500">
             <span className="flex items-center gap-1"><Users size={12} /> {d.participantes_count ?? 0} participante{(d.participantes_count ?? 0) !== 1 ? 's' : ''}</span>
             {d.max_participantes && <span>Max: {d.max_participantes}</span>}
+          </div>
+          <div className="flex items-center gap-4 text-xs text-zinc-500">
+            <span className="flex items-center gap-1">
+              <DollarSign size={12} className="text-green-500" />
+              {d.entry_fee > 0
+                ? <span className="text-green-400 font-bold">R$ {(d.entry_fee / 100).toFixed(2).replace('.', ',')}</span>
+                : <span className="text-zinc-500">Gratuito</span>}
+            </span>
           </div>
           <div className="flex items-center gap-2 text-xs text-yellow-500 pt-1 border-t border-zinc-800">
             <Trophy size={13} />
@@ -696,6 +734,11 @@ export function AdminChallengesView({ onBack }) {
               <div className="flex flex-wrap items-center gap-3 text-[11px] text-zinc-500">
                 <span className="flex items-center gap-1"><Calendar size={11} /> {formatDate(d.data_inicio)} — {formatDate(d.data_fim)}</span>
                 <span className="flex items-center gap-1"><Users size={11} /> {d.participantes_count ?? 0}</span>
+                {d.entry_fee > 0 && (
+                  <span className="flex items-center gap-1 text-green-400 font-bold">
+                    <DollarSign size={11} /> R$ {(d.entry_fee / 100).toFixed(2).replace('.', ',')}
+                  </span>
+                )}
               </div>
               {d.tipo_treino?.length > 0 && (
                 <div className="flex flex-wrap gap-1">

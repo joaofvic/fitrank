@@ -71,6 +71,7 @@ const createSchema = z.object({
   max_participantes: z.number().int().min(1).nullable().default(null),
   reward_winners_count: z.number().int().min(1).max(50).default(3),
   reward_distribution_type: z.enum(['equal', 'weighted']).default('weighted'),
+  entry_fee: z.number().int().min(0).default(0),
   status: z.enum(['rascunho', 'ativo']).default('rascunho')
 });
 
@@ -84,7 +85,8 @@ const updateSchema = z.object({
   data_fim: z.string().regex(dateRegex).optional(),
   max_participantes: z.number().int().min(1).nullable().optional(),
   reward_winners_count: z.number().int().min(1).max(50).optional(),
-  reward_distribution_type: z.enum(['equal', 'weighted']).optional()
+  reward_distribution_type: z.enum(['equal', 'weighted']).optional(),
+  entry_fee: z.number().int().min(0).optional()
 });
 
 const lifecycleSchema = z.object({
@@ -261,7 +263,8 @@ Deno.serve(async (req) => {
           criado_por: user.id,
           max_participantes: d.max_participantes,
           reward_winners_count: d.reward_winners_count,
-          reward_distribution_type: d.reward_distribution_type
+          reward_distribution_type: d.reward_distribution_type,
+          entry_fee: d.entry_fee
         })
         .select('*')
         .single();
@@ -277,6 +280,7 @@ Deno.serve(async (req) => {
         payload: {
           nome: d.nome,
           status: d.status,
+          entry_fee: d.entry_fee,
           data_inicio: d.data_inicio,
           data_fim: d.data_fim,
           tipo_treino: d.tipo_treino
@@ -448,6 +452,7 @@ Deno.serve(async (req) => {
         if (upd.max_participantes !== undefined) fields.max_participantes = upd.max_participantes;
         if (upd.reward_winners_count !== undefined) fields.reward_winners_count = upd.reward_winners_count;
         if (upd.reward_distribution_type !== undefined) fields.reward_distribution_type = upd.reward_distribution_type;
+        if (upd.entry_fee !== undefined) fields.entry_fee = upd.entry_fee;
 
         if (Object.keys(fields).length === 0) {
           return jsonResponse({ error: 'Nenhum campo para atualizar' }, 400);
