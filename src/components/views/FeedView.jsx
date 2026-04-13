@@ -34,7 +34,8 @@ export function FeedView({
   storiesRing = [],
   onLoadStoriesRing,
   onOpenStory,
-  onCreateStory
+  onCreateStory,
+  selfAvatarUrl
 }) {
   const [commentsOpen, setCommentsOpen] = useState(null);
   const [likesOpen, setLikesOpen] = useState(null);
@@ -115,6 +116,7 @@ export function FeedView({
           currentUserId={currentUserId}
           onOpenStory={onOpenStory}
           onCreateStory={onCreateStory}
+          selfAvatarUrl={selfAvatarUrl}
         />
       )}
 

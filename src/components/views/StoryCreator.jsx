@@ -12,7 +12,8 @@ export function StoryCreator({ onClose, onCreateStory }) {
   const [showCaption, setShowCaption] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState(null);
-  const inputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
   const videoRef = useRef(null);
 
   const handleFile = useCallback((e) => {
@@ -26,18 +27,20 @@ export function StoryCreator({ onClose, onCreateStory }) {
     setPreview(URL.createObjectURL(f));
 
     if (isVid) {
-      const video = document.createElement('video');
-      video.preload = 'metadata';
-      video.onloadedmetadata = () => {
-        if (video.duration > MAX_VIDEO_DURATION_S) {
-          setError(`Vídeo muito longo (${Math.round(video.duration)}s). Máximo: ${MAX_VIDEO_DURATION_S}s.`);
+      const vid = document.createElement('video');
+      vid.preload = 'metadata';
+      vid.onloadedmetadata = () => {
+        if (vid.duration > MAX_VIDEO_DURATION_S) {
+          setError(`Vídeo muito longo (${Math.round(vid.duration)}s). Máximo: ${MAX_VIDEO_DURATION_S}s.`);
           setFile(null);
           setPreview(null);
         }
-        URL.revokeObjectURL(video.src);
+        URL.revokeObjectURL(vid.src);
       };
-      video.src = URL.createObjectURL(f);
+      vid.src = URL.createObjectURL(f);
     }
+
+    e.target.value = '';
   }, []);
 
   const handlePublish = useCallback(async () => {
@@ -53,6 +56,14 @@ export function StoryCreator({ onClose, onCreateStory }) {
       setPublishing(false);
     }
   }, [file, caption, onCreateStory, onClose]);
+
+  const resetSelection = () => {
+    setFile(null);
+    setPreview(null);
+    setCaption('');
+    setShowCaption(false);
+    setError(null);
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
@@ -71,31 +82,50 @@ export function StoryCreator({ onClose, onCreateStory }) {
         )}
       </div>
 
+      {/* Inputs separados para câmera e galeria */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handleFile}
+      />
+      <input
+        ref={galleryInputRef}
+        type="file"
+        accept="image/*,video/*"
+        className="hidden"
+        onChange={handleFile}
+      />
+
       {!file ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-6 px-8">
           <div className="text-center space-y-2">
             <h2 className="text-xl font-black text-white">Novo Story</h2>
             <p className="text-sm text-zinc-500">Foto ou vídeo curto (até 15s)</p>
           </div>
-          <div className="flex gap-4">
+          <div className="flex gap-3">
             <button
               type="button"
-              onClick={() => { inputRef.current.accept = 'image/*'; inputRef.current.capture = 'environment'; inputRef.current.click(); }}
-              className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-green-500/50 transition-colors"
+              onClick={() => cameraInputRef.current?.click()}
+              className="flex flex-col items-center gap-2 px-5 py-4 rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-green-500/50 transition-colors"
             >
               <Camera className="w-8 h-8 text-green-400" />
               <span className="text-xs font-bold text-zinc-300">Câmera</span>
             </button>
             <button
               type="button"
-              onClick={() => { inputRef.current.accept = 'image/*,video/*'; inputRef.current.removeAttribute('capture'); inputRef.current.click(); }}
-              className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-green-500/50 transition-colors"
+              onClick={() => galleryInputRef.current?.click()}
+              className="flex flex-col items-center gap-2 px-5 py-4 rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-blue-500/50 transition-colors"
             >
               <Image className="w-8 h-8 text-blue-400" />
               <span className="text-xs font-bold text-zinc-300">Galeria</span>
             </button>
           </div>
-          <input ref={inputRef} type="file" className="hidden" onChange={handleFile} />
+          <p className="text-[11px] text-zinc-600 text-center max-w-[240px]">
+            Fotos e vídeos de até {MAX_VIDEO_DURATION_S}s. Desaparecem em 24h.
+          </p>
         </div>
       ) : (
         <>
@@ -148,7 +178,7 @@ export function StoryCreator({ onClose, onCreateStory }) {
           <div className="p-4 pb-8 flex items-center gap-3 bg-gradient-to-t from-black/80 to-transparent">
             <button
               type="button"
-              onClick={() => { setFile(null); setPreview(null); setCaption(''); setError(null); }}
+              onClick={resetSelection}
               className="flex-1 py-3 rounded-xl bg-zinc-800 text-sm font-bold text-zinc-300 active:scale-95 transition-transform"
             >
               Trocar

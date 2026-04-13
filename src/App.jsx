@@ -288,6 +288,7 @@ export default function App() {
             onLoadStoriesRing={social.loadStoriesRing}
             onOpenStory={handleOpenStory}
             onCreateStory={() => setStoryCreatorOpen(true)}
+            selfAvatarUrl={profile?.avatar_url}
           />
         )}
         {view === 'challenges' && <ChallengesView />}
