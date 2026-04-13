@@ -19,10 +19,10 @@ todos:
     status: completed
   - id: config-toml
     content: Atualizar supabase/config.toml com as novas Edge Functions
-    status: pending
+    status: completed
   - id: admin-billing-view
     content: "Criar AdminBillingView.jsx (painel admin: planos, assinaturas, metricas)"
-    status: pending
+    status: completed
   - id: app-integration
     content: Integrar AdminBillingView no App.jsx e ProfileView.jsx (navegacao + CTA PRO funcional)
     status: pending
