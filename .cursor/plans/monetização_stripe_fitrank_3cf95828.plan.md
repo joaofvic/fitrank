@@ -25,7 +25,7 @@ todos:
     status: completed
   - id: app-integration
     content: Integrar AdminBillingView no App.jsx e ProfileView.jsx (navegacao + CTA PRO funcional)
-    status: pending
+    status: completed
 isProject: false
 ---
 

@@ -2,11 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   User, Camera, Flame, Zap, Calendar, CheckCircle2, Crown, RefreshCw,
   Settings, X, Building2, Trophy, Users, Shield, SlidersHorizontal, BarChart3, ScrollText, LogOut,
-  Clock, Check, ChevronLeft, ChevronRight, Loader2
+  Clock, Check, ChevronLeft, ChevronRight, Loader2, CreditCard, ExternalLink
 } from 'lucide-react';
 import { Card } from '../ui/Card.jsx';
 import { Button } from '../ui/Button.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
+import { invokeEdge } from '../../lib/supabase/invoke-edge.js';
 import { workoutTypeIcon } from '../../lib/workout-icons.js';
 import { FriendsListDrawer } from './FriendsListDrawer.jsx';
 
@@ -23,6 +24,7 @@ export function ProfileView({
   onOpenUsers,
   onOpenEngagement,
   onOpenAudit,
+  onOpenBilling,
   onEditProfile,
   onRetryCheckin,
   friends = [],
@@ -39,8 +41,11 @@ export function ProfileView({
   onLimitChange,
   onSignOut
 }) {
-  const { supabase } = useAuth();
+  const { supabase, profile: authProfile } = useAuth();
   const [reasonLabelMap, setReasonLabelMap] = useState({});
+  const [availablePlans, setAvailablePlans] = useState([]);
+  const [proLoading, setProLoading] = useState(false);
+  const isPro = userData?.is_pro || authProfile?.is_pro;
 
   useEffect(() => {
     if (!supabase) return;
@@ -59,6 +64,57 @@ export function ProfileView({
     })();
     return () => { cancelled = true; };
   }, [supabase]);
+
+  useEffect(() => {
+    if (!supabase || isPro) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('subscription_plans')
+        .select('id, name, stripe_price_id, price_amount, currency, interval, interval_count, features')
+        .eq('is_active', true)
+        .order('sort_order');
+      if (!cancelled && data) setAvailablePlans(data);
+    })();
+    return () => { cancelled = true; };
+  }, [supabase, isPro]);
+
+  const handleSubscribe = useCallback(async (stripePriceId) => {
+    if (!supabase || proLoading) return;
+    setProLoading(true);
+    try {
+      const { data, error } = await invokeEdge('stripe-checkout', supabase, {
+        method: 'POST',
+        body: { price_id: stripePriceId }
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (data?.url) window.location.href = data.url;
+    } catch (err) {
+      console.error('FitRank: checkout failed', err.message);
+      alert(err.message || 'Erro ao iniciar assinatura.');
+    } finally {
+      setProLoading(false);
+    }
+  }, [supabase, proLoading]);
+
+  const handleManageSubscription = useCallback(async () => {
+    if (!supabase || proLoading) return;
+    setProLoading(true);
+    try {
+      const { data, error } = await invokeEdge('stripe-portal', supabase, {
+        method: 'POST'
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (data?.url) window.location.href = data.url;
+    } catch (err) {
+      console.error('FitRank: portal failed', err.message);
+      alert(err.message || 'Erro ao abrir portal de assinatura.');
+    } finally {
+      setProLoading(false);
+    }
+  }, [supabase, proLoading]);
 
   const [adminOpen, setAdminOpen] = useState(false);
   const [friendsDrawerOpen, setFriendsDrawerOpen] = useState(false);
@@ -248,7 +304,8 @@ export function ProfileView({
                 { fn: onOpenModeration, icon: Shield, label: 'Moderação' },
                 { fn: onOpenModerationSettings, icon: SlidersHorizontal, label: 'Config moderação' },
                 { fn: onOpenEngagement, icon: BarChart3, label: 'Engajamento' },
-                { fn: onOpenAudit, icon: ScrollText, label: 'Auditoria' }
+                { fn: onOpenAudit, icon: ScrollText, label: 'Auditoria' },
+                { fn: onOpenBilling, icon: CreditCard, label: 'Assinaturas' }
               ]
                 .filter((item) => Boolean(item.fn))
                 .map(({ fn, icon: Icon, label }) => (
@@ -491,16 +548,74 @@ export function ProfileView({
         })()}
       </div>
 
-      <Card className="bg-gradient-to-br from-yellow-500/5 via-transparent to-yellow-500/5 border-dashed border-yellow-500/20">
-        <h4 className="font-bold mb-1 flex items-center gap-2">
-          <Crown className="w-5 h-5 text-yellow-500 drop-shadow-[0_0_6px_rgba(234,179,8,0.4)]" />
-          Seja um Membro PRO
-        </h4>
-        <p className="text-sm text-zinc-500 mb-4">Desbloqueie badges exclusivos e acesso a ligas premium.</p>
-        <Button variant="secondary" className="w-full py-2">
-          Ver Benefícios
-        </Button>
-      </Card>
+      {isPro ? (
+        <Card className="bg-gradient-to-br from-yellow-500/5 via-transparent to-yellow-500/5 border-yellow-500/20">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-bold flex items-center gap-2">
+              <Crown className="w-5 h-5 text-yellow-500 drop-shadow-[0_0_6px_rgba(234,179,8,0.4)]" />
+              Membro PRO
+            </h4>
+            <span className="text-[10px] font-bold uppercase px-2 py-1 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+              Ativo
+            </span>
+          </div>
+          <p className="text-sm text-zinc-500 mb-4">Você tem acesso a todos os benefícios PRO.</p>
+          <Button
+            variant="secondary"
+            className="w-full py-2"
+            onClick={handleManageSubscription}
+            disabled={proLoading}
+          >
+            {proLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
+            Gerenciar Assinatura
+          </Button>
+        </Card>
+      ) : (
+        <Card className="bg-gradient-to-br from-yellow-500/5 via-transparent to-yellow-500/5 border-dashed border-yellow-500/20">
+          <h4 className="font-bold mb-1 flex items-center gap-2">
+            <Crown className="w-5 h-5 text-yellow-500 drop-shadow-[0_0_6px_rgba(234,179,8,0.4)]" />
+            Seja um Membro PRO
+          </h4>
+          <p className="text-sm text-zinc-500 mb-4">Desbloqueie badges exclusivos e acesso a ligas premium.</p>
+          {availablePlans.length > 0 ? (
+            <div className="space-y-2">
+              {availablePlans.map(plan => (
+                <button
+                  key={plan.id}
+                  type="button"
+                  onClick={() => handleSubscribe(plan.stripe_price_id)}
+                  disabled={proLoading}
+                  className="w-full flex items-center justify-between gap-3 bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/50 rounded-xl px-4 py-3 transition-colors disabled:opacity-50"
+                >
+                  <div className="text-left min-w-0">
+                    <p className="font-bold text-sm text-white">{plan.name}</p>
+                    {plan.features?.length > 0 && (
+                      <p className="text-[10px] text-zinc-500 truncate">{plan.features.slice(0, 2).join(' · ')}</p>
+                    )}
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <span className="text-sm font-black text-yellow-400 tabular-nums">
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: (plan.currency || 'brl').toUpperCase() }).format(plan.price_amount / 100)}
+                    </span>
+                    <span className="text-[10px] text-zinc-500 block">
+                      /{plan.interval === 'year' ? 'ano' : 'mês'}
+                    </span>
+                  </div>
+                </button>
+              ))}
+              {proLoading && (
+                <div className="flex justify-center py-2">
+                  <Loader2 className="w-5 h-5 text-yellow-400 animate-spin" />
+                </div>
+              )}
+            </div>
+          ) : (
+            <Button variant="secondary" className="w-full py-2" disabled>
+              Em breve
+            </Button>
+          )}
+        </Card>
+      )}
 
       {onSignOut && (
         <Button variant="ghost" className="w-full mt-2 py-2 text-sm text-zinc-500" onClick={onSignOut}>

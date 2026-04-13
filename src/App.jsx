@@ -21,6 +21,7 @@ import { AdminUsersView } from './components/views/AdminUsersView.jsx';
 import { AdminEngagementView } from './components/views/AdminEngagementView.jsx';
 import { AdminAuditView } from './components/views/AdminAuditView.jsx';
 import { AdminChallengesView } from './components/views/AdminChallengesView.jsx';
+import { AdminBillingView } from './components/views/AdminBillingView.jsx';
 import { PublicProfileView } from './components/views/PublicProfileView.jsx';
 import { NotificationsView } from './components/views/NotificationsView.jsx';
 import { EditProfileView } from './components/views/EditProfileView.jsx';
@@ -246,6 +247,7 @@ export default function App() {
             }
             onOpenEngagement={profile?.is_platform_master ? () => setView('admin-engagement') : undefined}
             onOpenAudit={profile?.is_platform_master ? () => setView('admin-audit') : undefined}
+            onOpenBilling={profile?.is_platform_master ? () => setView('admin-billing') : undefined}
             onEditProfile={useCloud ? () => setView('edit-profile') : undefined}
             onRetryCheckin={useCloud ? cloud.retryCheckin : undefined}
             onOpenFriends={useCloud ? () => setView('friends') : undefined}
@@ -327,6 +329,9 @@ export default function App() {
         )}
         {view === 'admin-audit' && profile?.is_platform_master && (
           <AdminAuditView onBack={() => setView('profile')} />
+        )}
+        {view === 'admin-billing' && profile?.is_platform_master && (
+          <AdminBillingView onBack={() => setView('profile')} />
         )}
 
         {view === 'notifications' && useCloud && (
