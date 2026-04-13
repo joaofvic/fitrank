@@ -628,6 +628,16 @@ export function useSocialData({ supabase, session, profile }) {
     }
   }, [supabase, userId]);
 
+  const loadStoryViewers = useCallback(async (storyId) => {
+    if (!supabase || !userId) return [];
+    const { data, error } = await supabase.rpc('get_story_viewers', { p_story_id: storyId });
+    if (error) {
+      console.error('FitRank: story viewers', error.message);
+      return [];
+    }
+    return Array.isArray(data) ? data : [];
+  }, [supabase, userId]);
+
   const deleteStory = useCallback(async (storyId) => {
     if (!supabase || !userId) return false;
     const { error } = await supabase
@@ -706,6 +716,7 @@ export function useSocialData({ supabase, session, profile }) {
     loadUserStories,
     createStory,
     markStoryViewed,
+    loadStoryViewers,
     deleteStory
   };
 }

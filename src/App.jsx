@@ -447,9 +447,11 @@ export default function App() {
             loadUserStories={social.loadUserStories}
             onMarkViewed={social.markStoryViewed}
             onDeleteStory={social.deleteStory}
+            onLoadViewers={social.loadStoryViewers}
             onClose={() => { setStoryViewerTarget(null); social.loadStoriesRing(); }}
             onNextUser={handleStoryNextUser}
             onPrevUser={handleStoryPrevUser}
+            onOpenProfile={openPublicProfile}
             currentUserId={localUser?.uid}
           />
         )}

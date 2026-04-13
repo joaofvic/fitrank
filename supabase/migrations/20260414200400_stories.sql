@@ -176,3 +176,31 @@ end;
 $$;
 
 grant execute on function public.cleanup_expired_stories() to service_role;
+
+-- 7. RPC: listar quem visualizou um story (apenas o dono pode ver)
+create or replace function public.get_story_viewers(p_story_id uuid)
+returns table (
+  viewer_id uuid,
+  display_name text,
+  avatar_url text,
+  username text,
+  viewed_at timestamptz
+)
+language sql stable security definer
+set search_path = public
+as $$
+  select
+    sv.viewer_id,
+    coalesce(p.display_name, p.nome, 'Usuário') as display_name,
+    p.avatar_url,
+    p.username,
+    sv.viewed_at
+  from public.story_views sv
+  join public.profiles p on p.id = sv.viewer_id
+  join public.stories s on s.id = sv.story_id
+  where sv.story_id = p_story_id
+    and s.user_id = auth.uid()
+  order by sv.viewed_at desc;
+$$;
+
+grant execute on function public.get_story_viewers(uuid) to authenticated;
