@@ -1,0 +1,54 @@
+🚀 Configuração do Stripe
+📄 Variáveis de Ambiente Necessárias
+Adicione as seguintes variáveis ao seu arquivo `.env.local`:
+```bash
+# Stripe
+STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
+VITE_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_your_stripe_publishable_key
+STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
+
+# App
+VITE_PUBLIC_APP_URL=http://localhost:3000
+🛠️ Configuração do Stripe Dashboard
+1. Criar Conta no Stripe
+Acesse stripe.com
+
+Crie uma conta ou faça login
+
+Ative o modo de teste para desenvolvimento
+
+2. Obter Chaves da API
+No dashboard do Stripe, vá em Developers > API keys
+
+Copie a Publishable key (começa com pk_test_)
+
+Copie a Secret key (começa com sk_test_)
+
+3. Configurar Webhooks
+⚠️ IMPORTANTE: Webhook Obrigatório para Atualização Automática de Planos
+O webhook é essencial para que o plano do usuário seja atualizado automaticamente após o pagamento no Stripe.
+
+No dashboard do Stripe, vá em Developers > Webhooks
+
+Clique em Add endpoint
+
+URL do endpoint: https://seu-dominio.com/api/stripe/webhook
+
+Eventos para escutar:
+
+checkout.session.completed ✅ Obrigatório
+
+customer.subscription.updated
+
+customer.subscription.deleted
+
+invoice.payment_succeeded
+
+invoice.payment_failed
+
+Copie o Signing secret (começa com whsec_)
+
+Configuração Local (.env.local)
+Bash
+# Adicione esta variável ao seu .env.local
+STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxxxxxxxxxxxxxx
