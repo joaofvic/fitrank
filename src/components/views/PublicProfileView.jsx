@@ -8,6 +8,10 @@ import { useAuth } from '../auth/AuthProvider.jsx';
 import { FeedPostCard } from './FeedPostCard.jsx';
 import { CommentsDrawer } from './CommentsDrawer.jsx';
 import { LikesDrawer } from './LikesDrawer.jsx';
+import { BadgeMiniIcons, BadgesGrid } from './BadgesGrid.jsx';
+import { LevelBadge } from '../ui/LevelBadge.jsx';
+import { LeagueBadge } from '../ui/LeagueBadge.jsx';
+import { getLevelInfo } from '../../lib/profile-map.js';
 
 export function PublicProfileView({
   userId,
@@ -21,7 +25,8 @@ export function PublicProfileView({
   onLoadLikes,
   currentUserId,
   onUpdatePrivacy,
-  onDeletePost
+  onDeletePost,
+  onLoadBadges
 }) {
   const { supabase } = useAuth();
   const [profile, setProfile] = useState(null);
@@ -34,6 +39,8 @@ export function PublicProfileView({
   const [posts, setPosts] = useState([]);
   const [commentsOpen, setCommentsOpen] = useState(null);
   const [likesOpen, setLikesOpen] = useState(null);
+  const [userBadges, setUserBadges] = useState([]);
+  const [badgesLoading, setBadgesLoading] = useState(false);
 
   const loadProfile = useCallback(async () => {
     if (!supabase || !userId) return;
@@ -77,6 +84,14 @@ export function PublicProfileView({
   useEffect(() => {
     loadProfile();
   }, [loadProfile]);
+
+  useEffect(() => {
+    if (!userId || !onLoadBadges) return;
+    setBadgesLoading(true);
+    onLoadBadges(userId).then((rows) => {
+      setUserBadges(rows ?? []);
+    }).finally(() => setBadgesLoading(false));
+  }, [userId, onLoadBadges]);
 
   useEffect(() => {
     if (!profile?.recent_checkins) { setPosts([]); return; }
@@ -192,10 +207,15 @@ export function PublicProfileView({
           )}
         </div>
         <div className="space-y-1">
-          <h2 className="text-2xl font-black flex items-center justify-center gap-2">
-            {profile.display_name}
+          <div className="flex items-center justify-center gap-2 flex-wrap">
+            <LevelBadge level={getLevelInfo(profile.xp).level} size="sm" />
+            <h2 className="text-2xl font-black">
+              {profile.display_name}
+            </h2>
             {profile.is_pro && <Crown className="w-5 h-5 text-yellow-500 fill-yellow-500" />}
-          </h2>
+            <BadgeMiniIcons badges={userBadges} max={3} />
+          </div>
+          <LeagueBadge league={profile.league ?? 'bronze'} size="sm" />
           {profile.username && (
             <p className="text-sm text-zinc-400">@{profile.username}</p>
           )}
@@ -228,6 +248,18 @@ export function PublicProfileView({
           <span className="text-[10px] text-zinc-500 uppercase">Treinos</span>
         </Card>
       </div>
+
+      <BadgesGrid
+        badges={userBadges}
+        loading={badgesLoading}
+        currentValues={{
+          streak: profile.streak ?? 0,
+          checkins: profile.approved_checkins_count ?? 0,
+          points: profile.pontos ?? 0,
+          social: 0
+        }}
+        isPro={profile.is_pro}
+      />
 
       <FriendshipButton
         status={localFriendshipStatus}

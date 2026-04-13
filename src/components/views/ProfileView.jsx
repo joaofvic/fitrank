@@ -11,6 +11,10 @@ import { useAuth } from '../auth/AuthProvider.jsx';
 import { invokeEdge } from '../../lib/supabase/invoke-edge.js';
 import { workoutTypeIcon } from '../../lib/workout-icons.js';
 import { FriendsListDrawer } from './FriendsListDrawer.jsx';
+import { BadgesGrid } from './BadgesGrid.jsx';
+import { LevelBadge } from '../ui/LevelBadge.jsx';
+import { XpProgressBar } from '../ui/XpProgressBar.jsx';
+import { LeagueBadge } from '../ui/LeagueBadge.jsx';
 
 export function ProfileView({
   userData,
@@ -33,6 +37,9 @@ export function ProfileView({
   onLoadFriends,
   onRemoveFriend,
   onOpenProfile,
+  badges = [],
+  badgesLoading = false,
+  onLoadBadges,
   checkinPage = 0,
   checkinLimit = 10,
   checkinCount = 0,
@@ -103,6 +110,7 @@ export function ProfileView({
   const [friendsDrawerOpen, setFriendsDrawerOpen] = useState(false);
 
   useEffect(() => { onLoadFriends?.(); }, [onLoadFriends]);
+  useEffect(() => { onLoadBadges?.(); }, [onLoadBadges]);
 
   const [retryingId, setRetryingId] = useState(null);
   const retryFileRef = useRef(null);
@@ -211,6 +219,22 @@ export function ProfileView({
         )}
       </div>
 
+      {userData?.levelInfo && (
+        <Card className="flex items-center gap-4 py-3 px-4 border-green-500/20">
+          <LevelBadge level={userData.levelInfo.level} size="lg" />
+          <div className="flex-1 min-w-0">
+            <XpProgressBar
+              currentXp={userData.levelInfo.currentXp}
+              xpCurrentLevel={userData.levelInfo.xpCurrentLevel}
+              xpNextLevel={userData.levelInfo.xpNextLevel}
+              progressPct={userData.levelInfo.progressPct}
+              level={userData.levelInfo.level}
+            />
+          </div>
+          <LeagueBadge league={userData?.league ?? 'bronze'} size="md" />
+        </Card>
+      )}
+
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <Card className="flex flex-col items-center justify-center py-4 border-orange-500/20">
           <Flame className="w-6 h-6 text-orange-500 fill-orange-500 mb-1.5" />
@@ -241,6 +265,18 @@ export function ProfileView({
           </Card>
         </button>
       </div>
+
+      <BadgesGrid
+        badges={badges}
+        loading={badgesLoading}
+        currentValues={{
+          streak: userData?.streak || 0,
+          checkins: checkinApprovedCount ?? checkins.filter((c) => c.photo_review_status !== 'rejected').length,
+          points: userData?.pontos || 0,
+          social: friends.length
+        }}
+        isPro={isPro}
+      />
 
       {isPlatformMaster && (
         <Button

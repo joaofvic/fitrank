@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Bell, Home, Newspaper, Plus, TrendingUp, User, Zap } from 'lucide-react';
 
 import { useAuth } from './components/auth/AuthProvider.jsx';
@@ -28,6 +28,9 @@ import { EditProfileView } from './components/views/EditProfileView.jsx';
 import { HashtagFeedView } from './components/views/HashtagFeedView.jsx';
 import { StoryCreator } from './components/views/StoryCreator.jsx';
 import { StoryViewer } from './components/views/StoryViewer.jsx';
+import { CelebrationOverlay } from './components/views/CelebrationOverlay.jsx';
+import { LeaguePromotionOverlay } from './components/views/LeaguePromotionOverlay.jsx';
+import { calculateLevel } from './lib/profile-map.js';
 
 export default function App() {
   const {
@@ -65,6 +68,9 @@ export default function App() {
   const [message, setMessage] = useState(null);
   const [storyCreatorOpen, setStoryCreatorOpen] = useState(false);
   const [storyViewerTarget, setStoryViewerTarget] = useState(null);
+  const [celebration, setCelebration] = useState(null);
+  const [leaguePromotion, setLeaguePromotion] = useState(null);
+  const prevLeagueRef = useRef(null);
 
   const openPublicProfile = useCallback((targetId) => {
     if (targetId === session?.user?.id) {
@@ -122,6 +128,21 @@ export default function App() {
     }
   }, [useCloud, userData, checkins]);
 
+  const LEAGUE_ORDER = ['bronze', 'prata', 'ouro', 'platina', 'diamante'];
+  useEffect(() => {
+    const currentLeague = profile?.league;
+    if (!currentLeague) return;
+    const prev = prevLeagueRef.current;
+    prevLeagueRef.current = currentLeague;
+    if (prev && prev !== currentLeague) {
+      const prevIdx = LEAGUE_ORDER.indexOf(prev);
+      const currIdx = LEAGUE_ORDER.indexOf(currentLeague);
+      if (currIdx > prevIdx) {
+        setLeaguePromotion(currentLeague);
+      }
+    }
+  }, [profile?.league]);
+
   const localLeaderboard = useMemo(() => {
     return [{ ...userData }].sort((a, b) => (b.pontos || 0) - (a.pontos || 0));
   }, [userData]);
@@ -146,8 +167,36 @@ export default function App() {
   const handleCheckin = async (workoutType = 'Treino Geral', fotoFile = null, feedVisible = true, feedCaption = null) => {
     if (useCloud) {
       try {
+        const prevLevel = calculateLevel(profile?.xp ?? 0);
+        const prevStreak = profile?.streak ?? 0;
+        const prevBadgeCount = social.badges?.length ?? 0;
+
         await cloud.insertCheckin(workoutType, fotoFile, feedVisible, feedCaption);
-        showToast('Check-in realizado! +10 pontos ⚡');
+
+        const freshProfile = await refreshProfile?.();
+        const newXp = freshProfile?.xp ?? profile?.xp ?? 0;
+        const newLevel = calculateLevel(newXp);
+        const newStreak = freshProfile?.streak ?? prevStreak;
+
+        let newBadges = [];
+        try {
+          const badgeRes = await social.loadBadges?.(session?.user?.id);
+          if (Array.isArray(badgeRes)) {
+            const unlocked = badgeRes.filter((b) => b.unlocked_at);
+            if (unlocked.length > prevBadgeCount) {
+              newBadges = unlocked.slice(prevBadgeCount).map((b) => b.name);
+            }
+          }
+        } catch { /* ignore */ }
+
+        setCelebration({
+          points: 10,
+          workoutType,
+          streak: newStreak,
+          leveledUp: newLevel > prevLevel,
+          newLevel: newLevel > prevLevel ? newLevel : undefined,
+          badges: newBadges.length > 0 ? newBadges : undefined
+        });
         setView('home');
       } catch (err) {
         showToast(err.message ?? 'Falha no check-in');
@@ -254,8 +303,15 @@ export default function App() {
             rankingPeriod={cloud.rankingPeriod}
             onRankingPeriodChange={cloud.setRankingPeriod}
             rankingPeriodLabel={cloud.rankingPeriodLabel}
+            leagueUsers={useCloud ? cloud.leagueLeaderboard : []}
+            leagueLoading={useCloud ? cloud.leagueLoading : false}
+            onLoadLeagueRanking={useCloud ? cloud.refreshLeagueRanking : undefined}
             onOpenCheckin={() => setView('checkin-modal')}
             onOpenProfile={useCloud ? openPublicProfile : undefined}
+            onCheckStreakRecovery={useCloud ? cloud.checkStreakRecovery : undefined}
+            onRecoverStreak={useCloud ? cloud.recoverStreak : undefined}
+            onGetBoostStatus={useCloud ? cloud.getBoostStatus : undefined}
+            onPurchaseBoost={useCloud ? cloud.purchaseBoost : undefined}
           />
         )}
         {view === 'feed' && useCloud && (
@@ -317,6 +373,9 @@ export default function App() {
             onLoadFriends={useCloud ? social.loadFriends : undefined}
             onRemoveFriend={useCloud ? social.removeFriend : undefined}
             onOpenProfile={useCloud ? openPublicProfile : undefined}
+            badges={useCloud ? social.badges : []}
+            badgesLoading={useCloud ? social.badgesLoading : false}
+            onLoadBadges={useCloud ? social.loadBadges : undefined}
             checkinPage={useCloud ? cloud.checkinPage : 0}
             checkinLimit={useCloud ? cloud.checkinLimit : 0}
             checkinCount={useCloud ? cloud.checkinCount : 0}
@@ -387,6 +446,7 @@ export default function App() {
             currentUserId={localUser?.uid}
             onUpdatePrivacy={social.updatePostPrivacy}
             onDeletePost={social.deletePost}
+            onLoadBadges={social.loadBadges}
           />
         )}
         {view === 'admin-tenants' && profile?.is_platform_master && (
@@ -453,6 +513,18 @@ export default function App() {
             onPrevUser={handleStoryPrevUser}
             onOpenProfile={openPublicProfile}
             currentUserId={localUser?.uid}
+          />
+        )}
+
+        <CelebrationOverlay
+          celebration={celebration}
+          onDismiss={() => setCelebration(null)}
+        />
+
+        {leaguePromotion && (
+          <LeaguePromotionOverlay
+            league={leaguePromotion}
+            onClose={() => setLeaguePromotion(null)}
           />
         )}
 

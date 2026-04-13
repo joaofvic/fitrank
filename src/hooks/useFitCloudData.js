@@ -37,6 +37,7 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
   const [checkinCount, setCheckinCount] = useState(0);
   const [checkinApprovedCount, setCheckinApprovedCount] = useState(0);
   const [checkinsLoading, setCheckinsLoading] = useState(false);
+  const previousRankRef = useRef({});
 
   const refreshLeaderboard = useCallback(async () => {
     if (!supabase || !userId) return;
@@ -52,7 +53,52 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
         return;
       }
       const rows = Array.isArray(data) ? data : [];
-      setLeaderboard(
+      const prevMap = previousRankRef.current;
+      const mapped = rows.map((r, i) => {
+        const rank = i + 1;
+        const prevRank = prevMap[r.id] ?? null;
+        return {
+          uid: r.id,
+          nome: r.nome_exibicao,
+          pontos: r.pontos,
+          streak: r.streak,
+          is_pro: r.is_pro,
+          academia: r.academia || '',
+          avatar_url: r.avatar_url || null,
+          xp: r.xp ?? 0,
+          league: r.league ?? 'bronze',
+          rank,
+          prevRank
+        };
+      });
+      const newMap = {};
+      mapped.forEach((u) => { newMap[u.uid] = u.rank; });
+      previousRankRef.current = newMap;
+      setLeaderboard(mapped);
+    } finally {
+      setLeaderboardLoading(false);
+    }
+  }, [supabase, userId, rankingStart, rankingEnd, rankingPeriod]);
+
+  // --- League Ranking ---
+  const [leagueLeaderboard, setLeagueLeaderboard] = useState([]);
+  const [leagueLoading, setLeagueLoading] = useState(false);
+
+  const refreshLeagueRanking = useCallback(async () => {
+    if (!supabase || !userId) return;
+    setLeagueLoading(true);
+    try {
+      const { data, error: rpcError } = await supabase.rpc('get_league_leaderboard', {
+        p_start: rankingStart,
+        p_end: rankingEnd,
+        p_period: rankingPeriod
+      });
+      if (rpcError) {
+        console.error('FitRank: league ranking', rpcError.message);
+        return;
+      }
+      const rows = Array.isArray(data) ? data : [];
+      setLeagueLeaderboard(
         rows.map((r) => ({
           uid: r.id,
           nome: r.nome_exibicao,
@@ -60,11 +106,13 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
           streak: r.streak,
           is_pro: r.is_pro,
           academia: r.academia || '',
-          avatar_url: r.avatar_url || null
+          avatar_url: r.avatar_url || null,
+          xp: r.xp ?? 0,
+          league: r.league ?? 'bronze'
         }))
       );
     } finally {
-      setLeaderboardLoading(false);
+      setLeagueLoading(false);
     }
   }, [supabase, userId, rankingStart, rankingEnd, rankingPeriod]);
 
@@ -473,6 +521,51 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
     [supabase]
   );
 
+  const checkStreakRecovery = useCallback(
+    async () => {
+      if (!supabase || !userId) return null;
+      const { data, error: err } = await supabase.rpc('can_recover_streak');
+      if (err) { console.error('FitRank: can_recover_streak', err.message); return null; }
+      return data;
+    },
+    [supabase, userId]
+  );
+
+  const recoverStreak = useCallback(
+    async (gapDate) => {
+      if (!supabase || !userId) return { error: 'Não autenticado' };
+      const { data, error: err } = await supabase.rpc('recover_streak', { p_date: gapDate || null });
+      if (err) { console.error('FitRank: recover_streak', err.message); return { error: err.message }; }
+      if (data?.error) return data;
+      if (refreshProfile) await refreshProfile();
+      return data;
+    },
+    [supabase, userId, refreshProfile]
+  );
+
+  const getBoostStatus = useCallback(
+    async () => {
+      if (!supabase || !userId) return null;
+      const { data, error: err } = await supabase.rpc('get_boost_status');
+      if (err) { console.error('FitRank: get_boost_status', err.message); return null; }
+      return data;
+    },
+    [supabase, userId]
+  );
+
+  const purchaseBoost = useCallback(
+    async (points) => {
+      if (!supabase || !userId) return { error: 'Não autenticado' };
+      const { data, error: err } = await supabase.rpc('purchase_boost', { p_points: points });
+      if (err) { console.error('FitRank: purchase_boost', err.message); return { error: err.message }; }
+      if (data?.error) return data;
+      if (refreshProfile) await refreshProfile();
+      refreshLeaderboard();
+      return data;
+    },
+    [supabase, userId, refreshProfile, refreshLeaderboard]
+  );
+
   return {
     leaderboard,
     checkins,
@@ -484,6 +577,9 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
     setError,
     refreshAll,
     refreshLeaderboard,
+    leagueLeaderboard,
+    leagueLoading,
+    refreshLeagueRanking,
     refreshCheckins,
     refreshNotifications,
     refreshReadNotifications,
@@ -503,6 +599,10 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
     uploadAvatar,
     updateProfile,
     checkUsernameAvailable,
-    updatePassword
+    updatePassword,
+    checkStreakRecovery,
+    recoverStreak,
+    getBoostStatus,
+    purchaseBoost
   };
 }

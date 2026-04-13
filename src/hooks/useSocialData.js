@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+import { haptic } from '../lib/haptics.js';
 
 const FEED_PAGE_SIZE = 10;
 
@@ -100,6 +101,8 @@ export function useSocialData({ supabase, session, profile }) {
   // --- Like (optimistic) ---
   const toggleLike = useCallback(async (checkinId, currentlyLiked) => {
     if (!supabase || !userId || !tenantId) return;
+
+    if (!currentlyLiked) haptic('light');
 
     setFeed((prev) =>
       prev.map((item) =>
@@ -547,6 +550,31 @@ export function useSocialData({ supabase, session, profile }) {
     }
   }, [supabase, userId, tenantId]);
 
+  // --- Badges ---
+  const [badges, setBadges] = useState([]);
+  const [badgesLoading, setBadgesLoading] = useState(false);
+
+  const loadBadges = useCallback(async (targetUserId) => {
+    if (!supabase) return [];
+    const uid = targetUserId ?? userId;
+    if (!uid) return [];
+    setBadgesLoading(true);
+    try {
+      const { data, error } = await supabase.rpc('get_user_badges', { p_user_id: uid });
+      if (error) {
+        console.error('FitRank: loadBadges', error.message);
+        return [];
+      }
+      const rows = Array.isArray(data) ? data : [];
+      if (!targetUserId || targetUserId === userId) {
+        setBadges(rows);
+      }
+      return rows;
+    } finally {
+      setBadgesLoading(false);
+    }
+  }, [supabase, userId]);
+
   // --- Stories ---
   const [storiesRing, setStoriesRing] = useState([]);
   const [storiesRingLoading, setStoriesRingLoading] = useState(false);
@@ -710,6 +738,9 @@ export function useSocialData({ supabase, session, profile }) {
     removeFriend,
     trendingHashtags,
     loadTrendingHashtags,
+    badges,
+    badgesLoading,
+    loadBadges,
     storiesRing,
     storiesRingLoading,
     loadStoriesRing,
