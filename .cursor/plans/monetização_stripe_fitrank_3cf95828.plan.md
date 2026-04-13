@@ -7,7 +7,7 @@ todos:
     status: completed
   - id: ef-stripe-webhook
     content: Criar Edge Function stripe-webhook (verificacao Stripe-Signature, eventos checkout/subscription/invoice)
-    status: pending
+    status: completed
   - id: ef-stripe-checkout
     content: Criar Edge Function stripe-checkout (cria Checkout Session, busca/cria Customer)
     status: pending

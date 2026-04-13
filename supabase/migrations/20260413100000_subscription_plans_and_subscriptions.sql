@@ -242,3 +242,41 @@ comment on function public.admin_billing_metrics() is
   'Retorna métricas agregadas de billing para o dashboard admin.';
 
 grant execute on function public.admin_billing_metrics() to authenticated;
+
+-- ============================================================
+-- 5) RPC helper para webhook atualizar campos protegidos em profiles
+-- ============================================================
+
+create or replace function public.internal_update_profile_stripe(
+  p_user_id uuid,
+  p_is_pro boolean,
+  p_stripe_customer_id text default null,
+  p_stripe_subscription_id text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform set_config('fitrank.internal_profile_update', '1', true);
+
+  update public.profiles
+  set
+    is_pro = p_is_pro,
+    stripe_customer_id = coalesce(p_stripe_customer_id, stripe_customer_id),
+    stripe_subscription_id = coalesce(p_stripe_subscription_id, stripe_subscription_id)
+  where id = p_user_id;
+
+  perform set_config('fitrank.internal_profile_update', '0', true);
+exception when others then
+  perform set_config('fitrank.internal_profile_update', '0', true);
+  raise;
+end;
+$$;
+
+comment on function public.internal_update_profile_stripe(uuid, boolean, text, text) is
+  'Atualiza campos Stripe protegidos em profiles (uso exclusivo de Edge Functions via service_role).';
+
+revoke execute on function public.internal_update_profile_stripe(uuid, boolean, text, text) from public;
+revoke execute on function public.internal_update_profile_stripe(uuid, boolean, text, text) from authenticated;
