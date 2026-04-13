@@ -19,7 +19,8 @@ export function PublicProfileView({
   onDeleteComment,
   onLoadLikes,
   currentUserId,
-  onUpdatePrivacy
+  onUpdatePrivacy,
+  onDeletePost
 }) {
   const { supabase } = useAuth();
   const [profile, setProfile] = useState(null);
@@ -104,6 +105,12 @@ export function PublicProfileView({
     );
     await onUpdatePrivacy?.(checkinId, fields);
   }, [onUpdatePrivacy]);
+
+  const handleDeletePost = useCallback(async (checkinId) => {
+    const ok = await onDeletePost?.(checkinId);
+    if (ok) setPosts((prev) => prev.filter((p) => p.id !== checkinId));
+    return ok;
+  }, [onDeletePost]);
 
   const handleToggleLike = useCallback((checkinId, currentlyLiked) => {
     setPosts((prev) =>
@@ -249,6 +256,7 @@ export function PublicProfileView({
               onOpenLikes={(id) => setLikesOpen(id)}
               currentUserId={currentUserId}
               onUpdatePrivacy={handleUpdatePrivacy}
+              onDeletePost={handleDeletePost}
             />
           ))}
         </div>

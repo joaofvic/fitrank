@@ -228,6 +228,7 @@ export default function App() {
             onOpenProfile={useCloud ? openPublicProfile : undefined}
             currentUserId={localUser?.uid}
             onUpdatePrivacy={social.updatePostPrivacy}
+            onDeletePost={social.deletePost}
           />
         )}
         {view === 'challenges' && <ChallengesView />}
@@ -307,6 +308,7 @@ export default function App() {
             onLoadLikes={social.loadLikes}
             currentUserId={localUser?.uid}
             onUpdatePrivacy={social.updatePostPrivacy}
+            onDeletePost={social.deletePost}
           />
         )}
         {view === 'admin-tenants' && profile?.is_platform_master && (

@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
-import { Heart, MessageCircle, MessageCircleOff, MoreHorizontal, User, EyeOff, Eye } from 'lucide-react';
+import { Heart, MessageCircle, MessageCircleOff, MoreHorizontal, User, EyeOff, Eye, Trash2 } from 'lucide-react';
 import { formatTimeAgo } from '../../lib/dates.js';
 import { workoutTypeIcon } from '../../lib/workout-icons.js';
 
-export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenLikes, onOpenProfile, currentUserId, onUpdatePrivacy }) {
+export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenLikes, onOpenProfile, currentUserId, onUpdatePrivacy, onDeletePost }) {
   const [animating, setAnimating] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
@@ -54,7 +54,7 @@ export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenLikes, 
           <span className="text-[11px] text-zinc-600">
             {formatTimeAgo(post.created_at)}
           </span>
-          {isOwner && onUpdatePrivacy && (
+          {isOwner && (onUpdatePrivacy || onDeletePost) && (
             <div className="relative" ref={menuRef}>
               <button
                 type="button"
@@ -95,6 +95,25 @@ export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenLikes, 
                       {post.hide_likes_count ? 'Mostrar curtidas' : 'Ocultar curtidas'}
                     </span>
                   </button>
+                  {onDeletePost && (
+                    <>
+                      <div className="border-t border-zinc-700/50 my-1" />
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setMenuOpen(false);
+                          if (confirm('Tem certeza que deseja excluir este post? Esta ação não pode ser desfeita.')) {
+                            const ok = await onDeletePost(post.id);
+                            if (!ok) console.warn('FitRank: exclusão do post falhou', post.id);
+                          }
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-red-500/10 transition-colors"
+                      >
+                        <Trash2 size={16} className="text-red-400 shrink-0" />
+                        <span className="text-xs text-red-400">Excluir post</span>
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </div>

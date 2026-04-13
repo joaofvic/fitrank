@@ -463,6 +463,30 @@ export function useSocialData({ supabase, session, profile }) {
     return true;
   }, [supabase, userId]);
 
+  const deletePost = useCallback(async (checkinId) => {
+    if (!supabase || !userId) return false;
+
+    const { data, error } = await supabase
+      .from('checkins')
+      .delete()
+      .eq('id', checkinId)
+      .eq('user_id', userId)
+      .select('id');
+
+    if (error) {
+      console.error('FitRank: deletePost', error.message);
+      return false;
+    }
+
+    if (!data || data.length === 0) {
+      console.warn('FitRank: deletePost — nenhum registro excluído (RLS ou id inválido)', { checkinId, userId });
+      return false;
+    }
+
+    setFeed((prev) => prev.filter((item) => item.id !== checkinId));
+    return true;
+  }, [supabase, userId]);
+
   return {
     feed,
     feedLoading,
@@ -476,6 +500,7 @@ export function useSocialData({ supabase, session, profile }) {
     loadLikes,
     deleteComment,
     updatePostPrivacy,
+    deletePost,
     friends,
     friendsLoading,
     pendingRequests,
