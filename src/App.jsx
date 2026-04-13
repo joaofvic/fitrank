@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Bell, Home, Newspaper, Plus, TrendingUp, User, Zap } from 'lucide-react';
 
 import { useAuth } from './components/auth/AuthProvider.jsx';
@@ -25,6 +25,9 @@ import { AdminBillingView } from './components/views/AdminBillingView.jsx';
 import { PublicProfileView } from './components/views/PublicProfileView.jsx';
 import { NotificationsView } from './components/views/NotificationsView.jsx';
 import { EditProfileView } from './components/views/EditProfileView.jsx';
+import { HashtagFeedView } from './components/views/HashtagFeedView.jsx';
+import { StoryCreator } from './components/views/StoryCreator.jsx';
+import { StoryViewer } from './components/views/StoryViewer.jsx';
 
 export default function App() {
   const {
@@ -58,16 +61,60 @@ export default function App() {
   const [checkins, setCheckins] = useState(() => loadFitRankState()?.checkins ?? []);
   const [view, setView] = useState('home');
   const [publicProfileUserId, setPublicProfileUserId] = useState(null);
+  const [hashtagTag, setHashtagTag] = useState(null);
   const [message, setMessage] = useState(null);
+  const [storyCreatorOpen, setStoryCreatorOpen] = useState(false);
+  const [storyViewerTarget, setStoryViewerTarget] = useState(null);
 
-  const openPublicProfile = (userId) => {
-    if (userId === localUser?.uid) {
+  const openPublicProfile = useCallback((targetId) => {
+    if (targetId === session?.user?.id) {
       setView('profile');
       return;
     }
-    setPublicProfileUserId(userId);
+    setPublicProfileUserId(targetId);
     setView('public-profile');
-  };
+  }, [session?.user?.id]);
+
+  const handleHashtagClick = useCallback((tag) => {
+    setHashtagTag(tag);
+    setView('hashtag-feed');
+  }, []);
+
+  const handleMentionClick = useCallback(async (username) => {
+    if (!useCloud || !social.resolveUsername) return;
+    const userId = await social.resolveUsername(username);
+    if (userId) openPublicProfile(userId);
+  }, [useCloud, social.resolveUsername, openPublicProfile]);
+
+  const handleOpenStory = useCallback((userId) => {
+    const ring = social.storiesRing ?? [];
+    const userEntry = ring.find((s) => s.user_id === userId);
+    if (userEntry) {
+      setStoryViewerTarget(userEntry);
+    }
+  }, [social.storiesRing]);
+
+  const handleStoryNextUser = useCallback(() => {
+    const uid = session?.user?.id;
+    const ring = (social.storiesRing ?? []).filter((s) => s.user_id !== uid);
+    if (!storyViewerTarget || ring.length === 0) return;
+    const currentIdx = ring.findIndex((s) => s.user_id === storyViewerTarget.user_id);
+    if (currentIdx < ring.length - 1) {
+      setStoryViewerTarget(ring[currentIdx + 1]);
+    } else {
+      setStoryViewerTarget(null);
+    }
+  }, [social.storiesRing, storyViewerTarget, session?.user?.id]);
+
+  const handleStoryPrevUser = useCallback(() => {
+    const uid = session?.user?.id;
+    const ring = (social.storiesRing ?? []).filter((s) => s.user_id !== uid);
+    if (!storyViewerTarget || ring.length === 0) return;
+    const currentIdx = ring.findIndex((s) => s.user_id === storyViewerTarget.user_id);
+    if (currentIdx > 0) {
+      setStoryViewerTarget(ring[currentIdx - 1]);
+    }
+  }, [social.storiesRing, storyViewerTarget, session?.user?.id]);
 
   useEffect(() => {
     if (!useCloud) {
@@ -216,6 +263,8 @@ export default function App() {
             feed={social.feed}
             feedLoading={social.feedLoading}
             feedHasMore={social.feedHasMore}
+            feedMode={social.feedMode}
+            onFeedModeChange={social.setFeedMode}
             onLoadFeed={social.loadFeed}
             onLoadMoreFeed={social.loadMoreFeed}
             onRefreshFeed={social.refreshFeed}
@@ -229,6 +278,16 @@ export default function App() {
             currentUserId={localUser?.uid}
             onUpdatePrivacy={social.updatePostPrivacy}
             onDeletePost={social.deletePost}
+            onTrackShare={social.trackShare}
+            onTrackImpression={social.trackImpression}
+            onMentionClick={handleMentionClick}
+            onHashtagClick={handleHashtagClick}
+            trendingHashtags={social.trendingHashtags}
+            onLoadTrendingHashtags={social.loadTrendingHashtags}
+            storiesRing={social.storiesRing}
+            onLoadStoriesRing={social.loadStoriesRing}
+            onOpenStory={handleOpenStory}
+            onCreateStory={() => setStoryCreatorOpen(true)}
           />
         )}
         {view === 'challenges' && <ChallengesView />}
@@ -295,6 +354,24 @@ export default function App() {
             onBack={() => setView('home')}
           />
         )}
+        {view === 'hashtag-feed' && hashtagTag && useCloud && (
+          <HashtagFeedView
+            tag={hashtagTag}
+            onBack={() => setView('feed')}
+            onToggleLike={social.toggleLike}
+            onAddComment={social.addComment}
+            onLoadComments={social.loadComments}
+            onDeleteComment={social.deleteComment}
+            onLoadLikes={social.loadLikes}
+            onOpenProfile={openPublicProfile}
+            currentUserId={localUser?.uid}
+            onUpdatePrivacy={social.updatePostPrivacy}
+            onDeletePost={social.deletePost}
+            onTrackShare={social.trackShare}
+            onMentionClick={handleMentionClick}
+            onHashtagClick={handleHashtagClick}
+          />
+        )}
         {view === 'public-profile' && publicProfileUserId && useCloud && (
           <PublicProfileView
             userId={publicProfileUserId}
@@ -346,7 +423,34 @@ export default function App() {
         )}
 
         {view === 'checkin-modal' && (
-          <CheckinModal onClose={() => setView('home')} onCheckin={handleCheckin} />
+          <CheckinModal
+            onClose={() => setView('home')}
+            onCheckin={handleCheckin}
+            friends={useCloud ? social.friends : []}
+          />
+        )}
+
+        {storyCreatorOpen && useCloud && (
+          <StoryCreator
+            onClose={() => setStoryCreatorOpen(false)}
+            onCreateStory={social.createStory}
+          />
+        )}
+
+        {storyViewerTarget && useCloud && (
+          <StoryViewer
+            userId={storyViewerTarget.user_id}
+            displayName={storyViewerTarget.display_name}
+            avatarUrl={storyViewerTarget.avatar_url}
+            storiesRing={social.storiesRing}
+            loadUserStories={social.loadUserStories}
+            onMarkViewed={social.markStoryViewed}
+            onDeleteStory={social.deleteStory}
+            onClose={() => { setStoryViewerTarget(null); social.loadStoriesRing(); }}
+            onNextUser={handleStoryNextUser}
+            onPrevUser={handleStoryPrevUser}
+            currentUserId={localUser?.uid}
+          />
         )}
 
         {message && (

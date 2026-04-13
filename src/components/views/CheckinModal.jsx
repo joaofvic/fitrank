@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { CheckCircle2, Camera, Plus, ChevronLeft, Globe } from 'lucide-react';
 import { Button } from '../ui/Button.jsx';
+import { MentionInput } from '../ui/MentionInput.jsx';
 import { CHECKIN_GRID_WORKOUT_TYPES } from '../../lib/workout-types.js';
 
 const CAPTION_MAX = 200;
 
-export function CheckinModal({ onClose, onCheckin }) {
+export function CheckinModal({ onClose, onCheckin, friends = [] }) {
   const { supabase } = useAuth();
   const [foto, setFoto] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -202,18 +203,15 @@ export function CheckinModal({ onClose, onCheckin }) {
 
               {feedVisible && (
                 <div className="space-y-2 animate-in-fade">
-                  <div className="relative">
-                    <textarea
-                      value={caption}
-                      onChange={(e) => setCaption(e.target.value.slice(0, CAPTION_MAX))}
-                      placeholder="Escreva uma legenda... (opcional)"
-                      rows={3}
-                      className="w-full bg-zinc-800/60 border border-zinc-700/50 rounded-xl p-3 text-sm text-white placeholder:text-zinc-600 resize-none focus:outline-none focus:border-green-500/50 transition-colors"
-                    />
-                    <span className={`absolute bottom-2 right-3 text-[10px] ${caption.length >= CAPTION_MAX ? 'text-red-400' : 'text-zinc-600'}`}>
-                      {caption.length}/{CAPTION_MAX}
-                    </span>
-                  </div>
+                  <MentionInput
+                    value={caption}
+                    onChange={setCaption}
+                    friends={friends}
+                    maxLength={CAPTION_MAX}
+                    placeholder="Escreva uma legenda... Use @amigo para mencionar (opcional)"
+                    rows={3}
+                    className="w-full bg-zinc-800/60 border border-zinc-700/50 rounded-xl p-3 text-sm text-white placeholder:text-zinc-600 resize-none focus:outline-none focus:border-green-500/50 transition-colors"
+                  />
                 </div>
               )}
             </div>

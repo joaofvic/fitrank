@@ -1,15 +1,51 @@
-import { useState, useRef, useEffect } from 'react';
-import { Heart, MessageCircle, MessageCircleOff, MoreHorizontal, EyeOff, Eye, Trash2 } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Heart, MessageCircle, MessageCircleOff, MoreHorizontal, EyeOff, Eye, Trash2, Share2 } from 'lucide-react';
 import { formatTimeAgo } from '../../lib/dates.js';
 import { workoutTypeIcon } from '../../lib/workout-icons.js';
 import { UserAvatar } from '../ui/user-avatar.jsx';
+import { renderCaption } from '../../lib/caption-renderer.jsx';
 
-export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenLikes, onOpenProfile, currentUserId, onUpdatePrivacy, onDeletePost }) {
+export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenLikes, onOpenProfile, currentUserId, onUpdatePrivacy, onDeletePost, onShare, onMentionClick, onHashtagClick, onTrackImpression }) {
   const [animating, setAnimating] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
+  const cardRef = useRef(null);
+  const visibleSince = useRef(null);
+  const impressionSent = useRef(false);
 
   const isOwner = currentUserId === post.user_id;
+
+  useEffect(() => {
+    if (!onTrackImpression || !cardRef.current) return;
+    impressionSent.current = false;
+    visibleSince.current = null;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          visibleSince.current = Date.now();
+        } else if (visibleSince.current && !impressionSent.current) {
+          const duration = Date.now() - visibleSince.current;
+          if (duration >= 1000) {
+            impressionSent.current = true;
+            onTrackImpression(post.id, duration);
+          }
+          visibleSince.current = null;
+        }
+      },
+      { threshold: 0.5 }
+    );
+    observer.observe(cardRef.current);
+    return () => {
+      if (visibleSince.current && !impressionSent.current) {
+        const duration = Date.now() - visibleSince.current;
+        if (duration >= 1000) {
+          onTrackImpression(post.id, duration);
+        }
+      }
+      observer.disconnect();
+    };
+  }, [onTrackImpression, post.id]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -32,7 +68,7 @@ export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenLikes, 
   };
 
   return (
-    <div className="bg-black border-b border-zinc-800/60">
+    <div ref={cardRef} className="bg-black border-b border-zinc-800/60">
       <div className="flex items-center gap-3 px-4 py-3">
         <button
           type="button"
@@ -159,6 +195,11 @@ export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenLikes, 
                 <MessageCircle className="w-6 h-6 text-white group-hover:text-zinc-400 transition-colors" />
               </button>
             )}
+            {onShare && (
+              <button type="button" onClick={() => onShare(post)} className="group p-1">
+                <Share2 className="w-6 h-6 text-white group-hover:text-zinc-400 transition-colors" />
+              </button>
+            )}
           </div>
           <span className="text-[11px] font-bold text-green-500 bg-green-500/10 px-2 py-0.5 rounded-full">
             +{post.points_earned ?? 10} PTS
@@ -186,7 +227,9 @@ export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenLikes, 
             {post.display_name}
           </span>
           {' '}
-          <span className="text-zinc-400">{post.caption || post.workout_type}</span>
+          <span className="text-zinc-400">
+            {post.caption ? renderCaption(post.caption, onMentionClick, onHashtagClick) : post.workout_type}
+          </span>
         </p>
         {post.allow_comments !== false && (post.comments_count ?? 0) > 0 && (
           <button

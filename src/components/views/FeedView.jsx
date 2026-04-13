@@ -1,13 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, UserPlus, Users } from 'lucide-react';
+import { Hash, Loader2, UserPlus, Users } from 'lucide-react';
 import { FeedPostCard } from './FeedPostCard.jsx';
 import { CommentsDrawer } from './CommentsDrawer.jsx';
 import { LikesDrawer } from './LikesDrawer.jsx';
+import { ShareDrawer } from './ShareDrawer.jsx';
+import { StoriesRing } from './StoriesRing.jsx';
 
 export function FeedView({
   feed = [],
   feedLoading = false,
   feedHasMore = false,
+  feedMode = 'relevant',
+  onFeedModeChange,
   onLoadFeed,
   onLoadMoreFeed,
   onRefreshFeed,
@@ -20,10 +24,21 @@ export function FeedView({
   onOpenProfile,
   currentUserId,
   onUpdatePrivacy,
-  onDeletePost
+  onDeletePost,
+  onTrackShare,
+  onTrackImpression,
+  onMentionClick,
+  onHashtagClick,
+  trendingHashtags = [],
+  onLoadTrendingHashtags,
+  storiesRing = [],
+  onLoadStoriesRing,
+  onOpenStory,
+  onCreateStory
 }) {
   const [commentsOpen, setCommentsOpen] = useState(null);
   const [likesOpen, setLikesOpen] = useState(null);
+  const [sharePost, setSharePost] = useState(null);
   const feedLoaded = useRef(false);
   const sentinelRef = useRef(null);
 
@@ -31,8 +46,10 @@ export function FeedView({
     if (!feedLoaded.current && onLoadFeed) {
       feedLoaded.current = true;
       onLoadFeed(0);
+      onLoadTrendingHashtags?.();
+      onLoadStoriesRing?.();
     }
-  }, [onLoadFeed]);
+  }, [onLoadFeed, onLoadTrendingHashtags, onLoadStoriesRing]);
 
   useEffect(() => {
     if (!sentinelRef.current || !onLoadMoreFeed || !feedHasMore) return;
@@ -52,17 +69,71 @@ export function FeedView({
     <div className="animate-in-fade -mx-4">
       <div className="flex items-center justify-between px-4 mb-4">
         <h2 className="text-lg font-black tracking-tight">Feed</h2>
-        {onOpenFriends && (
-          <button
-            type="button"
-            onClick={onOpenFriends}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white hover:border-zinc-700 transition-colors"
-          >
-            <UserPlus className="w-3.5 h-3.5" />
-            Amigos
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {onFeedModeChange && (
+            <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-full p-0.5">
+              <button
+                type="button"
+                onClick={() => onFeedModeChange('relevant')}
+                className={`px-3 py-1 rounded-full text-[11px] font-bold transition-colors ${
+                  feedMode === 'relevant'
+                    ? 'bg-green-500 text-black'
+                    : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                Para você
+              </button>
+              <button
+                type="button"
+                onClick={() => onFeedModeChange('recent')}
+                className={`px-3 py-1 rounded-full text-[11px] font-bold transition-colors ${
+                  feedMode === 'recent'
+                    ? 'bg-green-500 text-black'
+                    : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                Recentes
+              </button>
+            </div>
+          )}
+          {onOpenFriends && (
+            <button
+              type="button"
+              onClick={onOpenFriends}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white hover:border-zinc-700 transition-colors"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              Amigos
+            </button>
+          )}
+        </div>
       </div>
+
+      {(storiesRing.length > 0 || onCreateStory) && (
+        <StoriesRing
+          stories={storiesRing}
+          currentUserId={currentUserId}
+          onOpenStory={onOpenStory}
+          onCreateStory={onCreateStory}
+        />
+      )}
+
+      {trendingHashtags.length > 0 && (
+        <div className="flex gap-2 px-4 mb-4 overflow-x-auto scrollbar-hide -mr-4 pr-4">
+          {trendingHashtags.map((h) => (
+            <button
+              key={h.tag}
+              type="button"
+              onClick={() => onHashtagClick?.(h.tag)}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-colors whitespace-nowrap shrink-0"
+            >
+              <Hash className="w-3 h-3" />
+              {h.tag}
+              <span className="text-blue-500/60 ml-0.5">{h.post_count}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {feedLoading && feed.length === 0 ? (
         <div className="flex justify-center py-16">
@@ -101,6 +172,10 @@ export function FeedView({
               currentUserId={currentUserId}
               onUpdatePrivacy={onUpdatePrivacy}
               onDeletePost={onDeletePost}
+              onShare={setSharePost}
+              onMentionClick={onMentionClick}
+              onHashtagClick={onHashtagClick}
+              onTrackImpression={onTrackImpression}
             />
           ))}
 
@@ -139,6 +214,14 @@ export function FeedView({
           onClose={() => setLikesOpen(null)}
           onLoadLikes={onLoadLikes}
           onOpenProfile={onOpenProfile}
+        />
+      )}
+
+      {sharePost && (
+        <ShareDrawer
+          post={sharePost}
+          onClose={() => setSharePost(null)}
+          onTrackShare={onTrackShare}
         />
       )}
     </div>

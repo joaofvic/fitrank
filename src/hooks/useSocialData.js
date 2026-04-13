@@ -2,6 +2,19 @@ import { useCallback, useRef, useState } from 'react';
 
 const FEED_PAGE_SIZE = 10;
 
+function getVideoDuration(file) {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.onloadedmetadata = () => {
+      resolve(Math.round(video.duration * 1000));
+      URL.revokeObjectURL(video.src);
+    };
+    video.onerror = () => resolve(5000);
+    video.src = URL.createObjectURL(file);
+  });
+}
+
 /**
  * Hook de dados sociais: feed de amigos, amizades, curtidas e comentários.
  */
@@ -13,13 +26,36 @@ export function useSocialData({ supabase, session, profile }) {
   const [feed, setFeed] = useState([]);
   const [feedLoading, setFeedLoading] = useState(false);
   const [feedHasMore, setFeedHasMore] = useState(true);
+  const [feedMode, setFeedModeRaw] = useState('relevant');
   const feedPageRef = useRef(0);
 
-  const loadFeed = useCallback(async (page = 0) => {
+  const mapFeedRow = (r) => ({
+    id: r.checkin_id,
+    user_id: r.user_id,
+    display_name: r.display_name,
+    avatar_url: r.avatar_url ?? null,
+    date: r.checkin_local_date,
+    workout_type: r.tipo_treino,
+    foto_url: r.foto_url,
+    points_earned: r.points_awarded,
+    photo_review_status: r.photo_review_status,
+    created_at: r.created_at,
+    likes_count: Number(r.likes_count ?? 0),
+    comments_count: Number(r.comments_count ?? 0),
+    has_liked: r.has_liked ?? false,
+    caption: r.feed_caption ?? null,
+    allow_comments: r.allow_comments ?? true,
+    hide_likes_count: r.hide_likes_count ?? false,
+    mentioned_usernames: r.mentioned_usernames ?? []
+  });
+
+  const loadFeed = useCallback(async (page = 0, modeOverride) => {
     if (!supabase || !userId) return;
     setFeedLoading(true);
     try {
-      const { data, error } = await supabase.rpc('get_friend_feed', {
+      const mode = modeOverride ?? feedMode;
+      const rpcName = mode === 'relevant' ? 'get_relevant_feed' : 'get_friend_feed';
+      const { data, error } = await supabase.rpc(rpcName, {
         p_limit: FEED_PAGE_SIZE,
         p_offset: page * FEED_PAGE_SIZE
       });
@@ -27,25 +63,7 @@ export function useSocialData({ supabase, session, profile }) {
         console.error('FitRank: feed', error.message);
         return;
       }
-      const raw = Array.isArray(data) ? data : [];
-      const rows = raw.map((r) => ({
-        id: r.checkin_id,
-        user_id: r.user_id,
-        display_name: r.display_name,
-        avatar_url: r.avatar_url ?? null,
-        date: r.checkin_local_date,
-        workout_type: r.tipo_treino,
-        foto_url: r.foto_url,
-        points_earned: r.points_awarded,
-        photo_review_status: r.photo_review_status,
-        created_at: r.created_at,
-        likes_count: Number(r.likes_count ?? 0),
-        comments_count: Number(r.comments_count ?? 0),
-        has_liked: r.has_liked ?? false,
-        caption: r.feed_caption ?? null,
-        allow_comments: r.allow_comments ?? true,
-        hide_likes_count: r.hide_likes_count ?? false
-      }));
+      const rows = (Array.isArray(data) ? data : []).map(mapFeedRow);
       if (page === 0) {
         setFeed(rows);
       } else {
@@ -56,7 +74,17 @@ export function useSocialData({ supabase, session, profile }) {
     } finally {
       setFeedLoading(false);
     }
-  }, [supabase, userId]);
+  }, [supabase, userId, feedMode]);
+
+  const setFeedMode = useCallback((mode) => {
+    setFeedModeRaw(mode);
+    setFeed([]);
+    setFeedHasMore(true);
+    feedPageRef.current = 0;
+    if (supabase && userId) {
+      loadFeed(0, mode);
+    }
+  }, [supabase, userId, loadFeed]);
 
   const refreshFeed = useCallback(() => {
     feedPageRef.current = 0;
@@ -464,6 +492,157 @@ export function useSocialData({ supabase, session, profile }) {
     return true;
   }, [supabase, userId]);
 
+  const resolveUsername = useCallback(async (username) => {
+    if (!supabase || !username) return null;
+    const { data } = await supabase
+      .from('profiles')
+      .select('id')
+      .ilike('username', username)
+      .eq('tenant_id', tenantId)
+      .limit(1)
+      .maybeSingle();
+    return data?.id ?? null;
+  }, [supabase, tenantId]);
+
+  const trackShare = useCallback(async (checkinId, platform) => {
+    if (!supabase || !userId || !tenantId) return;
+    try {
+      await supabase
+        .from('shares')
+        .insert({ user_id: userId, checkin_id: checkinId, tenant_id: tenantId, platform });
+    } catch (err) {
+      console.error('FitRank: trackShare', err.message);
+    }
+  }, [supabase, userId, tenantId]);
+
+  // --- Trending Hashtags ---
+  const [trendingHashtags, setTrendingHashtags] = useState([]);
+
+  const loadTrendingHashtags = useCallback(async () => {
+    if (!supabase || !userId) return;
+    try {
+      const { data, error } = await supabase.rpc('get_trending_hashtags', { p_limit: 10 });
+      if (error) {
+        console.error('FitRank: trending hashtags', error.message);
+        return;
+      }
+      setTrendingHashtags(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('FitRank: trending hashtags', err.message);
+    }
+  }, [supabase, userId]);
+
+  // --- Post Impressions ---
+  const trackImpression = useCallback(async (checkinId, durationMs) => {
+    if (!supabase || !userId || !tenantId || !checkinId) return;
+    try {
+      await supabase.from('post_impressions').insert({
+        user_id: userId,
+        checkin_id: checkinId,
+        tenant_id: tenantId,
+        view_duration_ms: Math.round(durationMs)
+      });
+    } catch (err) {
+      console.error('FitRank: trackImpression', err.message);
+    }
+  }, [supabase, userId, tenantId]);
+
+  // --- Stories ---
+  const [storiesRing, setStoriesRing] = useState([]);
+  const [storiesRingLoading, setStoriesRingLoading] = useState(false);
+
+  const loadStoriesRing = useCallback(async () => {
+    if (!supabase || !userId) return;
+    setStoriesRingLoading(true);
+    try {
+      const { data, error } = await supabase.rpc('get_stories_ring', { p_limit: 20 });
+      if (error) {
+        console.error('FitRank: stories ring', error.message);
+        return;
+      }
+      setStoriesRing(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('FitRank: stories ring', err.message);
+    } finally {
+      setStoriesRingLoading(false);
+    }
+  }, [supabase, userId]);
+
+  const loadUserStories = useCallback(async (targetUserId) => {
+    if (!supabase || !userId) return [];
+    const { data, error } = await supabase.rpc('get_user_stories', { p_user_id: targetUserId });
+    if (error) {
+      console.error('FitRank: user stories', error.message);
+      return [];
+    }
+    return Array.isArray(data) ? data : [];
+  }, [supabase, userId]);
+
+  const createStory = useCallback(async (file, caption = '') => {
+    if (!supabase || !userId || !tenantId || !file) return null;
+    const isVideo = file.type?.startsWith('video/');
+    const ext = file.name?.split('.').pop()?.toLowerCase() || (isVideo ? 'mp4' : 'jpg');
+    const storagePath = `${userId}/${Date.now()}.${ext}`;
+
+    const { error: upErr } = await supabase.storage.from('stories').upload(storagePath, file, {
+      upsert: false,
+      contentType: file.type || (isVideo ? 'video/mp4' : 'image/jpeg')
+    });
+    if (upErr) throw upErr;
+
+    const { data: pub } = supabase.storage.from('stories').getPublicUrl(storagePath);
+    const mediaUrl = pub.publicUrl;
+
+    let durationMs = 5000;
+    if (isVideo) {
+      durationMs = Math.min(15000, await getVideoDuration(file));
+    }
+
+    const { data, error } = await supabase
+      .from('stories')
+      .insert({
+        user_id: userId,
+        tenant_id: tenantId,
+        media_url: mediaUrl,
+        media_type: isVideo ? 'video' : 'photo',
+        duration_ms: durationMs,
+        caption: caption?.trim() || null
+      })
+      .select('id')
+      .single();
+
+    if (error) throw error;
+    await loadStoriesRing();
+    return data.id;
+  }, [supabase, userId, tenantId, loadStoriesRing]);
+
+  const markStoryViewed = useCallback(async (storyId) => {
+    if (!supabase || !userId) return;
+    try {
+      await supabase.from('story_views').insert({
+        story_id: storyId,
+        viewer_id: userId
+      });
+    } catch (_) {
+      // ignore duplicates
+    }
+  }, [supabase, userId]);
+
+  const deleteStory = useCallback(async (storyId) => {
+    if (!supabase || !userId) return false;
+    const { error } = await supabase
+      .from('stories')
+      .delete()
+      .eq('id', storyId)
+      .eq('user_id', userId);
+    if (error) {
+      console.error('FitRank: deleteStory', error.message);
+      return false;
+    }
+    await loadStoriesRing();
+    return true;
+  }, [supabase, userId, loadStoriesRing]);
+
   const deletePost = useCallback(async (checkinId) => {
     if (!supabase || !userId) return false;
 
@@ -492,6 +671,8 @@ export function useSocialData({ supabase, session, profile }) {
     feed,
     feedLoading,
     feedHasMore,
+    feedMode,
+    setFeedMode,
     loadFeed,
     loadMoreFeed,
     refreshFeed,
@@ -502,6 +683,9 @@ export function useSocialData({ supabase, session, profile }) {
     deleteComment,
     updatePostPrivacy,
     deletePost,
+    trackShare,
+    trackImpression,
+    resolveUsername,
     friends,
     friendsLoading,
     pendingRequests,
@@ -513,6 +697,15 @@ export function useSocialData({ supabase, session, profile }) {
     sendFriendRequest,
     acceptFriendRequest,
     declineFriendRequest,
-    removeFriend
+    removeFriend,
+    trendingHashtags,
+    loadTrendingHashtags,
+    storiesRing,
+    storiesRingLoading,
+    loadStoriesRing,
+    loadUserStories,
+    createStory,
+    markStoryViewed,
+    deleteStory
   };
 }

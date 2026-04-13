@@ -4,6 +4,8 @@ import {
   rankingPeriodRangeLabel,
   todayLocalISODate
 } from '../lib/dates.js';
+import { extractMentions } from '../lib/mention-parser.js';
+import { extractHashtags } from '../lib/hashtag-parser.js';
 
 /**
  * Dados FitRank na nuvem (ranking, check-ins, realtime leve).
@@ -325,15 +327,17 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
         foto_url = pub.publicUrl;
       }
 
-      const { error: insErr } = await supabase.from('checkins').insert({
+      const trimmedCaption = feedCaption?.trim() || null;
+
+      const { data: insData, error: insErr } = await supabase.from('checkins').insert({
         user_id: userId,
         tenant_id: tenantId,
         checkin_local_date: today,
         tipo_treino: tipoTreino,
         foto_url,
         feed_visible: feedVisible,
-        feed_caption: feedCaption?.trim() || null
-      });
+        feed_caption: trimmedCaption
+      }).select('id').single();
 
       if (insErr) {
         if (insErr.code === '23505') {
@@ -342,6 +346,24 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
           throw dup;
         }
         throw insErr;
+      }
+
+      if (trimmedCaption && insData?.id) {
+        const usernames = extractMentions(trimmedCaption);
+        if (usernames.length > 0) {
+          await supabase.rpc('save_checkin_mentions', {
+            p_checkin_id: insData.id,
+            p_usernames: usernames
+          }).catch((err) => console.error('FitRank: save mentions', err.message));
+        }
+
+        const tags = extractHashtags(trimmedCaption);
+        if (tags.length > 0) {
+          await supabase.rpc('save_checkin_hashtags', {
+            p_checkin_id: insData.id,
+            p_tags: tags
+          }).catch((err) => console.error('FitRank: save hashtags', err.message));
+        }
       }
 
       setCheckinPage(0);
