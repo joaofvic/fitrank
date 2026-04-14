@@ -75,31 +75,31 @@
 
 /* ── View transition classes ── */
 .view-enter-forward {
-  animation: view-slide-in-right var(--transition-duration) var(--transition-ios) both;
+  animation: view-slide-in-right var(--transition-duration) var(--transition-ios) backwards;
 }
 .view-exit-forward {
-  animation: view-slide-out-left var(--transition-duration) var(--transition-ios) both;
+  animation: view-slide-out-left var(--transition-duration) var(--transition-ios) forwards;
 }
 
 .view-enter-back {
-  animation: view-slide-in-left var(--transition-duration) var(--transition-ios) both;
+  animation: view-slide-in-left var(--transition-duration) var(--transition-ios) backwards;
 }
 .view-exit-back {
-  animation: view-slide-out-right var(--transition-duration) var(--transition-ios) both;
+  animation: view-slide-out-right var(--transition-duration) var(--transition-ios) forwards;
 }
 
 .view-enter-up {
-  animation: view-slide-in-up var(--transition-duration) var(--transition-ios) both;
+  animation: view-slide-in-up var(--transition-duration) var(--transition-ios) backwards;
 }
 .view-exit-down {
-  animation: view-slide-out-down var(--transition-duration) var(--transition-ios) both;
+  animation: view-slide-out-down var(--transition-duration) var(--transition-ios) forwards;
 }
 
 .view-enter-fade {
-  animation: view-scale-fade-in var(--transition-duration) ease-out both;
+  animation: view-scale-fade-in var(--transition-duration) ease-out backwards;
 }
 .view-exit-fade {
-  animation: view-scale-fade-out var(--transition-duration) ease-out both;
+  animation: view-scale-fade-out var(--transition-duration) ease-out forwards;
 }
 
 .view-enter-none {
@@ -117,8 +117,17 @@
 
 /* ── Swipe visual feedback ── */
 .view-swipe-container {
-  will-change: transform;
   touch-action: pan-y;
+}
+.view-swipe-container.view-enter-forward,
+.view-swipe-container.view-enter-back,
+.view-swipe-container.view-enter-up,
+.view-swipe-container.view-enter-fade,
+.view-swipe-container.view-exit-forward,
+.view-swipe-container.view-exit-back,
+.view-swipe-container.view-exit-down,
+.view-swipe-container.view-exit-fade {
+  will-change: transform, opacity;
 }
 
 /* ── Mobile-native feel ── */
