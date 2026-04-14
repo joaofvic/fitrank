@@ -273,7 +273,7 @@ export default function App() {
         navigate('home');
       } catch (err) {
         analytics.checkinError(err.message);
-        showToast(err.message ?? 'Falha no check-in');
+        throw err;
       }
       return;
     }
