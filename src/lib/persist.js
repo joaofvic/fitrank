@@ -1,3 +1,5 @@
+import { logger } from './logger.js';
+
 const STORAGE_KEY = 'fitrank-local-v1';
 
 export function defaultUserData() {
@@ -32,6 +34,6 @@ export function saveFitRankState({ userData, checkins }) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ userData, checkins }));
   } catch (e) {
-    console.error('FitRank: falha ao salvar dados locais', e);
+    logger.error('falha ao salvar dados locais', e);
   }
 }

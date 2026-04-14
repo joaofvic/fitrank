@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { Button } from '../ui/Button.jsx';
 import { invokeEdge } from '../../lib/supabase/invoke-edge.js';
+import { logger } from '../../lib/logger.js';
 
 const STATUSES = [
   { id: 'pending', label: 'Pendentes' },
@@ -94,12 +95,12 @@ export function AdminModerationView({ onBack }) {
       method: 'GET'
     });
     if (fnError) {
-      console.error('FitRank: admin tenants', fnError.message);
+      logger.error('admin tenants', fnError);
       setTenants([]);
       return;
     }
     if (data?.error) {
-      console.error('FitRank: admin tenants', data.error);
+      logger.error('admin tenants', { message: data.error });
       setTenants([]);
       return;
     }

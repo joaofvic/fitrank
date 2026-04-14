@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Loader2, Send, Trash2, X } from 'lucide-react';
 import { formatTimeAgo } from '../../lib/dates.js';
+import { logger } from '../../lib/logger.js';
 import { UserAvatar } from '../ui/user-avatar.jsx';
 
 export function CommentsDrawer({
@@ -46,7 +47,7 @@ export function CommentsDrawer({
       if (newComment) setComments((prev) => [...prev, newComment]);
       setText('');
     } catch (err) {
-      console.error('FitRank: add comment', err.message);
+      logger.error('add comment', err);
     } finally {
       setSending(false);
     }
@@ -58,7 +59,7 @@ export function CommentsDrawer({
     try {
       await onDeleteComment(commentId, checkinId);
     } catch (err) {
-      console.error('FitRank: delete comment', err.message);
+      logger.error('delete comment', err);
     }
   };
 

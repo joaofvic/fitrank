@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { RefreshCw, WifiOff, X } from 'lucide-react';
 import { onSwUpdate } from '../../lib/register-sw.js';
+import { track } from '../../lib/analytics.js';
 
 export function SwUpdateToast() {
   const [notification, setNotification] = useState(null);
@@ -34,7 +35,7 @@ export function SwUpdateToast() {
         <RefreshCw className="w-5 h-5 text-green-500 shrink-0" />
         <p className="text-sm flex-1">Nova versão disponível</p>
         <button
-          onClick={async () => { const { updateSW } = await import('../../lib/register-sw.js'); updateSW(true); setNotification(null); }}
+          onClick={async () => { track('pwa_sw_update_applied'); const { updateSW } = await import('../../lib/register-sw.js'); updateSW(true); setNotification(null); }}
           className="text-sm font-bold text-green-500 hover:text-green-400 shrink-0"
         >
           Atualizar

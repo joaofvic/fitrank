@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Download, X, Share } from 'lucide-react';
+import { analytics } from '../../lib/analytics.js';
 
 const DISMISS_KEY = 'fitrank_install_dismiss';
 const DISMISS_DAYS = 7;
@@ -32,6 +33,7 @@ export function InstallPrompt() {
     if (isIOSSafari()) {
       setShowIOSGuide(true);
       setVisible(true);
+      analytics.pwaInstallPrompted();
       return;
     }
 
@@ -39,6 +41,7 @@ export function InstallPrompt() {
       e.preventDefault();
       setDeferredPrompt(e);
       setVisible(true);
+      analytics.pwaInstallPrompted();
     };
     window.addEventListener('beforeinstallprompt', handler);
     return () => window.removeEventListener('beforeinstallprompt', handler);
@@ -49,12 +52,14 @@ export function InstallPrompt() {
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
     if (outcome === 'accepted') {
+      analytics.pwaInstalled();
       setVisible(false);
     }
     setDeferredPrompt(null);
   }, [deferredPrompt]);
 
   const handleDismiss = useCallback(() => {
+    analytics.pwaInstallDismissed();
     localStorage.setItem(DISMISS_KEY, String(Date.now()));
     setVisible(false);
   }, []);

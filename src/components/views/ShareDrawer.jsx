@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Download, Loader2, MessageCircle, X } from 'lucide-react';
 import { generateShareCard } from '../../lib/share-card.js';
+import { logger } from '../../lib/logger.js';
 
 const INSTAGRAM_ICON = () => (
   <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -49,7 +50,7 @@ export function ShareDrawer({ post, onClose, onTrackShare }) {
       }
     } catch (err) {
       if (err.name !== 'AbortError') {
-        console.error('FitRank: share instagram', err.message);
+        logger.error('share instagram', err);
       }
     } finally {
       setGenerating(false);
@@ -86,7 +87,7 @@ export function ShareDrawer({ post, onClose, onTrackShare }) {
       onTrackShare?.(post.id, 'whatsapp');
     } catch (err) {
       if (err.name !== 'AbortError') {
-        console.error('FitRank: share whatsapp', err.message);
+        logger.error('share whatsapp', err);
       }
     } finally {
       setGenerating(false);
@@ -102,7 +103,7 @@ export function ShareDrawer({ post, onClose, onTrackShare }) {
       downloadBlob(blob, 'fitrank-treino.png');
       onTrackShare?.(post.id, 'other');
     } catch (err) {
-      console.error('FitRank: share download', err.message);
+      logger.error('share download', err);
     } finally {
       setGenerating(false);
       setSharingPlatform(null);

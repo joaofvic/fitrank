@@ -5,6 +5,7 @@ import { FeedPostCard } from './FeedPostCard.jsx';
 import { CommentsDrawer } from './CommentsDrawer.jsx';
 import { LikesDrawer } from './LikesDrawer.jsx';
 import { ShareDrawer } from './ShareDrawer.jsx';
+import { logger } from '../../lib/logger.js';
 
 const PAGE_SIZE = 10;
 
@@ -45,7 +46,7 @@ export function HashtagFeedView({
         p_offset: page * PAGE_SIZE
       });
       if (error) {
-        console.error('FitRank: hashtag feed', error.message);
+        logger.error('hashtag feed', error);
         return;
       }
       const rows = (Array.isArray(data) ? data : []).map((r) => ({

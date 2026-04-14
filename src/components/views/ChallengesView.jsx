@@ -6,6 +6,7 @@ import { Card } from '../ui/Card.jsx';
 import { Button } from '../ui/Button.jsx';
 import { todayLocalISODate } from '../../lib/dates.js';
 import { invokeEdge } from '../../lib/supabase/invoke-edge.js';
+import { logger } from '../../lib/logger.js';
 
 function formatDateBR(iso) {
   if (!iso) return '—';
@@ -95,7 +96,7 @@ export function ChallengesView() {
       }
       setParticipantCounts(counts);
     } catch (e) {
-      console.error('FitRank: desafios', e.message);
+      logger.error('desafios', e);
       setError(e.message);
     } finally {
       setLoading(false);
@@ -113,7 +114,7 @@ export function ChallengesView() {
         p_desafio_id: desafioId
       });
       if (rErr) {
-        console.error('FitRank: ranking', rErr.message);
+        logger.error('ranking desafios', rErr);
         setRankings((prev) => ({ ...prev, [desafioId]: [] }));
       } else {
         setRankings((prev) => ({ ...prev, [desafioId]: Array.isArray(data) ? data : [] }));

@@ -4,6 +4,7 @@ import { formatTimeAgo } from '../../lib/dates.js';
 import { workoutTypeIcon } from '../../lib/workout-icons.js';
 import { UserAvatar } from '../ui/user-avatar.jsx';
 import { renderCaption } from '../../lib/caption-renderer.jsx';
+import { logger } from '../../lib/logger.js';
 
 export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenLikes, onOpenProfile, currentUserId, onUpdatePrivacy, onDeletePost, onShare, onMentionClick, onHashtagClick, onTrackImpression }) {
   const [animating, setAnimating] = useState(false);
@@ -135,7 +136,7 @@ export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenLikes, 
                           setMenuOpen(false);
                           if (confirm('Tem certeza que deseja excluir este post? Esta ação não pode ser desfeita.')) {
                             const ok = await onDeletePost(post.id);
-                            if (!ok) console.warn('FitRank: exclusão do post falhou', post.id);
+                            if (!ok) logger.warn('exclusão do post falhou', { postId: post.id });
                           }
                         }}
                         className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-red-500/10 transition-colors"

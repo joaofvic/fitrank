@@ -2,13 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Camera, Flame, Zap, Calendar, CheckCircle2, Crown, RefreshCw,
   Settings, X, Building2, Trophy, Users, Shield, SlidersHorizontal, BarChart3, ScrollText, LogOut,
-  Clock, Check, ChevronLeft, ChevronRight, Loader2, CreditCard
+  Clock, Check, ChevronLeft, ChevronRight, Loader2, CreditCard, Activity
 } from 'lucide-react';
 import { UserAvatar } from '../ui/user-avatar.jsx';
 import { Card } from '../ui/Card.jsx';
 import { Button } from '../ui/Button.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { invokeEdge } from '../../lib/supabase/invoke-edge.js';
+import { logger } from '../../lib/logger.js';
 import { workoutTypeIcon } from '../../lib/workout-icons.js';
 import { FriendsListDrawer } from './FriendsListDrawer.jsx';
 import { BadgesGrid } from './BadgesGrid.jsx';
@@ -31,6 +32,7 @@ export function ProfileView({
   onOpenEngagement,
   onOpenAudit,
   onOpenBilling,
+  onOpenObservability,
   onEditProfile,
   onRetryCheckin,
   friends = [],
@@ -100,7 +102,7 @@ export function ProfileView({
       if (data?.error) throw new Error(data.error);
       if (data?.url) window.location.href = data.url;
     } catch (err) {
-      console.error('FitRank: checkout failed', err.message);
+      logger.error('checkout failed', err);
       alert(err.message || 'Erro ao iniciar assinatura.');
     } finally {
       setProLoading(false);
@@ -126,7 +128,7 @@ export function ProfileView({
       try {
         await onRetryCheckin(retryTargetRef.current, file);
       } catch (err) {
-        console.error('FitRank: retry failed', err.message);
+        logger.error('retry failed', err);
         alert(err.message || 'Erro ao reenviar foto.');
       } finally {
         setRetryingId(null);
@@ -318,6 +320,7 @@ export function ProfileView({
                 { fn: onOpenModeration, icon: Shield, label: 'Moderação' },
                 { fn: onOpenModerationSettings, icon: SlidersHorizontal, label: 'Config moderação' },
                 { fn: onOpenEngagement, icon: BarChart3, label: 'Engajamento' },
+                { fn: onOpenObservability, icon: Activity, label: 'Observabilidade' },
                 { fn: onOpenAudit, icon: ScrollText, label: 'Auditoria' },
                 { fn: onOpenBilling, icon: CreditCard, label: 'Assinaturas' }
               ]

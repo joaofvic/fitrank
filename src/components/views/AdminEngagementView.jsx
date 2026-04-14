@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthProvider.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Card } from '../ui/Card.jsx';
 import { invokeEdge } from '../../lib/supabase/invoke-edge.js';
+import { logger } from '../../lib/logger.js';
 
 /** Sugestão operacional por código de rejeição (US-ADM-14 insights). */
 function rejectionInsightSuggestion(code) {
@@ -662,7 +663,7 @@ export function AdminEngagementView({ onBack }) {
         .maybeSingle();
       if (cancelled) return;
       if (error) {
-        console.error('FitRank: admin_ui_preferences', error.message);
+        logger.error('admin_ui_preferences', error);
         adminUiPrefsBaseRef.current = {};
         setPrefsHydrated(true);
         return;
@@ -692,7 +693,7 @@ export function AdminEngagementView({ onBack }) {
         .update({ admin_ui_preferences: next })
         .eq('id', profile.id);
       if (error) {
-        console.error('FitRank: salvar colunas CSV (admin_ui_preferences)', error.message);
+        logger.error('salvar colunas CSV (admin_ui_preferences)', error);
         return;
       }
       adminUiPrefsBaseRef.current = next;

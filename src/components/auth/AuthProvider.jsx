@@ -1,5 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { getSupabase, isSupabaseConfigured } from '../../lib/supabase/client.js';
+import { Sentry } from '../../lib/sentry.js';
+import { identifyUser, resetUser } from '../../lib/posthog.js';
+import { logger } from '../../lib/logger.js';
+import { analytics } from '../../lib/analytics.js';
 
 const AuthContext = createContext(null);
 
@@ -16,6 +20,8 @@ export function AuthProvider({ children }) {
       if (!supabase || !userId) {
         setProfile(null);
         setTenant(null);
+        if (Sentry?.setUser) Sentry.setUser(null);
+        resetUser();
         return;
       }
       const { data, error } = await supabase
@@ -27,13 +33,21 @@ export function AuthProvider({ children }) {
         .maybeSingle();
 
       if (error) {
-        console.error('FitRank: perfil', error.message);
+        logger.error('perfil', error);
         setProfile(null);
         setTenant(null);
         return;
       }
-      setProfile(data ? { ...data, tenants: undefined } : null);
+      const profileData = data ? { ...data, tenants: undefined } : null;
+      setProfile(profileData);
       setTenant(data?.tenants ?? null);
+
+      if (profileData && Sentry?.setUser) {
+        Sentry.setUser({ id: profileData.id, username: profileData.username });
+        Sentry.setTag('tenant_id', profileData.tenant_id ?? 'none');
+        Sentry.setTag('is_master', String(!!profileData.is_platform_master));
+      }
+      identifyUser(profileData, data?.tenants);
     },
     [supabase]
   );
@@ -86,10 +100,14 @@ export function AuthProvider({ children }) {
 
   const signOut = useCallback(async () => {
     if (!supabase) return;
+    analytics.authLogout();
     await supabase.auth.signOut();
+    analytics.authLogout();
     setProfile(null);
     setTenant(null);
     setIsPasswordRecovery(false);
+    if (Sentry?.setUser) Sentry.setUser(null);
+    resetUser();
   }, [supabase]);
 
   const completePasswordRecovery = useCallback(() => {

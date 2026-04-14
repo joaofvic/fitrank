@@ -4,6 +4,7 @@ import { ArrowLeft, Bell, Home, Newspaper, Plus, TrendingUp, User, Zap } from 'l
 import { useAuth } from './components/auth/AuthProvider.jsx';
 import { AuthScreen } from './components/auth/AuthScreen.jsx';
 import { ResetPasswordScreen } from './components/auth/ResetPasswordScreen.jsx';
+import { analytics } from './lib/analytics.js';
 import { defaultUserData, loadFitRankState, saveFitRankState } from './lib/persist.js';
 import { profileToUserData } from './lib/profile-map.js';
 import { useFitCloudData } from './hooks/useFitCloudData.js';
@@ -22,6 +23,7 @@ import { AdminEngagementView } from './components/views/AdminEngagementView.jsx'
 import { AdminAuditView } from './components/views/AdminAuditView.jsx';
 import { AdminChallengesView } from './components/views/AdminChallengesView.jsx';
 import { AdminBillingView } from './components/views/AdminBillingView.jsx';
+import { AdminObservabilityView } from './components/views/AdminObservabilityView.jsx';
 import { PublicProfileView } from './components/views/PublicProfileView.jsx';
 import { NotificationsView } from './components/views/NotificationsView.jsx';
 import { EditProfileView } from './components/views/EditProfileView.jsx';
@@ -178,6 +180,7 @@ export default function App() {
       const currIdx = LEAGUE_ORDER.indexOf(currentLeague);
       if (currIdx > prevIdx) {
         setLeaguePromotion(currentLeague);
+        analytics.leaguePromoted({ from_league: prev, to_league: currentLeague });
       }
     }
   }, [profile?.league]);
@@ -204,12 +207,14 @@ export default function App() {
   };
 
   const handleCheckin = async (workoutType = 'Treino Geral', fotoFile = null, feedVisible = true, feedCaption = null) => {
+    analytics.checkinStarted();
     if (useCloud) {
       try {
         const prevLevel = calculateLevel(profile?.xp ?? 0);
         const prevStreak = profile?.streak ?? 0;
         const prevBadgeCount = social.badges?.length ?? 0;
 
+        analytics.checkinSubmitted({ workout_type: workoutType });
         await cloud.insertCheckin(workoutType, fotoFile, feedVisible, feedCaption);
 
         const freshProfile = await refreshProfile?.();
@@ -236,8 +241,15 @@ export default function App() {
           newLevel: newLevel > prevLevel ? newLevel : undefined,
           badges: newBadges.length > 0 ? newBadges : undefined
         });
+        analytics.checkinSuccess({
+          points: 10,
+          workout_type: workoutType,
+          streak_day: newStreak,
+          leveled_up: newLevel > prevLevel
+        });
         navigate('home');
       } catch (err) {
+        analytics.checkinError(err.message);
         showToast(err.message ?? 'Falha no check-in');
       }
       return;
@@ -418,6 +430,7 @@ export default function App() {
             onOpenEngagement={profile?.is_platform_master ? () => navigate('admin-engagement') : undefined}
             onOpenAudit={profile?.is_platform_master ? () => navigate('admin-audit') : undefined}
             onOpenBilling={profile?.is_platform_master ? () => navigate('admin-billing') : undefined}
+            onOpenObservability={profile?.is_platform_master ? () => navigate('admin-observability') : undefined}
             onEditProfile={useCloud ? () => navigate('edit-profile') : undefined}
             onRetryCheckin={useCloud ? cloud.retryCheckin : undefined}
             onOpenFriends={useCloud ? () => navigate('friends') : undefined}
@@ -525,6 +538,9 @@ export default function App() {
         )}
         {view === 'admin-billing' && profile?.is_platform_master && (
           <AdminBillingView onBack={goBack} />
+        )}
+        {view === 'admin-observability' && profile?.is_platform_master && (
+          <AdminObservabilityView onBack={goBack} />
         )}
 
         {view === 'notifications' && useCloud && (

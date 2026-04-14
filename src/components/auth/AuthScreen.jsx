@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from './AuthProvider.jsx';
 import { Button } from '../ui/Button.jsx';
+import { analytics } from '../../lib/analytics.js';
 
 export function AuthScreen() {
   const { supabase } = useAuth();
@@ -28,6 +29,7 @@ export function AuthScreen() {
           redirectTo: recoveryRedirectTo()
         });
         if (err) throw err;
+        analytics.authPasswordReset();
         setInfo(
           'Se existir uma conta com este e-mail, você receberá um link para redefinir a senha. Verifique a caixa de entrada e o spam.'
         );
@@ -49,6 +51,9 @@ export function AuthScreen() {
           }
         });
         if (err) throw err;
+        if (data?.user) {
+          analytics.authSignup();
+        }
         if (data?.user && !data.session) {
           setInfo(
             'Conta criada. Se o projeto exigir confirmação por e-mail, abra o link enviado antes de entrar.'
@@ -60,6 +65,7 @@ export function AuthScreen() {
           password
         });
         if (err) throw err;
+        analytics.authLogin();
       }
     } catch (err) {
       setError(err.message ?? 'Falha na autenticação');

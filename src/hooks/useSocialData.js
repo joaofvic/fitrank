@@ -1,5 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
+import { analytics } from '../lib/analytics.js';
 import { haptic } from '../lib/haptics.js';
+import { logger } from '../lib/logger.js';
 
 const FEED_PAGE_SIZE = 10;
 
@@ -61,7 +63,7 @@ export function useSocialData({ supabase, session, profile }) {
         p_offset: page * FEED_PAGE_SIZE
       });
       if (error) {
-        console.error('FitRank: feed', error.message);
+        logger.error('feed', error);
         return;
       }
       const rows = (Array.isArray(data) ? data : []).map(mapFeedRow);
@@ -124,14 +126,16 @@ export function useSocialData({ supabase, session, profile }) {
           .eq('user_id', userId)
           .eq('checkin_id', checkinId);
         if (error) throw error;
+        analytics.socialUnlike(checkinId);
       } else {
         const { error } = await supabase
           .from('likes')
           .insert({ user_id: userId, checkin_id: checkinId, tenant_id: tenantId });
         if (error) throw error;
+        analytics.socialLike(checkinId);
       }
     } catch (err) {
-      console.error('FitRank: toggleLike', err.message);
+      logger.error('toggleLike', err);
       setFeed((prev) =>
         prev.map((item) =>
           item.id === checkinId
@@ -185,7 +189,7 @@ export function useSocialData({ supabase, session, profile }) {
       .single();
 
     if (error) {
-      console.error('FitRank: addComment', error.message);
+      logger.error('addComment', error);
       setFeed((prev) =>
         prev.map((item) =>
           item.id === checkinId
@@ -195,6 +199,8 @@ export function useSocialData({ supabase, session, profile }) {
       );
       return null;
     }
+
+    analytics.socialCommentAdded(checkinId);
 
     return {
       ...data,
@@ -215,7 +221,7 @@ export function useSocialData({ supabase, session, profile }) {
       .limit(100);
 
     if (error) {
-      console.error('FitRank: loadComments', error.message);
+      logger.error('loadComments', error);
       return [];
     }
 
@@ -242,7 +248,7 @@ export function useSocialData({ supabase, session, profile }) {
       .limit(200);
 
     if (error) {
-      console.error('FitRank: loadLikes', error.message);
+      logger.error('loadLikes', error);
       return [];
     }
 
@@ -266,7 +272,7 @@ export function useSocialData({ supabase, session, profile }) {
       .eq('user_id', userId);
 
     if (error) {
-      console.error('FitRank: deleteComment', error.message);
+      logger.error('deleteComment', error);
       return false;
     }
 
@@ -300,7 +306,7 @@ export function useSocialData({ supabase, session, profile }) {
         .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`);
 
       if (error) {
-        console.error('FitRank: loadFriends', error.message);
+        logger.error('loadFriends', error);
         return;
       }
 
@@ -337,7 +343,7 @@ export function useSocialData({ supabase, session, profile }) {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('FitRank: loadPendingRequests', error.message);
+      logger.error('loadPendingRequests', error);
       return;
     }
 
@@ -366,7 +372,7 @@ export function useSocialData({ supabase, session, profile }) {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('FitRank: loadSentRequests', error.message);
+      logger.error('loadSentRequests', error);
       return;
     }
 
@@ -390,7 +396,7 @@ export function useSocialData({ supabase, session, profile }) {
       p_query: query.trim()
     });
     if (error) {
-      console.error('FitRank: searchUsers', error.message);
+      logger.error('searchUsers', error);
       return [];
     }
     const raw = Array.isArray(data) ? data : [];
@@ -414,9 +420,10 @@ export function useSocialData({ supabase, session, profile }) {
       });
 
     if (error) {
-      console.error('FitRank: sendFriendRequest', error.message);
+      logger.error('sendFriendRequest', error);
       return false;
     }
+    analytics.socialFriendRequestSent();
     await loadSentRequests();
     return true;
   }, [supabase, userId, tenantId, loadSentRequests]);
@@ -430,10 +437,11 @@ export function useSocialData({ supabase, session, profile }) {
       .eq('addressee_id', userId);
 
     if (error) {
-      console.error('FitRank: acceptFriendRequest', error.message);
+      logger.error('acceptFriendRequest', error);
       return false;
     }
 
+    analytics.socialFriendAccepted();
     await Promise.all([loadFriends(), loadPendingRequests()]);
     return true;
   }, [supabase, userId, loadFriends, loadPendingRequests]);
@@ -447,7 +455,7 @@ export function useSocialData({ supabase, session, profile }) {
       .eq('addressee_id', userId);
 
     if (error) {
-      console.error('FitRank: declineFriendRequest', error.message);
+      logger.error('declineFriendRequest', error);
       return false;
     }
 
@@ -463,7 +471,7 @@ export function useSocialData({ supabase, session, profile }) {
       .eq('id', friendshipId);
 
     if (error) {
-      console.error('FitRank: removeFriend', error.message);
+      logger.error('removeFriend', error);
       return false;
     }
 
@@ -485,7 +493,7 @@ export function useSocialData({ supabase, session, profile }) {
       .eq('user_id', userId);
 
     if (error) {
-      console.error('FitRank: updatePostPrivacy', error.message);
+      logger.error('updatePostPrivacy', error);
       return false;
     }
 
@@ -510,11 +518,12 @@ export function useSocialData({ supabase, session, profile }) {
   const trackShare = useCallback(async (checkinId, platform) => {
     if (!supabase || !userId || !tenantId) return;
     try {
-      await supabase
+      const { error } = await supabase
         .from('shares')
         .insert({ user_id: userId, checkin_id: checkinId, tenant_id: tenantId, platform });
+      if (!error) analytics.socialShare(platform);
     } catch (err) {
-      console.error('FitRank: trackShare', err.message);
+      logger.error('trackShare', err);
     }
   }, [supabase, userId, tenantId]);
 
@@ -526,12 +535,12 @@ export function useSocialData({ supabase, session, profile }) {
     try {
       const { data, error } = await supabase.rpc('get_trending_hashtags', { p_limit: 10 });
       if (error) {
-        console.error('FitRank: trending hashtags', error.message);
+        logger.error('trending hashtags', error);
         return;
       }
       setTrendingHashtags(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error('FitRank: trending hashtags', err.message);
+      logger.error('trending hashtags', err);
     }
   }, [supabase, userId]);
 
@@ -546,7 +555,7 @@ export function useSocialData({ supabase, session, profile }) {
         view_duration_ms: Math.round(durationMs)
       });
     } catch (err) {
-      console.error('FitRank: trackImpression', err.message);
+      logger.error('trackImpression', err);
     }
   }, [supabase, userId, tenantId]);
 
@@ -562,7 +571,7 @@ export function useSocialData({ supabase, session, profile }) {
     try {
       const { data, error } = await supabase.rpc('get_user_badges', { p_user_id: uid });
       if (error) {
-        console.error('FitRank: loadBadges', error.message);
+        logger.error('loadBadges', error);
         return [];
       }
       const rows = Array.isArray(data) ? data : [];
@@ -585,12 +594,12 @@ export function useSocialData({ supabase, session, profile }) {
     try {
       const { data, error } = await supabase.rpc('get_stories_ring', { p_limit: 20 });
       if (error) {
-        console.error('FitRank: stories ring', error.message);
+        logger.error('stories ring', error);
         return;
       }
       setStoriesRing(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error('FitRank: stories ring', err.message);
+      logger.error('stories ring', err);
     } finally {
       setStoriesRingLoading(false);
     }
@@ -600,7 +609,7 @@ export function useSocialData({ supabase, session, profile }) {
     if (!supabase || !userId) return [];
     const { data, error } = await supabase.rpc('get_user_stories', { p_user_id: targetUserId });
     if (error) {
-      console.error('FitRank: user stories', error.message);
+      logger.error('user stories', error);
       return [];
     }
     return Array.isArray(data) ? data : [];
@@ -640,6 +649,7 @@ export function useSocialData({ supabase, session, profile }) {
       .single();
 
     if (error) throw error;
+    analytics.socialStoryCreated();
     await loadStoriesRing();
     return data.id;
   }, [supabase, userId, tenantId, loadStoriesRing]);
@@ -647,10 +657,11 @@ export function useSocialData({ supabase, session, profile }) {
   const markStoryViewed = useCallback(async (storyId) => {
     if (!supabase || !userId) return;
     try {
-      await supabase.from('story_views').insert({
+      const { error } = await supabase.from('story_views').insert({
         story_id: storyId,
         viewer_id: userId
       });
+      if (!error) analytics.socialStoryViewed(userId);
     } catch (_) {
       // ignore duplicates
     }
@@ -660,7 +671,7 @@ export function useSocialData({ supabase, session, profile }) {
     if (!supabase || !userId) return [];
     const { data, error } = await supabase.rpc('get_story_viewers', { p_story_id: storyId });
     if (error) {
-      console.error('FitRank: story viewers', error.message);
+      logger.error('story viewers', error);
       return [];
     }
     return Array.isArray(data) ? data : [];
@@ -674,7 +685,7 @@ export function useSocialData({ supabase, session, profile }) {
       .eq('id', storyId)
       .eq('user_id', userId);
     if (error) {
-      console.error('FitRank: deleteStory', error.message);
+      logger.error('deleteStory', error);
       return false;
     }
     await loadStoriesRing();
@@ -692,12 +703,12 @@ export function useSocialData({ supabase, session, profile }) {
       .select('id');
 
     if (error) {
-      console.error('FitRank: deletePost', error.message);
+      logger.error('deletePost', error);
       return false;
     }
 
     if (!data || data.length === 0) {
-      console.warn('FitRank: deletePost — nenhum registro excluído (RLS ou id inválido)', { checkinId, userId });
+      logger.warn('deletePost — nenhum registro excluído (RLS ou id inválido)', { checkinId, userId });
       return false;
     }
 

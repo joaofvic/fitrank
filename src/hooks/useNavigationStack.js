@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { VIEW_META, TAB_VIEWS, getTransitionDirection } from '../lib/view-transition.js';
+import { capturePageView } from '../lib/posthog.js';
 
 const VIEW_TO_PATH = {
   home: '/',
@@ -20,6 +21,7 @@ const VIEW_TO_PATH = {
   'admin-engagement': '/admin/engagement',
   'admin-audit': '/admin/audit',
   'admin-billing': '/admin/billing',
+  'admin-observability': '/admin/observability',
 };
 
 function pathToView(pathname) {
@@ -86,6 +88,7 @@ export function useNavigationStack() {
 
     const path = getViewPath(newView, param);
     window.history.pushState({ view: newView, param }, '', path);
+    capturePageView(newView, path);
   }, [view]);
 
   const goBack = useCallback(() => {
@@ -102,6 +105,7 @@ export function useNavigationStack() {
 
     setTransitionDir(getTransitionDirection(view, prevView));
     setView(prevView);
+    capturePageView(prevView, getViewPath(prevView));
 
     if (!isPopRef.current) {
       window.history.back();
@@ -130,12 +134,14 @@ export function useNavigationStack() {
           }
         }
 
+        capturePageView(state.view, getViewPath(state.view, state.param));
         requestAnimationFrame(() => { isPopRef.current = false; });
       } else {
         isPopRef.current = true;
         setTransitionDir('back');
         setView('home');
         stackRef.current = ['home'];
+        capturePageView('home', '/');
         requestAnimationFrame(() => { isPopRef.current = false; });
       }
     };

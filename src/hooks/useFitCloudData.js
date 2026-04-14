@@ -6,6 +6,8 @@ import {
 } from '../lib/dates.js';
 import { extractMentions } from '../lib/mention-parser.js';
 import { extractHashtags } from '../lib/hashtag-parser.js';
+import { logger } from '../lib/logger.js';
+import { analytics } from '../lib/analytics.js';
 
 /**
  * Dados FitRank na nuvem (ranking, check-ins, realtime leve).
@@ -49,7 +51,7 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
         p_period: rankingPeriod
       });
       if (rpcError) {
-        console.error('FitRank: ranking', rpcError.message);
+        logger.error('ranking', rpcError);
         return;
       }
       const rows = Array.isArray(data) ? data : [];
@@ -94,7 +96,7 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
         p_period: rankingPeriod
       });
       if (rpcError) {
-        console.error('FitRank: league ranking', rpcError.message);
+        logger.error('league ranking', rpcError);
         return;
       }
       const rows = Array.isArray(data) ? data : [];
@@ -142,7 +144,7 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
       ]);
 
       if (pageResult.error) {
-        console.error('FitRank: checkins', pageResult.error.message);
+        logger.error('checkins', pageResult.error);
         return;
       }
 
@@ -179,7 +181,7 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
       .order('created_at', { ascending: false })
       .limit(20);
     if (nErr) {
-      console.error('FitRank: notifications', nErr.message);
+      logger.error('notifications', nErr);
       return;
     }
     setNotifications(Array.isArray(data) ? data : []);
@@ -195,7 +197,7 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
       .order('created_at', { ascending: false })
       .limit(50);
     if (nErr) {
-      console.error('FitRank: readNotifications', nErr.message);
+      logger.error('readNotifications', nErr);
       return;
     }
     setReadNotifications(Array.isArray(data) ? data : []);
@@ -302,7 +304,7 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
       )
       .subscribe((status) => {
         if (status === 'CHANNEL_ERROR') {
-          console.warn('FitRank: Realtime indisponível; use atualização manual ou habilite a publicação no Supabase.');
+          logger.warn('Realtime indisponível; use atualização manual ou habilite a publicação no Supabase.');
         }
       });
 
@@ -402,7 +404,7 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
           await supabase.rpc('save_checkin_mentions', {
             p_checkin_id: insData.id,
             p_usernames: usernames
-          }).catch((err) => console.error('FitRank: save mentions', err.message));
+          }).catch((err) => logger.error('save mentions', err));
         }
 
         const tags = extractHashtags(trimmedCaption);
@@ -410,7 +412,7 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
           await supabase.rpc('save_checkin_hashtags', {
             p_checkin_id: insData.id,
             p_tags: tags
-          }).catch((err) => console.error('FitRank: save hashtags', err.message));
+          }).catch((err) => logger.error('save hashtags', err));
         }
       }
 
@@ -494,7 +496,7 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
         p_username: username
       });
       if (rpcErr) {
-        console.error('FitRank: checkUsername', rpcErr.message);
+        logger.error('checkUsername', rpcErr);
         return false;
       }
       return data === true;
@@ -525,7 +527,7 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
     async () => {
       if (!supabase || !userId) return null;
       const { data, error: err } = await supabase.rpc('can_recover_streak');
-      if (err) { console.error('FitRank: can_recover_streak', err.message); return null; }
+      if (err) { logger.error('can_recover_streak', err); return null; }
       return data;
     },
     [supabase, userId]
@@ -535,8 +537,9 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
     async (gapDate) => {
       if (!supabase || !userId) return { error: 'Não autenticado' };
       const { data, error: err } = await supabase.rpc('recover_streak', { p_date: gapDate || null });
-      if (err) { console.error('FitRank: recover_streak', err.message); return { error: err.message }; }
+      if (err) { logger.error('recover_streak', err); return { error: err.message }; }
       if (data?.error) return data;
+      analytics.streakRecovery({ streak_days: Number(data?.streak_after ?? 0) });
       if (refreshProfile) await refreshProfile();
       return data;
     },
@@ -547,7 +550,7 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
     async () => {
       if (!supabase || !userId) return null;
       const { data, error: err } = await supabase.rpc('get_boost_status');
-      if (err) { console.error('FitRank: get_boost_status', err.message); return null; }
+      if (err) { logger.error('get_boost_status', err); return null; }
       return data;
     },
     [supabase, userId]
@@ -557,8 +560,9 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
     async (points) => {
       if (!supabase || !userId) return { error: 'Não autenticado' };
       const { data, error: err } = await supabase.rpc('purchase_boost', { p_points: points });
-      if (err) { console.error('FitRank: purchase_boost', err.message); return { error: err.message }; }
+      if (err) { logger.error('purchase_boost', err); return { error: err.message }; }
       if (data?.error) return data;
+      analytics.boostPurchased({ points: Number(data?.points_added ?? points) });
       if (refreshProfile) await refreshProfile();
       refreshLeaderboard();
       return data;
