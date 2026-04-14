@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="92.16" fill="#000"/>
+  <circle cx="256" cy="215.04" r="112.64" fill="#22c55e"/>
+  <text x="256" y="215.04" fill="#000" font-size="143.36" font-weight="bold" font-family="sans-serif" text-anchor="middle" dominant-baseline="central">F</text>
+  <text x="256" y="368.64" fill="#22c55e" font-size="46.08" font-weight="900" font-family="sans-serif" text-anchor="middle" dominant-baseline="central" letter-spacing="2">FITRANK</text>
+</svg>

@@ -2,6 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Base animations ── */
 @keyframes fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -27,4 +28,136 @@
 
 .animate-in-toast {
   animation: toast-in 0.3s ease-out;
+}
+
+/* ── View transition keyframes ── */
+@keyframes view-slide-in-right {
+  from { transform: translateX(100%); opacity: 0.6; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes view-slide-out-left {
+  from { transform: translateX(0);     opacity: 1; }
+  to   { transform: translateX(-30%);  opacity: 0; }
+}
+
+@keyframes view-slide-in-left {
+  from { transform: translateX(-100%); opacity: 0.6; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+@keyframes view-slide-out-right {
+  from { transform: translateX(0);    opacity: 1; }
+  to   { transform: translateX(30%);  opacity: 0; }
+}
+
+@keyframes view-slide-in-up {
+  from { transform: translateY(100%); opacity: 0.8; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+@keyframes view-slide-out-down {
+  from { transform: translateY(0);    opacity: 1; }
+  to   { transform: translateY(100%); opacity: 0; }
+}
+
+@keyframes view-scale-fade-in {
+  from { transform: scale(0.95); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+@keyframes view-scale-fade-out {
+  from { transform: scale(1);    opacity: 1; }
+  to   { transform: scale(0.95); opacity: 0; }
+}
+
+/* iOS-like cubic-bezier */
+:root {
+  --transition-ios: cubic-bezier(0.32, 0.72, 0, 1);
+  --transition-duration: 280ms;
+}
+
+/* ── View transition classes ── */
+.view-enter-forward {
+  animation: view-slide-in-right var(--transition-duration) var(--transition-ios) both;
+}
+.view-exit-forward {
+  animation: view-slide-out-left var(--transition-duration) var(--transition-ios) both;
+}
+
+.view-enter-back {
+  animation: view-slide-in-left var(--transition-duration) var(--transition-ios) both;
+}
+.view-exit-back {
+  animation: view-slide-out-right var(--transition-duration) var(--transition-ios) both;
+}
+
+.view-enter-up {
+  animation: view-slide-in-up var(--transition-duration) var(--transition-ios) both;
+}
+.view-exit-down {
+  animation: view-slide-out-down var(--transition-duration) var(--transition-ios) both;
+}
+
+.view-enter-fade {
+  animation: view-scale-fade-in var(--transition-duration) ease-out both;
+}
+.view-exit-fade {
+  animation: view-scale-fade-out var(--transition-duration) ease-out both;
+}
+
+.view-enter-none {
+  animation: none;
+}
+
+/* ── Pull-to-refresh ── */
+@keyframes ptr-spinner {
+  to { transform: rotate(360deg); }
+}
+
+.ptr-spinner {
+  animation: ptr-spinner 0.8s linear infinite;
+}
+
+/* ── Swipe visual feedback ── */
+.view-swipe-container {
+  will-change: transform;
+  touch-action: pan-y;
+}
+
+/* ── Mobile-native feel ── */
+html {
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  overscroll-behavior: contain;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent user-select on interactive areas but allow on text/inputs */
+button, a, [role="button"], nav, .no-select {
+  -webkit-user-select: none;
+  user-select: none;
+}
+input, textarea, [contenteditable], p, span.selectable {
+  -webkit-user-select: auto;
+  user-select: auto;
+}
+
+/* ── Safe area insets ── */
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ── Skeleton loading ── */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.3; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #27272a 0%, #3f3f46 50%, #27272a 100%);
+  background-size: 200% 100%;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+  border-radius: 0.5rem;
 }

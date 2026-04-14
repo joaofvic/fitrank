@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head><title>FitRank Icon Generator</title></head>
+<body>
+<p>Clique nos links para baixar os ícones e salve-os em <code>public/icons/</code>:</p>
+<canvas id="c" style="display:none"></canvas>
+<div id="links"></div>
+<script>
+const sizes = [
+  { name: 'icon-192.png', size: 192, maskable: false },
+  { name: 'icon-512.png', size: 512, maskable: false },
+  { name: 'icon-maskable-192.png', size: 192, maskable: true },
+  { name: 'icon-maskable-512.png', size: 512, maskable: true },
+  { name: 'apple-touch-icon.png', size: 180, maskable: false },
+  { name: 'favicon-32.png', size: 32, maskable: false }
+];
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const linksDiv = document.getElementById('links');
+
+sizes.forEach(({ name, size, maskable }) => {
+  canvas.width = size;
+  canvas.height = size;
+  
+  // Background
+  ctx.fillStyle = '#000000';
+  if (maskable) {
+    ctx.fillRect(0, 0, size, size);
+  } else {
+    ctx.beginPath();
+    const r = size * 0.18;
+    ctx.roundRect(0, 0, size, size, r);
+    ctx.fill();
+  }
+
+  // Green accent circle
+  const cx = size / 2;
+  const cy = size * 0.42;
+  const cr = size * 0.22;
+  ctx.fillStyle = '#22c55e';
+  ctx.beginPath();
+  ctx.arc(cx, cy, cr, 0, Math.PI * 2);
+  ctx.fill();
+
+  // "F" letter
+  ctx.fillStyle = '#000000';
+  ctx.font = `bold ${size * 0.28}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('F', cx, cy);
+
+  // "FITRANK" text
+  ctx.fillStyle = '#22c55e';
+  ctx.font = `900 ${size * 0.1}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('FITRANK', cx, size * 0.72);
+
+  const dataUrl = canvas.toDataURL('image/png');
+  const a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = name;
+  a.textContent = `Download ${name} (${size}x${size})`;
+  a.style.display = 'block';
+  a.style.margin = '8px';
+  linksDiv.appendChild(a);
+
+  // Auto-trigger for convenience
+  a.click();
+});
+</script>
+</body>
+</html>

@@ -13,6 +13,7 @@ import { workoutTypeIcon } from '../../lib/workout-icons.js';
 import { FriendsListDrawer } from './FriendsListDrawer.jsx';
 import { BadgesGrid } from './BadgesGrid.jsx';
 import { LevelBadge } from '../ui/LevelBadge.jsx';
+import { ProfileStatsSkeleton } from '../ui/Skeleton.jsx';
 import { XpProgressBar } from '../ui/XpProgressBar.jsx';
 import { LeagueBadge } from '../ui/LeagueBadge.jsx';
 
@@ -389,10 +390,8 @@ export function ProfileView({
           </div>
         ) : (
           <div className={`space-y-5 transition-opacity ${checkinsLoading ? 'opacity-50' : ''}`}>
-            {checkinsLoading && (
-              <div className="flex justify-center py-2">
-                <Loader2 className="w-5 h-5 text-green-500 animate-spin" />
-              </div>
+            {checkinsLoading && checkins.length === 0 && (
+              <ProfileStatsSkeleton />
             )}
             {checkinGroups.map((group) => (
               <div key={group.date} className="space-y-2">

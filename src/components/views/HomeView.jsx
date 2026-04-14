@@ -8,6 +8,7 @@ import { XpProgressBar } from '../ui/XpProgressBar.jsx';
 import { LeagueBadge } from '../ui/LeagueBadge.jsx';
 import { LeagueProgressView } from './LeagueProgressView.jsx';
 import { StreakRecoveryModal } from './StreakRecoveryModal.jsx';
+import { RankingSkeleton } from '../ui/Skeleton.jsx';
 import { BoostShopDrawer } from './BoostShopDrawer.jsx';
 import { calculateLevel } from '../../lib/profile-map.js';
 import { fireConfetti } from '../../lib/confetti.js';
@@ -259,7 +260,7 @@ export function HomeView({
 
         <div className="space-y-2">
           {isRankingLoading && displayUsers.length === 0 ? (
-            <div className="text-center py-10 text-zinc-600">Carregando ranking…</div>
+            <RankingSkeleton />
           ) : displayUsers.length === 0 ? (
             <div className="text-center py-10 text-zinc-600">
               {rankingTab === 'league' ? 'Nenhum atleta na sua liga ainda.' : 'Nenhum atleta no ranking ainda.'}

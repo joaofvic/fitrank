@@ -5,6 +5,7 @@ import { CommentsDrawer } from './CommentsDrawer.jsx';
 import { LikesDrawer } from './LikesDrawer.jsx';
 import { ShareDrawer } from './ShareDrawer.jsx';
 import { StoriesRing } from './StoriesRing.jsx';
+import { FeedSkeleton } from '../ui/Skeleton.jsx';
 
 export function FeedView({
   feed = [],
@@ -138,9 +139,7 @@ export function FeedView({
       )}
 
       {feedLoading && feed.length === 0 ? (
-        <div className="flex justify-center py-16">
-          <Loader2 className="w-6 h-6 text-green-500 animate-spin" />
-        </div>
+        <FeedSkeleton />
       ) : feed.length === 0 ? (
         <div className="text-center py-16 px-6 space-y-3">
           <div className="w-16 h-16 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4">

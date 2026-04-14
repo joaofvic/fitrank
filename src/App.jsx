@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Bell, Home, Newspaper, Plus, TrendingUp, User, Zap } from 'lucide-react';
+import { ArrowLeft, Bell, Home, Newspaper, Plus, TrendingUp, User, Zap } from 'lucide-react';
 
 import { useAuth } from './components/auth/AuthProvider.jsx';
 import { AuthScreen } from './components/auth/AuthScreen.jsx';
@@ -31,6 +31,13 @@ import { StoryViewer } from './components/views/StoryViewer.jsx';
 import { CelebrationOverlay } from './components/views/CelebrationOverlay.jsx';
 import { LeaguePromotionOverlay } from './components/views/LeaguePromotionOverlay.jsx';
 import { calculateLevel } from './lib/profile-map.js';
+import { SwUpdateToast } from './components/ui/SwUpdateToast.jsx';
+import { InstallPrompt } from './components/ui/InstallPrompt.jsx';
+import { AnimatedViewContainer } from './components/ui/AnimatedViewContainer.jsx';
+import { PullToRefreshIndicator } from './components/ui/PullToRefreshIndicator.jsx';
+import { useSwipeNavigation } from './hooks/useSwipeNavigation.js';
+import { usePullToRefresh } from './hooks/usePullToRefresh.js';
+import { useNavigationStack } from './hooks/useNavigationStack.js';
 
 export default function App() {
   const {
@@ -62,9 +69,18 @@ export default function App() {
 
   const [userData, setUserData] = useState(() => loadFitRankState()?.userData ?? defaultUserData());
   const [checkins, setCheckins] = useState(() => loadFitRankState()?.checkins ?? []);
-  const [view, setView] = useState('home');
-  const [publicProfileUserId, setPublicProfileUserId] = useState(null);
-  const [hashtagTag, setHashtagTag] = useState(null);
+
+  const { view, transitionDir, routeParam, navigate, goBack, canGoBack } = useNavigationStack();
+  const mainContentRef = useRef(null);
+
+  const [publicProfileUserId, setPublicProfileUserId] = useState(() => {
+    if (view === 'public-profile' && routeParam) return routeParam;
+    return null;
+  });
+  const [hashtagTag, setHashtagTag] = useState(() => {
+    if (view === 'hashtag-feed' && routeParam) return routeParam;
+    return null;
+  });
   const [message, setMessage] = useState(null);
   const [storyCreatorOpen, setStoryCreatorOpen] = useState(false);
   const [storyViewerTarget, setStoryViewerTarget] = useState(null);
@@ -72,19 +88,42 @@ export default function App() {
   const [leaguePromotion, setLeaguePromotion] = useState(null);
   const prevLeagueRef = useRef(null);
 
+  useEffect(() => {
+    if (view === 'public-profile' && routeParam) setPublicProfileUserId(routeParam);
+    if (view === 'hashtag-feed' && routeParam) setHashtagTag(routeParam);
+  }, [view, routeParam]);
+
+  useSwipeNavigation(view, navigate, mainContentRef);
+
+  const handlePullRefresh = useCallback(async () => {
+    if (view === 'home' && useCloud) {
+      await Promise.all([cloud.refreshLeaderboard?.(), refreshProfile?.()]);
+    } else if (view === 'feed' && useCloud) {
+      await social.refreshFeed?.();
+    } else if (view === 'challenges') {
+      // ChallengesView refreshes internally
+    } else if (view === 'profile' && useCloud) {
+      await refreshProfile?.();
+    }
+  }, [view, useCloud, cloud, social, refreshProfile]);
+
+  const { pullDistance, refreshing, pullRef } = usePullToRefresh(handlePullRefresh, {
+    enabled: ['home', 'feed', 'challenges', 'profile'].includes(view),
+  });
+
   const openPublicProfile = useCallback((targetId) => {
     if (targetId === session?.user?.id) {
-      setView('profile');
+      navigate('profile');
       return;
     }
     setPublicProfileUserId(targetId);
-    setView('public-profile');
-  }, [session?.user?.id]);
+    navigate('public-profile', targetId);
+  }, [session?.user?.id, navigate]);
 
   const handleHashtagClick = useCallback((tag) => {
     setHashtagTag(tag);
-    setView('hashtag-feed');
-  }, []);
+    navigate('hashtag-feed', tag);
+  }, [navigate]);
 
   const handleMentionClick = useCallback(async (username) => {
     if (!useCloud || !social.resolveUsername) return;
@@ -197,7 +236,7 @@ export default function App() {
           newLevel: newLevel > prevLevel ? newLevel : undefined,
           badges: newBadges.length > 0 ? newBadges : undefined
         });
-        setView('home');
+        navigate('home');
       } catch (err) {
         showToast(err.message ?? 'Falha no check-in');
       }
@@ -253,7 +292,7 @@ export default function App() {
     }));
 
     showToast('Check-in realizado! +10 pontos ⚡');
-    setView('home');
+    navigate('home');
   };
 
   if (configured && authLoading) {
@@ -274,14 +313,25 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-black text-white font-sans selection:bg-green-500/30 overflow-x-hidden">
-      <div className="max-w-lg mx-auto px-4 pt-8 pb-24 min-h-screen">
+      <div ref={(el) => { mainContentRef.current = el; pullRef.current = el; }} className="max-w-lg mx-auto px-4 pt-8 pb-24 min-h-screen safe-top">
         <div className="flex justify-between items-center mb-10">
-          <h1 className="text-3xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-green-600 uppercase">
-            FitRank
-          </h1>
+          <div className="flex items-center gap-3">
+            {canGoBack && (
+              <button
+                type="button"
+                onClick={goBack}
+                className="w-10 h-10 bg-zinc-900 border border-zinc-800 rounded-full flex items-center justify-center hover:bg-zinc-800 transition-colors active:scale-90"
+              >
+                <ArrowLeft size={20} className="text-zinc-400" />
+              </button>
+            )}
+            <h1 className="text-3xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-green-600 uppercase">
+              FitRank
+            </h1>
+          </div>
           <button
             type="button"
-            onClick={() => setView('notifications')}
+            onClick={() => navigate('notifications')}
             className="relative w-10 h-10 bg-zinc-900 border border-zinc-800 rounded-full flex items-center justify-center hover:bg-zinc-800 transition-colors"
           >
             <Bell size={20} className={view === 'notifications' ? 'text-white' : 'text-zinc-400'} />
@@ -293,6 +343,9 @@ export default function App() {
           </button>
         </div>
 
+        <PullToRefreshIndicator pullDistance={pullDistance} refreshing={refreshing} />
+
+        <AnimatedViewContainer currentView={view} direction={transitionDir}>
         {view === 'home' && (
           <HomeView
             user={localUser}
@@ -306,7 +359,7 @@ export default function App() {
             leagueUsers={useCloud ? cloud.leagueLeaderboard : []}
             leagueLoading={useCloud ? cloud.leagueLoading : false}
             onLoadLeagueRanking={useCloud ? cloud.refreshLeagueRanking : undefined}
-            onOpenCheckin={() => setView('checkin-modal')}
+            onOpenCheckin={() => navigate('checkin-modal')}
             onOpenProfile={useCloud ? openPublicProfile : undefined}
             onCheckStreakRecovery={useCloud ? cloud.checkStreakRecovery : undefined}
             onRecoverStreak={useCloud ? cloud.recoverStreak : undefined}
@@ -329,7 +382,7 @@ export default function App() {
             onLoadComments={social.loadComments}
             onDeleteComment={social.deleteComment}
             onLoadLikes={social.loadLikes}
-            onOpenFriends={() => setView('friends')}
+            onOpenFriends={() => navigate('friends')}
             onOpenProfile={useCloud ? openPublicProfile : undefined}
             currentUserId={localUser?.uid}
             onUpdatePrivacy={social.updatePostPrivacy}
@@ -355,19 +408,19 @@ export default function App() {
             cloudTenant={tenant}
             cloudDisplayName={profile?.display_name}
             isPlatformMaster={profile?.is_platform_master}
-            onOpenAdmin={profile?.is_platform_master ? () => setView('admin-tenants') : undefined}
-            onOpenChallenges={profile?.is_platform_master ? () => setView('admin-challenges') : undefined}
-            onOpenUsers={profile?.is_platform_master ? () => setView('admin-users') : undefined}
-            onOpenModeration={profile?.is_platform_master ? () => setView('admin-moderation') : undefined}
+            onOpenAdmin={profile?.is_platform_master ? () => navigate('admin-tenants') : undefined}
+            onOpenChallenges={profile?.is_platform_master ? () => navigate('admin-challenges') : undefined}
+            onOpenUsers={profile?.is_platform_master ? () => navigate('admin-users') : undefined}
+            onOpenModeration={profile?.is_platform_master ? () => navigate('admin-moderation') : undefined}
             onOpenModerationSettings={
-              profile?.is_platform_master ? () => setView('admin-moderation-settings') : undefined
+              profile?.is_platform_master ? () => navigate('admin-moderation-settings') : undefined
             }
-            onOpenEngagement={profile?.is_platform_master ? () => setView('admin-engagement') : undefined}
-            onOpenAudit={profile?.is_platform_master ? () => setView('admin-audit') : undefined}
-            onOpenBilling={profile?.is_platform_master ? () => setView('admin-billing') : undefined}
-            onEditProfile={useCloud ? () => setView('edit-profile') : undefined}
+            onOpenEngagement={profile?.is_platform_master ? () => navigate('admin-engagement') : undefined}
+            onOpenAudit={profile?.is_platform_master ? () => navigate('admin-audit') : undefined}
+            onOpenBilling={profile?.is_platform_master ? () => navigate('admin-billing') : undefined}
+            onEditProfile={useCloud ? () => navigate('edit-profile') : undefined}
             onRetryCheckin={useCloud ? cloud.retryCheckin : undefined}
-            onOpenFriends={useCloud ? () => setView('friends') : undefined}
+            onOpenFriends={useCloud ? () => navigate('friends') : undefined}
             friends={useCloud ? social.friends : []}
             friendsLoading={useCloud ? social.friendsLoading : false}
             onLoadFriends={useCloud ? social.loadFriends : undefined}
@@ -389,7 +442,7 @@ export default function App() {
         {view === 'edit-profile' && useCloud && (
           <EditProfileView
             profile={profile}
-            onBack={() => setView('profile')}
+            onBack={goBack}
             onUploadAvatar={cloud.uploadAvatar}
             onUpdateProfile={cloud.updateProfile}
             onCheckUsername={cloud.checkUsernameAvailable}
@@ -411,13 +464,13 @@ export default function App() {
             onDecline={social.declineFriendRequest}
             onRemove={social.removeFriend}
             onOpenProfile={openPublicProfile}
-            onBack={() => setView('home')}
+            onBack={goBack}
           />
         )}
         {view === 'hashtag-feed' && hashtagTag && useCloud && (
           <HashtagFeedView
             tag={hashtagTag}
-            onBack={() => setView('feed')}
+            onBack={goBack}
             onToggleLike={social.toggleLike}
             onAddComment={social.addComment}
             onLoadComments={social.loadComments}
@@ -435,7 +488,7 @@ export default function App() {
         {view === 'public-profile' && publicProfileUserId && useCloud && (
           <PublicProfileView
             userId={publicProfileUserId}
-            onBack={() => setView('home')}
+            onBack={goBack}
             onSendFriendRequest={social.sendFriendRequest}
             onRemoveFriend={social.removeFriend}
             onToggleLike={social.toggleLike}
@@ -450,28 +503,28 @@ export default function App() {
           />
         )}
         {view === 'admin-tenants' && profile?.is_platform_master && (
-          <AdminTenantsView onBack={() => setView('profile')} />
+          <AdminTenantsView onBack={goBack} />
         )}
         {view === 'admin-challenges' && profile?.is_platform_master && (
-          <AdminChallengesView onBack={() => setView('profile')} />
+          <AdminChallengesView onBack={goBack} />
         )}
         {view === 'admin-moderation' && profile?.is_platform_master && (
-          <AdminModerationView onBack={() => setView('profile')} />
+          <AdminModerationView onBack={goBack} />
         )}
         {view === 'admin-moderation-settings' && profile?.is_platform_master && (
-          <AdminModerationSettingsView onBack={() => setView('profile')} />
+          <AdminModerationSettingsView onBack={goBack} />
         )}
         {view === 'admin-users' && profile?.is_platform_master && (
-          <AdminUsersView onBack={() => setView('profile')} />
+          <AdminUsersView onBack={goBack} />
         )}
         {view === 'admin-engagement' && profile?.is_platform_master && (
-          <AdminEngagementView onBack={() => setView('profile')} />
+          <AdminEngagementView onBack={goBack} />
         )}
         {view === 'admin-audit' && profile?.is_platform_master && (
-          <AdminAuditView onBack={() => setView('profile')} />
+          <AdminAuditView onBack={goBack} />
         )}
         {view === 'admin-billing' && profile?.is_platform_master && (
-          <AdminBillingView onBack={() => setView('profile')} />
+          <AdminBillingView onBack={goBack} />
         )}
 
         {view === 'notifications' && useCloud && (
@@ -479,13 +532,15 @@ export default function App() {
             notifications={cloud.notifications}
             readNotifications={cloud.readNotifications}
             onMarkAllRead={cloud.markAllNotificationsRead}
-            onBack={() => setView('home')}
+            onBack={goBack}
           />
         )}
 
+        </AnimatedViewContainer>
+
         {view === 'checkin-modal' && (
           <CheckinModal
-            onClose={() => setView('home')}
+            onClose={() => navigate('home')}
             onCheckin={handleCheckin}
             friends={useCloud ? social.friends : []}
           />
@@ -528,6 +583,9 @@ export default function App() {
           />
         )}
 
+        <SwUpdateToast />
+        <InstallPrompt />
+
         {message && (
           <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-green-500 text-black px-6 py-3 rounded-full font-bold shadow-xl shadow-green-500/20 flex items-center gap-2 animate-in-toast">
             <Zap size={18} />
@@ -535,10 +593,10 @@ export default function App() {
           </div>
         )}
 
-        <div className="fixed bottom-0 left-0 right-0 h-20 bg-zinc-950/80 backdrop-blur-xl border-t border-zinc-800 px-6 flex items-center justify-between z-40 max-w-lg mx-auto">
+        <div className="fixed bottom-0 left-0 right-0 bg-zinc-950/80 backdrop-blur-xl border-t border-zinc-800 px-6 flex items-center justify-between z-40 max-w-lg mx-auto safe-bottom" style={{ height: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}>
           <button
             type="button"
-            onClick={() => setView('home')}
+            onClick={() => navigate('home')}
             className={`flex flex-col items-center gap-1 transition-colors ${
               view === 'home' ? 'text-white' : 'text-zinc-600'
             }`}
@@ -548,7 +606,7 @@ export default function App() {
           </button>
           <button
             type="button"
-            onClick={() => setView('feed')}
+            onClick={() => navigate('feed')}
             className={`flex flex-col items-center gap-1 transition-colors ${
               view === 'feed' ? 'text-white' : 'text-zinc-600'
             }`}
@@ -558,7 +616,7 @@ export default function App() {
           </button>
           <button
             type="button"
-            onClick={() => setView('checkin-modal')}
+            onClick={() => navigate('checkin-modal')}
             className="flex flex-col items-center -mt-10"
           >
             <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center shadow-lg shadow-green-500/40 active:scale-90 transition-transform">
@@ -567,7 +625,7 @@ export default function App() {
           </button>
           <button
             type="button"
-            onClick={() => setView('challenges')}
+            onClick={() => navigate('challenges')}
             className={`flex flex-col items-center gap-1 transition-colors ${
               view === 'challenges' ? 'text-white' : 'text-zinc-600'
             }`}
@@ -577,7 +635,7 @@ export default function App() {
           </button>
           <button
             type="button"
-            onClick={() => setView('profile')}
+            onClick={() => navigate('profile')}
             className={`flex flex-col items-center gap-1 transition-colors ${
               view === 'profile' ? 'text-white' : 'text-zinc-600'
             }`}
