@@ -17,9 +17,10 @@ import { Button } from '../ui/Button.jsx';
 import { Card } from '../ui/Card.jsx';
 import { invokeEdge } from '../../lib/supabase/invoke-edge.js';
 import { logger } from '../../lib/logger.js';
+import { Skeleton } from '../ui/Skeleton.jsx';
 
 function SkeletonBar({ className = '' }) {
-  return <div className={`animate-pulse bg-zinc-800 rounded ${className}`} />;
+  return <Skeleton className={className} />;
 }
 
 function DeltaBadge({ current, previous }) {

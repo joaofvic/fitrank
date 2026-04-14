@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Hash, Loader2, UserPlus, Users } from 'lucide-react';
+import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { FeedPostCard } from './FeedPostCard.jsx';
 import { CommentsDrawer } from './CommentsDrawer.jsx';
 import { LikesDrawer } from './LikesDrawer.jsx';
@@ -42,7 +43,8 @@ export function FeedView({
   const [likesOpen, setLikesOpen] = useState(null);
   const [sharePost, setSharePost] = useState(null);
   const feedLoaded = useRef(false);
-  const sentinelRef = useRef(null);
+  const listRef = useRef(null);
+  const listOffsetRef = useRef(0);
 
   useEffect(() => {
     if (!feedLoaded.current && onLoadFeed) {
@@ -53,19 +55,26 @@ export function FeedView({
     }
   }, [onLoadFeed, onLoadTrendingHashtags, onLoadStoriesRing]);
 
+  useLayoutEffect(() => {
+    listOffsetRef.current = listRef.current?.offsetTop ?? 0;
+  });
+
+  const virtualizer = useWindowVirtualizer({
+    count: feed.length,
+    estimateSize: () => 420,
+    overscan: 5,
+    scrollMargin: listOffsetRef.current,
+  });
+
+  const virtualItems = virtualizer.getVirtualItems();
+
   useEffect(() => {
-    if (!sentinelRef.current || !onLoadMoreFeed || !feedHasMore) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && feedHasMore && !feedLoading) {
-          onLoadMoreFeed();
-        }
-      },
-      { rootMargin: '200px' }
-    );
-    observer.observe(sentinelRef.current);
-    return () => observer.disconnect();
-  }, [onLoadMoreFeed, feedHasMore, feedLoading]);
+    const lastItem = virtualItems[virtualItems.length - 1];
+    if (!lastItem) return;
+    if (lastItem.index >= feed.length - 3 && feedHasMore && !feedLoading) {
+      onLoadMoreFeed?.();
+    }
+  }, [virtualItems, feed.length, feedHasMore, feedLoading, onLoadMoreFeed]);
 
   return (
     <div className="animate-in-fade -mx-4">
@@ -161,26 +170,48 @@ export function FeedView({
           )}
         </div>
       ) : (
-        <div className="space-y-px">
-          {feed.map((post) => (
-            <FeedPostCard
-              key={post.id}
-              post={post}
-              onToggleLike={onToggleLike}
-              onOpenComments={(id) => setCommentsOpen(id)}
-              onOpenLikes={(id) => setLikesOpen(id)}
-              onOpenProfile={onOpenProfile}
-              currentUserId={currentUserId}
-              onUpdatePrivacy={onUpdatePrivacy}
-              onDeletePost={onDeletePost}
-              onShare={setSharePost}
-              onMentionClick={onMentionClick}
-              onHashtagClick={onHashtagClick}
-              onTrackImpression={onTrackImpression}
-            />
-          ))}
-
-          <div ref={sentinelRef} className="h-1" />
+        <div>
+          <div
+            ref={listRef}
+            style={{
+              height: `${virtualizer.getTotalSize()}px`,
+              width: '100%',
+              position: 'relative',
+            }}
+          >
+            {virtualItems.map((virtualRow) => {
+              const post = feed[virtualRow.index];
+              return (
+                <div
+                  key={post.id}
+                  data-index={virtualRow.index}
+                  ref={virtualizer.measureElement}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${virtualRow.start - virtualizer.options.scrollMargin}px)`,
+                  }}
+                >
+                  <FeedPostCard
+                    post={post}
+                    onToggleLike={onToggleLike}
+                    onOpenComments={(id) => setCommentsOpen(id)}
+                    onOpenLikes={(id) => setLikesOpen(id)}
+                    onOpenProfile={onOpenProfile}
+                    currentUserId={currentUserId}
+                    onUpdatePrivacy={onUpdatePrivacy}
+                    onDeletePost={onDeletePost}
+                    onShare={setSharePost}
+                    onMentionClick={onMentionClick}
+                    onHashtagClick={onHashtagClick}
+                    onTrackImpression={onTrackImpression}
+                  />
+                </div>
+              );
+            })}
+          </div>
 
           {feedLoading && feed.length > 0 && (
             <div className="flex justify-center py-6">

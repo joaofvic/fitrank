@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Trophy, ChevronDown, ChevronUp, Calendar, Dumbbell, Users, DollarSign } from 'lucide-react';
 import { UserAvatar } from '../ui/user-avatar.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { Card } from '../ui/Card.jsx';
 import { Button } from '../ui/Button.jsx';
-import { todayLocalISODate } from '../../lib/dates.js';
 import { invokeEdge } from '../../lib/supabase/invoke-edge.js';
 import { logger } from '../../lib/logger.js';
+import { ChallengesSkeleton } from '../ui/Skeleton.jsx';
 
 function formatDateBR(iso) {
   if (!iso) return '—';
@@ -31,11 +31,9 @@ function durationLabel(dataInicio, dataFim) {
   return days === 1 ? '1 dia' : `${days} dias`;
 }
 
-export function ChallengesView() {
+export function ChallengesView({ onRegisterRefresh }) {
   const { supabase, session, profile, refreshProfile } = useAuth();
   const [desafios, setDesafios] = useState([]);
-  const [enrolledIds, setEnrolledIds] = useState(new Set());
-  const [participantCounts, setParticipantCounts] = useState({});
   const [rankings, setRankings] = useState({});
   const [expandedId, setExpandedId] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -44,13 +42,10 @@ export function ChallengesView() {
 
   const tenantId = profile?.tenant_id;
   const userId = session?.user?.id;
-  const today = useMemo(() => todayLocalISODate(), []);
 
   const loadDesafios = useCallback(async () => {
     if (!supabase || !tenantId) {
       setDesafios([]);
-      setEnrolledIds(new Set());
-      setParticipantCounts({});
       setLoading(false);
       return;
     }
@@ -58,54 +53,28 @@ export function ChallengesView() {
     setError(null);
 
     try {
-      const { data: rows, error: dErr } = await supabase
-        .from('desafios')
-        .select('id, nome, descricao, status, tipo_treino, data_inicio, data_fim, max_participantes, mes_referencia, reward_winners_count, reward_distribution_type, entry_fee')
-        .eq('tenant_id', tenantId)
-        .eq('status', 'ativo')
-        .order('data_inicio', { ascending: false });
+      const { data: rows, error: rpcErr } = await supabase.rpc('get_challenges_with_counts', {
+        p_tenant_id: tenantId,
+      });
 
-      if (dErr) throw dErr;
-      const list = rows || [];
-      setDesafios(list);
-
-      if (list.length === 0) {
-        setEnrolledIds(new Set());
-        setParticipantCounts({});
-        setLoading(false);
-        return;
-      }
-
-      const ids = list.map((r) => r.id);
-
-      const { data: myParts } = await supabase
-        .from('desafio_participantes')
-        .select('desafio_id')
-        .eq('user_id', userId)
-        .in('desafio_id', ids);
-
-      setEnrolledIds(new Set((myParts || []).map((p) => p.desafio_id)));
-
-      const counts = {};
-      for (const id of ids) {
-        const { count } = await supabase
-          .from('desafio_participantes')
-          .select('id', { count: 'exact', head: true })
-          .eq('desafio_id', id);
-        counts[id] = count ?? 0;
-      }
-      setParticipantCounts(counts);
+      if (rpcErr) throw rpcErr;
+      setDesafios(rows || []);
     } catch (e) {
       logger.error('desafios', e);
       setError(e.message);
     } finally {
       setLoading(false);
     }
-  }, [supabase, tenantId, userId]);
+  }, [supabase, tenantId]);
 
   useEffect(() => {
     loadDesafios();
   }, [loadDesafios]);
+
+  useEffect(() => {
+    onRegisterRefresh?.(loadDesafios);
+    return () => onRegisterRefresh?.(null);
+  }, [onRegisterRefresh, loadDesafios]);
 
   const loadRanking = useCallback(
     async (desafioId) => {
@@ -140,10 +109,6 @@ export function ChallengesView() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('challenge_checkout') === 'success') {
-      const did = params.get('desafio_id');
-      if (did) {
-        setEnrolledIds((prev) => new Set([...prev, did]));
-      }
       const url = new URL(window.location.href);
       url.searchParams.delete('challenge_checkout');
       url.searchParams.delete('desafio_id');
@@ -171,10 +136,13 @@ export function ChallengesView() {
       }
 
       if (data?.enrolled) {
-        setEnrolledIds((prev) => new Set([...prev, desafioId]));
-        if (!data.already) {
-          setParticipantCounts((prev) => ({ ...prev, [desafioId]: (prev[desafioId] ?? 0) + 1 }));
-        }
+        setDesafios((prev) =>
+          prev.map((d) =>
+            d.id === desafioId
+              ? { ...d, is_enrolled: true, participant_count: d.participant_count + (data.already ? 0 : 1) }
+              : d
+          )
+        );
         await loadRanking(desafioId);
         if (!expandedId) setExpandedId(desafioId);
         if (refreshProfile) await refreshProfile();
@@ -188,8 +156,8 @@ export function ChallengesView() {
 
   if (!tenantId) {
     return (
-      <div className="text-center py-16 text-zinc-500 text-sm animate-in-fade">
-        Carregando desafios…
+      <div className="animate-in-fade px-1">
+        <ChallengesSkeleton />
       </div>
     );
   }
@@ -210,7 +178,7 @@ export function ChallengesView() {
       )}
 
       {loading ? (
-        <p className="text-zinc-500 text-sm">Carregando…</p>
+        <ChallengesSkeleton />
       ) : desafios.length === 0 ? (
         <Card className="border-zinc-800 text-zinc-500 text-sm py-8 text-center">
           Nenhum desafio ativo no momento.
@@ -218,10 +186,10 @@ export function ChallengesView() {
       ) : (
         <div className="space-y-4">
           {desafios.map((d) => {
-            const isEnrolled = enrolledIds.has(d.id);
+            const isEnrolled = d.is_enrolled;
             const isExpanded = expandedId === d.id;
             const ranking = rankings[d.id] || [];
-            const count = participantCounts[d.id] ?? 0;
+            const count = Number(d.participant_count) || 0;
             const remaining = daysRemaining(d.data_fim);
             const duration = durationLabel(d.data_inicio, d.data_fim);
             const isFull = d.max_participantes && count >= d.max_participantes;

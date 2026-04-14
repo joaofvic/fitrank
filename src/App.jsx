@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { lazy, Suspense, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { ArrowLeft, Bell, Home, Newspaper, Plus, TrendingUp, User, Zap } from 'lucide-react';
 
 import { useAuth } from './components/auth/AuthProvider.jsx';
@@ -6,40 +6,44 @@ import { AuthScreen } from './components/auth/AuthScreen.jsx';
 import { ResetPasswordScreen } from './components/auth/ResetPasswordScreen.jsx';
 import { analytics } from './lib/analytics.js';
 import { defaultUserData, loadFitRankState, saveFitRankState } from './lib/persist.js';
-import { profileToUserData } from './lib/profile-map.js';
+import { profileToUserData, calculateLevel } from './lib/profile-map.js';
 import { useFitCloudData } from './hooks/useFitCloudData.js';
 import { useSocialData } from './hooks/useSocialData.js';
 import { HomeView } from './components/views/HomeView.jsx';
 import { FeedView } from './components/views/FeedView.jsx';
-import { FriendsView } from './components/views/FriendsView.jsx';
 import { ProfileView } from './components/views/ProfileView.jsx';
-import { ChallengesView } from './components/views/ChallengesView.jsx';
-import { CheckinModal } from './components/views/CheckinModal.jsx';
-import { AdminTenantsView } from './components/views/AdminTenantsView.jsx';
-import { AdminModerationView } from './components/views/AdminModerationView.jsx';
-import { AdminModerationSettingsView } from './components/views/AdminModerationSettingsView.jsx';
-import { AdminUsersView } from './components/views/AdminUsersView.jsx';
-import { AdminEngagementView } from './components/views/AdminEngagementView.jsx';
-import { AdminAuditView } from './components/views/AdminAuditView.jsx';
-import { AdminChallengesView } from './components/views/AdminChallengesView.jsx';
-import { AdminBillingView } from './components/views/AdminBillingView.jsx';
-import { AdminObservabilityView } from './components/views/AdminObservabilityView.jsx';
-import { PublicProfileView } from './components/views/PublicProfileView.jsx';
-import { NotificationsView } from './components/views/NotificationsView.jsx';
-import { EditProfileView } from './components/views/EditProfileView.jsx';
-import { HashtagFeedView } from './components/views/HashtagFeedView.jsx';
-import { StoryCreator } from './components/views/StoryCreator.jsx';
-import { StoryViewer } from './components/views/StoryViewer.jsx';
 import { CelebrationOverlay } from './components/views/CelebrationOverlay.jsx';
 import { LeaguePromotionOverlay } from './components/views/LeaguePromotionOverlay.jsx';
-import { calculateLevel } from './lib/profile-map.js';
 import { SwUpdateToast } from './components/ui/SwUpdateToast.jsx';
 import { InstallPrompt } from './components/ui/InstallPrompt.jsx';
 import { AnimatedViewContainer } from './components/ui/AnimatedViewContainer.jsx';
 import { PullToRefreshIndicator } from './components/ui/PullToRefreshIndicator.jsx';
+import { ViewSkeleton } from './components/ui/ViewSkeleton.jsx';
 import { useSwipeNavigation } from './hooks/useSwipeNavigation.js';
 import { usePullToRefresh } from './hooks/usePullToRefresh.js';
 import { useNavigationStack } from './hooks/useNavigationStack.js';
+
+const lazyNamed = (loader, name) => lazy(() => loader().then(m => ({ default: m[name] })));
+
+const FriendsView = lazyNamed(() => import('./components/views/FriendsView.jsx'), 'FriendsView');
+const ChallengesView = lazyNamed(() => import('./components/views/ChallengesView.jsx'), 'ChallengesView');
+const CheckinModal = lazyNamed(() => import('./components/views/CheckinModal.jsx'), 'CheckinModal');
+const PublicProfileView = lazyNamed(() => import('./components/views/PublicProfileView.jsx'), 'PublicProfileView');
+const NotificationsView = lazyNamed(() => import('./components/views/NotificationsView.jsx'), 'NotificationsView');
+const EditProfileView = lazyNamed(() => import('./components/views/EditProfileView.jsx'), 'EditProfileView');
+const HashtagFeedView = lazyNamed(() => import('./components/views/HashtagFeedView.jsx'), 'HashtagFeedView');
+const StoryCreator = lazyNamed(() => import('./components/views/StoryCreator.jsx'), 'StoryCreator');
+const StoryViewer = lazyNamed(() => import('./components/views/StoryViewer.jsx'), 'StoryViewer');
+
+const AdminTenantsView = lazyNamed(() => import('./components/views/AdminTenantsView.jsx'), 'AdminTenantsView');
+const AdminModerationView = lazyNamed(() => import('./components/views/AdminModerationView.jsx'), 'AdminModerationView');
+const AdminModerationSettingsView = lazyNamed(() => import('./components/views/AdminModerationSettingsView.jsx'), 'AdminModerationSettingsView');
+const AdminUsersView = lazyNamed(() => import('./components/views/AdminUsersView.jsx'), 'AdminUsersView');
+const AdminEngagementView = lazyNamed(() => import('./components/views/AdminEngagementView.jsx'), 'AdminEngagementView');
+const AdminAuditView = lazyNamed(() => import('./components/views/AdminAuditView.jsx'), 'AdminAuditView');
+const AdminChallengesView = lazyNamed(() => import('./components/views/AdminChallengesView.jsx'), 'AdminChallengesView');
+const AdminBillingView = lazyNamed(() => import('./components/views/AdminBillingView.jsx'), 'AdminBillingView');
+const AdminObservabilityView = lazyNamed(() => import('./components/views/AdminObservabilityView.jsx'), 'AdminObservabilityView');
 
 export default function App() {
   const {
@@ -74,6 +78,7 @@ export default function App() {
 
   const { view, transitionDir, routeParam, navigate, goBack, canGoBack } = useNavigationStack();
   const mainContentRef = useRef(null);
+  const challengesRefreshRef = useRef(null);
 
   const [publicProfileUserId, setPublicProfileUserId] = useState(() => {
     if (view === 'public-profile' && routeParam) return routeParam;
@@ -103,9 +108,14 @@ export default function App() {
     } else if (view === 'feed' && useCloud) {
       await social.refreshFeed?.();
     } else if (view === 'challenges') {
-      // ChallengesView refreshes internally
+      await challengesRefreshRef.current?.();
     } else if (view === 'profile' && useCloud) {
-      await refreshProfile?.();
+      await Promise.all([
+        refreshProfile?.(),
+        cloud.refreshCheckins?.(),
+        social.loadFriends?.(),
+        social.loadBadges?.()
+      ]);
     }
   }, [view, useCloud, cloud, social, refreshProfile]);
 
@@ -357,6 +367,7 @@ export default function App() {
 
         <PullToRefreshIndicator pullDistance={pullDistance} refreshing={refreshing} />
 
+        <Suspense fallback={<ViewSkeleton />}>
         <AnimatedViewContainer currentView={view} direction={transitionDir}>
         {view === 'home' && (
           <HomeView
@@ -412,7 +423,7 @@ export default function App() {
             selfAvatarUrl={profile?.avatar_url}
           />
         )}
-        {view === 'challenges' && <ChallengesView />}
+        {view === 'challenges' && <ChallengesView onRegisterRefresh={(fn) => { challengesRefreshRef.current = fn; }} />}
         {view === 'profile' && (
           <ProfileView
             userData={displayUserData}
@@ -553,23 +564,29 @@ export default function App() {
         )}
 
         </AnimatedViewContainer>
+        </Suspense>
 
         {view === 'checkin-modal' && (
-          <CheckinModal
-            onClose={() => navigate('home')}
-            onCheckin={handleCheckin}
-            friends={useCloud ? social.friends : []}
-          />
+          <Suspense fallback={null}>
+            <CheckinModal
+              onClose={() => navigate('home')}
+              onCheckin={handleCheckin}
+              friends={useCloud ? social.friends : []}
+            />
+          </Suspense>
         )}
 
         {storyCreatorOpen && useCloud && (
-          <StoryCreator
-            onClose={() => setStoryCreatorOpen(false)}
-            onCreateStory={social.createStory}
-          />
+          <Suspense fallback={null}>
+            <StoryCreator
+              onClose={() => setStoryCreatorOpen(false)}
+              onCreateStory={social.createStory}
+            />
+          </Suspense>
         )}
 
         {storyViewerTarget && useCloud && (
+          <Suspense fallback={null}>
           <StoryViewer
             userId={storyViewerTarget.user_id}
             displayName={storyViewerTarget.display_name}
@@ -585,6 +602,7 @@ export default function App() {
             onOpenProfile={openPublicProfile}
             currentUserId={localUser?.uid}
           />
+          </Suspense>
         )}
 
         <CelebrationOverlay

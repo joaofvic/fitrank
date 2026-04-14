@@ -14,7 +14,7 @@ import { workoutTypeIcon } from '../../lib/workout-icons.js';
 import { FriendsListDrawer } from './FriendsListDrawer.jsx';
 import { BadgesGrid } from './BadgesGrid.jsx';
 import { LevelBadge } from '../ui/LevelBadge.jsx';
-import { ProfileStatsSkeleton } from '../ui/Skeleton.jsx';
+import { ProfileFullSkeleton, ProfileStatsSkeleton } from '../ui/Skeleton.jsx';
 import { XpProgressBar } from '../ui/XpProgressBar.jsx';
 import { LeagueBadge } from '../ui/LeagueBadge.jsx';
 
@@ -182,6 +182,14 @@ export function ProfileView({
   }
 
   const checkinGroups = checkins.length > 0 ? groupCheckinsByDate(checkins) : [];
+
+  if (!userData) {
+    return (
+      <div className="space-y-6 animate-in-fade px-1 pt-4">
+        <ProfileFullSkeleton />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-in-fade">

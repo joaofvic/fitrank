@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react';
 import { Trophy, Flame, Dumbbell, Crown, TrendingUp, Zap, ShieldAlert, ArrowUp, ArrowDown } from 'lucide-react';
+import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { Card } from '../ui/Card.jsx';
 import { Button } from '../ui/Button.jsx';
 import { UserAvatar } from '../ui/user-avatar.jsx';
@@ -12,6 +13,155 @@ import { RankingSkeleton } from '../ui/Skeleton.jsx';
 import { BoostShopDrawer } from './BoostShopDrawer.jsx';
 import { calculateLevel } from '../../lib/profile-map.js';
 import { fireConfetti } from '../../lib/confetti.js';
+
+const VIRTUALIZE_THRESHOLD = 50;
+const RANKING_ROW_HEIGHT = 76;
+
+function RankingRow({ u, idx, currentUid, onOpenProfile, rankingFilterEnabled }) {
+  return (
+    <div
+      role={onOpenProfile ? 'button' : undefined}
+      tabIndex={onOpenProfile ? 0 : undefined}
+      onClick={onOpenProfile ? () => onOpenProfile(u.uid) : undefined}
+      onKeyDown={onOpenProfile ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenProfile(u.uid); } } : undefined}
+      className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
+        u.uid === currentUid
+          ? 'bg-zinc-800/50 border-green-500/50 ring-1 ring-green-500/20'
+          : 'bg-zinc-900 border-zinc-800'
+      } ${onOpenProfile ? 'cursor-pointer hover:border-zinc-600 active:scale-[0.99]' : ''}`}
+    >
+      <div className="flex items-center gap-4">
+        <div className="w-8 flex flex-col items-center">
+          <span className="font-black text-zinc-600 italic">
+            {idx + 1 === 1 ? '🥇' : idx + 1 === 2 ? '🥈' : idx + 1 === 3 ? '🥉' : `#${idx + 1}`}
+          </span>
+          {u.prevRank != null && u.prevRank !== u.rank && (
+            u.rank < u.prevRank ? (
+              <ArrowUp className="w-3 h-3 text-green-500 animate-bounce" style={{ animationDuration: '1.5s' }} />
+            ) : (
+              <ArrowDown className="w-3 h-3 text-red-500" />
+            )
+          )}
+        </div>
+        <UserAvatar src={u.avatar_url} size="lg" className="w-10 h-10 bg-zinc-800 border border-zinc-700" />
+        <div>
+          <p
+            className={`font-bold flex items-center gap-1.5 ${
+              u.uid === currentUid ? 'text-green-400' : 'text-white'
+            }`}
+          >
+            <LevelBadge level={calculateLevel(u.xp)} size="sm" />
+            {u.nome}
+            {u.is_pro && <Crown className="w-3 h-3 text-yellow-500 fill-yellow-500" />}
+          </p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-xs text-zinc-500 uppercase tracking-tighter">
+              {u.academia || 'Treino Livre'}
+            </p>
+            {u.league && <LeagueBadge league={u.league} size="sm" />}
+          </div>
+        </div>
+      </div>
+      <div className="text-right">
+        <p className="text-lg font-black text-white">{u.pontos || 0}</p>
+        <p className="text-[10px] text-zinc-500 uppercase">
+          {rankingFilterEnabled ? 'Pts período' : 'Pontos'}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function VirtualizedRanking({ displayUsers, currentUid, onOpenProfile, rankingFilterEnabled }) {
+  const listRef = useRef(null);
+  const offsetRef = useRef(0);
+
+  useLayoutEffect(() => {
+    offsetRef.current = listRef.current?.offsetTop ?? 0;
+  });
+
+  const virtualizer = useWindowVirtualizer({
+    count: displayUsers.length,
+    estimateSize: () => RANKING_ROW_HEIGHT,
+    overscan: 8,
+    scrollMargin: offsetRef.current,
+    gap: 8,
+  });
+
+  return (
+    <div
+      ref={listRef}
+      style={{
+        height: `${virtualizer.getTotalSize()}px`,
+        width: '100%',
+        position: 'relative',
+      }}
+    >
+      {virtualizer.getVirtualItems().map((virtualRow) => {
+        const u = displayUsers[virtualRow.index];
+        return (
+          <div
+            key={u.uid}
+            data-index={virtualRow.index}
+            ref={virtualizer.measureElement}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              transform: `translateY(${virtualRow.start - virtualizer.options.scrollMargin}px)`,
+            }}
+          >
+            <RankingRow
+              u={u}
+              idx={virtualRow.index}
+              currentUid={currentUid}
+              onOpenProfile={onOpenProfile}
+              rankingFilterEnabled={rankingFilterEnabled}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function RankingList({ displayUsers, isRankingLoading, rankingTab, currentUid, onOpenProfile, rankingFilterEnabled }) {
+  if (isRankingLoading && displayUsers.length === 0) {
+    return <RankingSkeleton />;
+  }
+  if (displayUsers.length === 0) {
+    return (
+      <div className="text-center py-10 text-zinc-600">
+        {rankingTab === 'league' ? 'Nenhum atleta na sua liga ainda.' : 'Nenhum atleta no ranking ainda.'}
+      </div>
+    );
+  }
+  if (displayUsers.length > VIRTUALIZE_THRESHOLD) {
+    return (
+      <VirtualizedRanking
+        displayUsers={displayUsers}
+        currentUid={currentUid}
+        onOpenProfile={onOpenProfile}
+        rankingFilterEnabled={rankingFilterEnabled}
+      />
+    );
+  }
+  return (
+    <div className="space-y-2">
+      {displayUsers.map((u, idx) => (
+        <RankingRow
+          key={u.uid}
+          u={u}
+          idx={idx}
+          currentUid={currentUid}
+          onOpenProfile={onOpenProfile}
+          rankingFilterEnabled={rankingFilterEnabled}
+        />
+      ))}
+    </div>
+  );
+}
 
 const RANKING_PERIODS = [
   { id: 'day', label: 'Dia' },
@@ -258,69 +408,14 @@ export function HomeView({
           )}
         </div>
 
-        <div className="space-y-2">
-          {isRankingLoading && displayUsers.length === 0 ? (
-            <RankingSkeleton />
-          ) : displayUsers.length === 0 ? (
-            <div className="text-center py-10 text-zinc-600">
-              {rankingTab === 'league' ? 'Nenhum atleta na sua liga ainda.' : 'Nenhum atleta no ranking ainda.'}
-            </div>
-          ) : (
-            displayUsers.map((u, idx) => (
-              <div
-                key={u.uid}
-                role={onOpenProfile ? 'button' : undefined}
-                tabIndex={onOpenProfile ? 0 : undefined}
-                onClick={onOpenProfile ? () => onOpenProfile(u.uid) : undefined}
-                onKeyDown={onOpenProfile ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenProfile(u.uid); } } : undefined}
-                className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
-                  u.uid === user?.uid
-                    ? 'bg-zinc-800/50 border-green-500/50 ring-1 ring-green-500/20'
-                    : 'bg-zinc-900 border-zinc-800'
-                } ${onOpenProfile ? 'cursor-pointer hover:border-zinc-600 active:scale-[0.99]' : ''}`}
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-8 flex flex-col items-center">
-                    <span className="font-black text-zinc-600 italic">
-                      {idx + 1 === 1 ? '🥇' : idx + 1 === 2 ? '🥈' : idx + 1 === 3 ? '🥉' : `#${idx + 1}`}
-                    </span>
-                    {u.prevRank != null && u.prevRank !== u.rank && (
-                      u.rank < u.prevRank ? (
-                        <ArrowUp className="w-3 h-3 text-green-500 animate-bounce" style={{ animationDuration: '1.5s' }} />
-                      ) : (
-                        <ArrowDown className="w-3 h-3 text-red-500" />
-                      )
-                    )}
-                  </div>
-                  <UserAvatar src={u.avatar_url} size="lg" className="w-10 h-10 bg-zinc-800 border border-zinc-700" />
-                  <div>
-                    <p
-                      className={`font-bold flex items-center gap-1.5 ${
-                        u.uid === user?.uid ? 'text-green-400' : 'text-white'
-                      }`}
-                    >
-                      <LevelBadge level={calculateLevel(u.xp)} size="sm" />
-                      {u.nome}
-                      {u.is_pro && <Crown className="w-3 h-3 text-yellow-500 fill-yellow-500" />}
-                    </p>
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-xs text-zinc-500 uppercase tracking-tighter">
-                        {u.academia || 'Treino Livre'}
-                      </p>
-                      {u.league && <LeagueBadge league={u.league} size="sm" />}
-                    </div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-lg font-black text-white">{u.pontos || 0}</p>
-                  <p className="text-[10px] text-zinc-500 uppercase">
-                    {rankingFilterEnabled ? 'Pts período' : 'Pontos'}
-                  </p>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+        <RankingList
+          displayUsers={displayUsers}
+          isRankingLoading={isRankingLoading}
+          rankingTab={rankingTab}
+          currentUid={user?.uid}
+          onOpenProfile={onOpenProfile}
+          rankingFilterEnabled={rankingFilterEnabled}
+        />
       </div>
     </div>
   );

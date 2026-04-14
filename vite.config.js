@@ -52,6 +52,25 @@ export default defineConfig({
       }
     })
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          admin: [
+            './src/components/views/AdminTenantsView.jsx',
+            './src/components/views/AdminModerationView.jsx',
+            './src/components/views/AdminModerationSettingsView.jsx',
+            './src/components/views/AdminUsersView.jsx',
+            './src/components/views/AdminEngagementView.jsx',
+            './src/components/views/AdminAuditView.jsx',
+            './src/components/views/AdminChallengesView.jsx',
+            './src/components/views/AdminBillingView.jsx',
+            './src/components/views/AdminObservabilityView.jsx'
+          ]
+        }
+      }
+    }
+  },
   server: {
     port: 3000
   }
