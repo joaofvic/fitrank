@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "847056908476",
+    "project_id": "fitrank-4d90d",
+    "storage_bucket": "fitrank-4d90d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:847056908476:android:d69a29a551dbd5e332a0b9",
+        "android_client_info": {
+          "package_name": "com.joaofvic.fitrank"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDgEsRuCHyqMBLQlYwvvT0JNfyNSIJTxOo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
