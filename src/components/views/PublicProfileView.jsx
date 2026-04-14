@@ -12,6 +12,7 @@ import { BadgeMiniIcons, BadgesGrid } from './BadgesGrid.jsx';
 import { LevelBadge } from '../ui/LevelBadge.jsx';
 import { LeagueBadge } from '../ui/LeagueBadge.jsx';
 import { getLevelInfo } from '../../lib/profile-map.js';
+import { ConsistencyHeatmap } from '../ui/ConsistencyHeatmap.jsx';
 
 export function PublicProfileView({
   userId,
@@ -260,6 +261,8 @@ export function PublicProfileView({
         }}
         isPro={profile.is_pro}
       />
+
+      {userId && <ConsistencyHeatmap userId={userId} />}
 
       <FriendshipButton
         status={localFriendshipStatus}

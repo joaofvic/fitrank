@@ -1,13 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthProvider.jsx';
-import { CheckCircle2, Camera, Plus, ChevronLeft, Globe } from 'lucide-react';
+import { CheckCircle2, Camera, Plus, ChevronLeft, Globe, Clock, Weight, FileText, ChevronRight } from 'lucide-react';
 import { Button } from '../ui/Button.jsx';
 import { MentionInput } from '../ui/MentionInput.jsx';
 import { CHECKIN_GRID_WORKOUT_TYPES } from '../../lib/workout-types.js';
 
 const CAPTION_MAX = 200;
 
-export function CheckinModal({ onClose, onCheckin, friends = [] }) {
+function formatDuration(totalSeconds) {
+  if (!totalSeconds || totalSeconds <= 0) return '';
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  if (h > 0) return `${h}h ${m.toString().padStart(2, '0')}min`;
+  return `${m}min`;
+}
+
+export function CheckinModal({ onClose, onCheckin, friends = [], prefillDuration = null }) {
   const { supabase } = useAuth();
   const [foto, setFoto] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -20,6 +28,13 @@ export function CheckinModal({ onClose, onCheckin, friends = [] }) {
   const [feedVisible, setFeedVisible] = useState(true);
   const [caption, setCaption] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const [durationMin, setDurationMin] = useState(() => {
+    if (prefillDuration && prefillDuration > 0) return Math.round(prefillDuration / 60).toString();
+    return '';
+  });
+  const [weightKg, setWeightKg] = useState('');
+  const [notes, setNotes] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -56,14 +71,21 @@ export function CheckinModal({ onClose, onCheckin, friends = [] }) {
     }
     setError(null);
     setSelectedType(type);
-    setStep('confirm');
+    setStep('details');
   };
 
   const handleBack = () => {
+    if (step === 'confirm') {
+      setStep('details');
+      return;
+    }
     setStep('select-type');
     setSelectedType(null);
     setCaption('');
     setFeedVisible(true);
+    setDurationMin('');
+    setWeightKg('');
+    setNotes('');
   };
 
   const handleConfirm = async () => {
@@ -73,7 +95,13 @@ export function CheckinModal({ onClose, onCheckin, friends = [] }) {
     try {
       setError(null);
       const trimmed = caption.trim() || null;
-      await Promise.resolve(onCheckin(selectedType, canSkipPhoto ? null : foto, feedVisible, trimmed));
+      const parsedMin = parseInt(durationMin, 10);
+      const durationSec = Number.isFinite(parsedMin) && parsedMin > 0 ? parsedMin * 60 : null;
+      const parsedWeight = parseFloat(weightKg.replace(',', '.'));
+      const weight = Number.isFinite(parsedWeight) && parsedWeight > 0 ? parsedWeight : null;
+      const trimmedNotes = notes.trim() || null;
+      const extras = { duration_seconds: durationSec, weight_kg: weight, notes: trimmedNotes };
+      await Promise.resolve(onCheckin(selectedType, canSkipPhoto ? null : foto, feedVisible, trimmed, extras));
     } catch (err) {
       setError(err.message ?? 'Falha ao registrar check-in.');
     } finally {
@@ -88,6 +116,9 @@ export function CheckinModal({ onClose, onCheckin, friends = [] }) {
     setStep('select-type');
     setSelectedType(null);
     setCaption('');
+    setDurationMin('');
+    setWeightKg('');
+    setNotes('');
     onClose();
   };
 
@@ -95,7 +126,7 @@ export function CheckinModal({ onClose, onCheckin, friends = [] }) {
     <div className="fixed inset-0 z-50 bg-black/90 flex flex-col justify-end p-4 animate-in-slide-modal">
       <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 w-full max-w-lg mx-auto space-y-6">
         <div className="flex justify-between items-center">
-          {step === 'confirm' ? (
+          {step !== 'select-type' ? (
             <button type="button" onClick={handleBack} className="flex items-center gap-1 text-zinc-400 hover:text-white transition-colors">
               <ChevronLeft size={20} />
               <span className="text-sm font-semibold">Voltar</span>
@@ -170,8 +201,8 @@ export function CheckinModal({ onClose, onCheckin, friends = [] }) {
           </>
         )}
 
-        {step === 'confirm' && (
-          <div className="space-y-5">
+        {step === 'details' && (
+          <div className="space-y-5 animate-in-fade">
             <div className="flex items-center gap-3 bg-zinc-800/60 rounded-2xl p-4 border border-zinc-700/50">
               <CheckCircle2 size={20} className="text-green-500 shrink-0" />
               <div className="flex-1 min-w-0">
@@ -182,6 +213,118 @@ export function CheckinModal({ onClose, onCheckin, friends = [] }) {
                 <img src={previewUrl} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
               )}
             </div>
+
+            <p className="text-zinc-400 text-sm">Detalhes do treino <span className="text-zinc-600">(opcional)</span></p>
+
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 bg-zinc-800/40 border border-zinc-700/50 rounded-xl p-3">
+                <Clock size={18} className="text-zinc-500 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <label htmlFor="checkin-duration" className="text-[11px] text-zinc-500 uppercase font-bold block">Duração (minutos)</label>
+                  <input
+                    id="checkin-duration"
+                    type="number"
+                    inputMode="numeric"
+                    min="1"
+                    max="600"
+                    placeholder="ex: 45"
+                    value={durationMin}
+                    onChange={(e) => setDurationMin(e.target.value)}
+                    className="w-full bg-transparent text-white text-sm font-bold placeholder:text-zinc-700 focus:outline-none"
+                  />
+                </div>
+                {durationMin && (
+                  <span className="text-xs text-zinc-500 shrink-0">{formatDuration(parseInt(durationMin, 10) * 60)}</span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3 bg-zinc-800/40 border border-zinc-700/50 rounded-xl p-3">
+                <Weight size={18} className="text-zinc-500 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <label htmlFor="checkin-weight" className="text-[11px] text-zinc-500 uppercase font-bold block">Peso atual (kg)</label>
+                  <input
+                    id="checkin-weight"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.1"
+                    min="20"
+                    max="300"
+                    placeholder="ex: 75.5"
+                    value={weightKg}
+                    onChange={(e) => setWeightKg(e.target.value)}
+                    className="w-full bg-transparent text-white text-sm font-bold placeholder:text-zinc-700 focus:outline-none"
+                  />
+                </div>
+                {weightKg && <span className="text-xs text-zinc-500 shrink-0">kg</span>}
+              </div>
+
+              <div className="flex items-start gap-3 bg-zinc-800/40 border border-zinc-700/50 rounded-xl p-3">
+                <FileText size={18} className="text-zinc-500 shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <label htmlFor="checkin-notes" className="text-[11px] text-zinc-500 uppercase font-bold block mb-1">Observações</label>
+                  <textarea
+                    id="checkin-notes"
+                    rows={2}
+                    maxLength={300}
+                    placeholder="Como foi o treino? Anotações pessoais..."
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    className="w-full bg-transparent text-white text-sm placeholder:text-zinc-700 focus:outline-none resize-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setStep('confirm')}
+              className="w-full py-4 rounded-2xl bg-green-500 text-black font-black uppercase tracking-wide text-sm hover:bg-green-400 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+            >
+              Continuar <ChevronRight size={18} />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setStep('confirm')}
+              className="w-full text-center text-xs text-zinc-600 hover:text-zinc-400 transition-colors"
+            >
+              Pular detalhes
+            </button>
+          </div>
+        )}
+
+        {step === 'confirm' && (
+          <div className="space-y-5 animate-in-fade">
+            <div className="flex items-center gap-3 bg-zinc-800/60 rounded-2xl p-4 border border-zinc-700/50">
+              <CheckCircle2 size={20} className="text-green-500 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-zinc-500 uppercase font-bold">Tipo de treino</p>
+                <p className="text-white font-bold truncate">{selectedType}</p>
+              </div>
+              {previewUrl && (
+                <img src={previewUrl} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
+              )}
+            </div>
+
+            {(durationMin || weightKg || notes.trim()) && (
+              <div className="flex flex-wrap gap-2">
+                {durationMin && (
+                  <span className="bg-zinc-800 text-zinc-400 text-[11px] font-medium px-2.5 py-1 rounded-full flex items-center gap-1">
+                    <Clock size={12} /> {formatDuration(parseInt(durationMin, 10) * 60)}
+                  </span>
+                )}
+                {weightKg && (
+                  <span className="bg-zinc-800 text-zinc-400 text-[11px] font-medium px-2.5 py-1 rounded-full flex items-center gap-1">
+                    <Weight size={12} /> {weightKg} kg
+                  </span>
+                )}
+                {notes.trim() && (
+                  <span className="bg-zinc-800 text-zinc-400 text-[11px] font-medium px-2.5 py-1 rounded-full flex items-center gap-1">
+                    <FileText size={12} /> Notas
+                  </span>
+                )}
+              </div>
+            )}
 
             <div className="space-y-3">
               <button

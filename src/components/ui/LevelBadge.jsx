@@ -26,11 +26,11 @@ export function LevelBadge({ level = 0, size = 'md' }) {
       : 'w-8 h-8 text-xs';
 
   return (
-    <div
-      className={`${sizeClasses} rounded-full ${colors.bg} ring-2 ${colors.ring} flex items-center justify-center font-black ${colors.text} tabular-nums shadow-lg`}
+    <span
+      className={`${sizeClasses} rounded-full ${colors.bg} ring-2 ${colors.ring} inline-flex items-center justify-center font-black ${colors.text} tabular-nums shadow-lg`}
       title={`Nível ${level}`}
     >
       {level}
-    </div>
+    </span>
   );
 }

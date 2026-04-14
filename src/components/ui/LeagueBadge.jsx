@@ -36,7 +36,7 @@ export function LeagueBadge({ league = 'bronze', size = 'md', onClick }) {
 
   const iconSize = size === 'sm' ? 10 : size === 'lg' ? 16 : 12;
 
-  const Tag = onClick ? 'button' : 'div';
+  const Tag = onClick ? 'button' : 'span';
 
   return (
     <Tag

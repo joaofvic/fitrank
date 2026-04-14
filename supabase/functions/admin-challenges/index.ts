@@ -432,7 +432,10 @@ Deno.serve(async (req) => {
             .select('id', { count: 'exact', head: true })
             .eq('desafio_id', upd.id);
 
-          if ((count ?? 0) > 0 && (upd.data_inicio || upd.data_fim)) {
+          const datesChanged =
+            (upd.data_inicio && upd.data_inicio !== existing.data_inicio) ||
+            (upd.data_fim && upd.data_fim !== existing.data_fim);
+          if ((count ?? 0) > 0 && datesChanged) {
             return jsonResponse(
               { error: 'Nao e possivel alterar datas de desafio ativo com participantes' },
               400

@@ -22,6 +22,8 @@ import { ViewSkeleton } from './components/ui/ViewSkeleton.jsx';
 import { useSwipeNavigation } from './hooks/useSwipeNavigation.js';
 import { usePullToRefresh } from './hooks/usePullToRefresh.js';
 import { useNavigationStack } from './hooks/useNavigationStack.js';
+import { useWorkoutTimer } from './hooks/useWorkoutTimer.js';
+import { MiniTimer } from './components/ui/MiniTimer.jsx';
 
 const lazyNamed = (loader, name) => lazy(() => loader().then(m => ({ default: m[name] })));
 
@@ -34,6 +36,11 @@ const EditProfileView = lazyNamed(() => import('./components/views/EditProfileVi
 const HashtagFeedView = lazyNamed(() => import('./components/views/HashtagFeedView.jsx'), 'HashtagFeedView');
 const StoryCreator = lazyNamed(() => import('./components/views/StoryCreator.jsx'), 'StoryCreator');
 const StoryViewer = lazyNamed(() => import('./components/views/StoryViewer.jsx'), 'StoryViewer');
+const WorkoutTimerView = lazyNamed(() => import('./components/views/WorkoutTimerView.jsx'), 'WorkoutTimerView');
+const ProgressView = lazyNamed(() => import('./components/views/ProgressView.jsx'), 'ProgressView');
+const StatsView = lazyNamed(() => import('./components/views/StatsView.jsx'), 'StatsView');
+const WorkoutPlanView = lazyNamed(() => import('./components/views/WorkoutPlanView.jsx'), 'WorkoutPlanView');
+const WorkoutPlanGeneratorView = lazyNamed(() => import('./components/views/WorkoutPlanGeneratorView.jsx'), 'WorkoutPlanGeneratorView');
 
 const AdminTenantsView = lazyNamed(() => import('./components/views/AdminTenantsView.jsx'), 'AdminTenantsView');
 const AdminModerationView = lazyNamed(() => import('./components/views/AdminModerationView.jsx'), 'AdminModerationView');
@@ -79,6 +86,9 @@ export default function App() {
   const { view, transitionDir, routeParam, navigate, goBack, canGoBack } = useNavigationStack();
   const mainContentRef = useRef(null);
   const challengesRefreshRef = useRef(null);
+  const statsRefreshRef = useRef(null);
+  const [timerDuration, setTimerDuration] = useState(null);
+  const workoutTimer = useWorkoutTimer();
 
   const [publicProfileUserId, setPublicProfileUserId] = useState(() => {
     if (view === 'public-profile' && routeParam) return routeParam;
@@ -109,6 +119,8 @@ export default function App() {
       await social.refreshFeed?.();
     } else if (view === 'challenges') {
       await challengesRefreshRef.current?.();
+    } else if (view === 'stats' && useCloud) {
+      await statsRefreshRef.current?.();
     } else if (view === 'profile' && useCloud) {
       await Promise.all([
         refreshProfile?.(),
@@ -120,7 +132,7 @@ export default function App() {
   }, [view, useCloud, cloud, social, refreshProfile]);
 
   const { pullDistance, refreshing, pullRef } = usePullToRefresh(handlePullRefresh, {
-    enabled: ['home', 'feed', 'challenges', 'profile'].includes(view),
+    enabled: ['home', 'feed', 'challenges', 'profile', 'stats'].includes(view),
   });
 
   const openPublicProfile = useCallback((targetId) => {
@@ -216,7 +228,7 @@ export default function App() {
     setTimeout(() => setMessage(null), 3000);
   };
 
-  const handleCheckin = async (workoutType = 'Treino Geral', fotoFile = null, feedVisible = true, feedCaption = null) => {
+  const handleCheckin = async (workoutType = 'Treino Geral', fotoFile = null, feedVisible = true, feedCaption = null, extras = {}) => {
     analytics.checkinStarted();
     if (useCloud) {
       try {
@@ -225,7 +237,7 @@ export default function App() {
         const prevBadgeCount = social.badges?.length ?? 0;
 
         analytics.checkinSubmitted({ workout_type: workoutType });
-        await cloud.insertCheckin(workoutType, fotoFile, feedVisible, feedCaption);
+        await cloud.insertCheckin(workoutType, fotoFile, feedVisible, feedCaption, extras);
 
         const freshProfile = await refreshProfile?.();
         const newXp = freshProfile?.xp ?? profile?.xp ?? 0;
@@ -257,6 +269,7 @@ export default function App() {
           streak_day: newStreak,
           leveled_up: newLevel > prevLevel
         });
+        setTimerDuration(null);
         navigate('home');
       } catch (err) {
         analytics.checkinError(err.message);
@@ -314,6 +327,7 @@ export default function App() {
     }));
 
     showToast('Check-in realizado! +10 pontos ⚡');
+    setTimerDuration(null);
     navigate('home');
   };
 
@@ -383,6 +397,7 @@ export default function App() {
             leagueLoading={useCloud ? cloud.leagueLoading : false}
             onLoadLeagueRanking={useCloud ? cloud.refreshLeagueRanking : undefined}
             onOpenCheckin={() => navigate('checkin-modal')}
+            onOpenTimer={() => navigate('timer')}
             onOpenProfile={useCloud ? openPublicProfile : undefined}
             onCheckStreakRecovery={useCloud ? cloud.checkStreakRecovery : undefined}
             onRecoverStreak={useCloud ? cloud.recoverStreak : undefined}
@@ -461,6 +476,10 @@ export default function App() {
             onPageChange={useCloud ? cloud.setCheckinPage : undefined}
             onLimitChange={useCloud ? cloud.setCheckinLimit : undefined}
             onSignOut={configured ? signOut : undefined}
+            onOpenProgress={() => navigate('progress')}
+            onOpenStats={() => navigate('stats')}
+            onOpenPlan={() => navigate('workout-plan')}
+            onGeneratePlan={() => navigate('workout-plan-generator')}
           />
         )}
         {view === 'edit-profile' && useCloud && (
@@ -472,6 +491,38 @@ export default function App() {
             onCheckUsername={cloud.checkUsernameAvailable}
             onUpdatePassword={cloud.updatePassword}
           />
+        )}
+        {view === 'progress' && useCloud && (
+          <Suspense fallback={<ViewSkeleton />}>
+            <ProgressView onBack={goBack} />
+          </Suspense>
+        )}
+        {view === 'stats' && useCloud && (
+          <Suspense fallback={<ViewSkeleton />}>
+            <StatsView onBack={goBack} friends={social.friends} refreshRef={statsRefreshRef} />
+          </Suspense>
+        )}
+        {view === 'workout-plan' && useCloud && (
+          <Suspense fallback={<ViewSkeleton />}>
+            <WorkoutPlanView
+              onBack={goBack}
+              onOpenTimer={(restSec) => {
+                workoutTimer.ref.current.mode = 'countdown';
+                workoutTimer.ref.current.countdownTarget = restSec;
+                workoutTimer.ref.current.countdownPausedRemaining = restSec;
+                navigate('timer');
+              }}
+              onGenerateNew={() => navigate('workout-plan-generator')}
+            />
+          </Suspense>
+        )}
+        {view === 'workout-plan-generator' && useCloud && (
+          <Suspense fallback={<ViewSkeleton />}>
+            <WorkoutPlanGeneratorView
+              onBack={goBack}
+              onPlanGenerated={() => navigate('workout-plan')}
+            />
+          </Suspense>
         )}
         {view === 'friends' && useCloud && (
           <FriendsView
@@ -566,12 +617,26 @@ export default function App() {
         </AnimatedViewContainer>
         </Suspense>
 
+        {view === 'timer' && (
+          <Suspense fallback={<ViewSkeleton />}>
+            <WorkoutTimerView
+              onClose={() => navigate('home')}
+              onFinish={(sec) => {
+                setTimerDuration(sec);
+                navigate('checkin-modal');
+              }}
+              timerHook={workoutTimer}
+            />
+          </Suspense>
+        )}
+
         {view === 'checkin-modal' && (
           <Suspense fallback={null}>
             <CheckinModal
-              onClose={() => navigate('home')}
+              onClose={() => { setTimerDuration(null); navigate('home'); }}
               onCheckin={handleCheckin}
               friends={useCloud ? social.friends : []}
+              prefillDuration={timerDuration}
             />
           </Suspense>
         )}
@@ -625,6 +690,10 @@ export default function App() {
             <Zap size={18} />
             {message}
           </div>
+        )}
+
+        {view !== 'timer' && (
+          <MiniTimer timerHook={workoutTimer} onClick={() => navigate('timer')} />
         )}
 
         <div className="fixed bottom-0 left-0 right-0 bg-zinc-950/80 backdrop-blur-xl border-t border-zinc-800 px-6 flex items-center justify-between z-40 max-w-lg mx-auto safe-bottom" style={{ height: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}>

@@ -345,7 +345,7 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
   }, [supabase, userId, tenantId]);
 
   const insertCheckin = useCallback(
-    async (tipoTreino, fotoFile = null, feedVisible = true, feedCaption = null) => {
+    async (tipoTreino, fotoFile = null, feedVisible = true, feedCaption = null, extras = {}) => {
       if (!supabase || !userId || !tenantId) {
         throw new Error('Sessão inválida');
       }
@@ -379,15 +379,19 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
 
       const trimmedCaption = feedCaption?.trim() || null;
 
-      const { data: insData, error: insErr } = await supabase.from('checkins').insert({
+      const checkinRow = {
         user_id: userId,
         tenant_id: tenantId,
         checkin_local_date: today,
         tipo_treino: tipoTreino,
         foto_url,
         feed_visible: feedVisible,
-        feed_caption: trimmedCaption
-      }).select('id').single();
+        feed_caption: trimmedCaption,
+      };
+      if (extras.duration_seconds) checkinRow.duration_seconds = extras.duration_seconds;
+      if (extras.notes) checkinRow.notes = extras.notes;
+
+      const { data: insData, error: insErr } = await supabase.from('checkins').insert(checkinRow).select('id').single();
 
       if (insErr) {
         if (insErr.code === '23505') {
@@ -414,6 +418,14 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
             p_tags: tags
           }).catch((err) => logger.error('save hashtags', err));
         }
+      }
+
+      if (extras.weight_kg && insData?.id) {
+        await supabase.from('body_measurements').insert({
+          user_id: userId,
+          weight_kg: extras.weight_kg,
+          checkin_id: insData.id,
+        }).catch((err) => logger.error('save body measurement', err));
       }
 
       setCheckinPage(0);

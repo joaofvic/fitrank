@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react';
-import { Trophy, Flame, Dumbbell, Crown, TrendingUp, Zap, ShieldAlert, ArrowUp, ArrowDown } from 'lucide-react';
+import { Trophy, Flame, Dumbbell, Crown, TrendingUp, Zap, ShieldAlert, ArrowUp, ArrowDown, Timer } from 'lucide-react';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { Card } from '../ui/Card.jsx';
 import { Button } from '../ui/Button.jsx';
@@ -45,7 +45,7 @@ function RankingRow({ u, idx, currentUid, onOpenProfile, rankingFilterEnabled })
         </div>
         <UserAvatar src={u.avatar_url} size="lg" className="w-10 h-10 bg-zinc-800 border border-zinc-700" />
         <div>
-          <p
+          <span
             className={`font-bold flex items-center gap-1.5 ${
               u.uid === currentUid ? 'text-green-400' : 'text-white'
             }`}
@@ -53,7 +53,7 @@ function RankingRow({ u, idx, currentUid, onOpenProfile, rankingFilterEnabled })
             <LevelBadge level={calculateLevel(u.xp)} size="sm" />
             {u.nome}
             {u.is_pro && <Crown className="w-3 h-3 text-yellow-500 fill-yellow-500" />}
-          </p>
+          </span>
           <div className="flex items-center gap-1.5">
             <p className="text-xs text-zinc-500 uppercase tracking-tighter">
               {u.academia || 'Treino Livre'}
@@ -180,6 +180,7 @@ export function HomeView({
   allUsers,
   leagueUsers = [],
   onOpenCheckin,
+  onOpenTimer,
   rankingLoading = false,
   rankingFilterEnabled = false,
   rankingPeriod = 'month',
@@ -291,9 +292,22 @@ export function HomeView({
               <Dumbbell className="w-6 h-6 text-black" />
             </div>
           </div>
-          <Button onClick={onOpenCheckin} className="w-full h-14 text-lg">
-            TREINEI HOJE 💪
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={onOpenCheckin} className="flex-1 h-14 text-lg">
+              TREINEI HOJE 💪
+            </Button>
+            {onOpenTimer && (
+              <button
+                type="button"
+                onClick={onOpenTimer}
+                className="h-14 px-4 rounded-2xl bg-zinc-800 border border-zinc-700 hover:border-green-500/50 flex items-center gap-2 text-zinc-300 hover:text-green-400 transition-all active:scale-95"
+                aria-label="Iniciar timer de treino"
+              >
+                <Timer size={20} />
+                <span className="text-xs font-bold uppercase hidden min-[360px]:inline">Timer</span>
+              </button>
+            )}
+          </div>
         </div>
         <div className="absolute -right-8 -bottom-8 opacity-10 group-hover:opacity-20 transition-opacity">
           <TrendingUp size={120} className="text-green-500" />

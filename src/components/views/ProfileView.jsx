@@ -17,6 +17,9 @@ import { LevelBadge } from '../ui/LevelBadge.jsx';
 import { ProfileFullSkeleton, ProfileStatsSkeleton } from '../ui/Skeleton.jsx';
 import { XpProgressBar } from '../ui/XpProgressBar.jsx';
 import { LeagueBadge } from '../ui/LeagueBadge.jsx';
+import { ConsistencyHeatmap } from '../ui/ConsistencyHeatmap.jsx';
+import { ProgressWidget } from '../ui/ProgressWidget.jsx';
+import { WorkoutPlanWidget } from '../ui/WorkoutPlanWidget.jsx';
 
 export function ProfileView({
   userData,
@@ -50,9 +53,13 @@ export function ProfileView({
   checkinsLoading = false,
   onPageChange,
   onLimitChange,
-  onSignOut
+  onSignOut,
+  onOpenProgress,
+  onOpenStats,
+  onOpenPlan,
+  onGeneratePlan
 }) {
-  const { supabase, profile: authProfile } = useAuth();
+  const { supabase, session, profile: authProfile } = useAuth();
   const [reasonLabelMap, setReasonLabelMap] = useState({});
   const [availablePlans, setAvailablePlans] = useState([]);
   const [proLoading, setProLoading] = useState(false);
@@ -288,6 +295,39 @@ export function ProfileView({
         }}
         isPro={isPro}
       />
+
+      {session?.user?.id && (
+        <ConsistencyHeatmap userId={session.user.id} />
+      )}
+
+      {session?.user?.id && (
+        <ProgressWidget userId={session.user.id} onOpenProgress={onOpenProgress} />
+      )}
+
+      {onOpenStats && (
+        <button type="button" onClick={onOpenStats} className="w-full text-left">
+          <Card className="flex items-center justify-between hover:border-green-500/30 transition-colors group">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
+                <BarChart3 className="w-5 h-5 text-purple-500" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-zinc-300">Estatísticas</p>
+                <p className="text-[10px] text-zinc-500">Gráficos e evolução detalhada</p>
+              </div>
+            </div>
+            <ChevronRight size={18} className="text-zinc-600 group-hover:text-purple-500 transition-colors" />
+          </Card>
+        </button>
+      )}
+
+      {session?.user?.id && (
+        <WorkoutPlanWidget
+          userId={session.user.id}
+          onOpenPlan={onOpenPlan}
+          onGenerateNew={onGeneratePlan}
+        />
+      )}
 
       {isPlatformMaster && (
         <Button
