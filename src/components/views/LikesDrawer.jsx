@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Heart, Loader2, X } from 'lucide-react';
+import { Heart, Loader2 } from 'lucide-react';
 import { UserAvatar } from '../ui/user-avatar.jsx';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../ui/sheet.jsx';
 
 export function LikesDrawer({ checkinId, onClose, onLoadLikes, onOpenProfile }) {
   const [likes, setLikes] = useState([]);
@@ -20,26 +21,13 @@ export function LikesDrawer({ checkinId, onClose, onLoadLikes, onOpenProfile }) 
   }, [checkinId, onLoadLikes]);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end">
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in-fade"
-        onClick={onClose}
-      />
-
-      <div className="relative max-w-lg w-full mx-auto bg-zinc-900 border-t border-zinc-800 rounded-t-2xl flex flex-col max-h-[70vh] animate-in-slide-up">
-        <div className="px-5 pt-4 pb-3 border-b border-zinc-800 flex items-center justify-between shrink-0">
-          <div className="w-10 h-1 bg-zinc-700 rounded-full absolute top-2 left-1/2 -translate-x-1/2" />
-          <h3 className="text-sm font-black uppercase tracking-wide text-zinc-300">
+    <Sheet open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <SheetContent side="bottom" className="max-w-lg mx-auto max-h-[70vh]" showClose={false}>
+        <SheetHeader className="flex items-center justify-between flex-row">
+          <SheetTitle className="text-sm font-black uppercase tracking-wide text-zinc-300">
             Curtidas
-          </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+          </SheetTitle>
+        </SheetHeader>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
           {loading ? (
@@ -77,7 +65,7 @@ export function LikesDrawer({ checkinId, onClose, onLoadLikes, onOpenProfile }) 
             </>
           )}
         </div>
-      </div>
-    </div>
+      </SheetContent>
+    </Sheet>
   );
 }

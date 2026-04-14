@@ -1,5 +1,6 @@
-import { Shield, X, ChevronRight } from 'lucide-react';
+import { Shield, ChevronRight } from 'lucide-react';
 import { getAllLeagues, getLeagueConfig, getNextLeague } from '../ui/LeagueBadge.jsx';
+import { Sheet, SheetContent, SheetTitle } from '../ui/sheet.jsx';
 
 export function LeagueProgressView({ currentLeague = 'bronze', currentXp = 0, onClose }) {
   const leagues = getAllLeagues();
@@ -7,25 +8,12 @@ export function LeagueProgressView({ currentLeague = 'bronze', currentXp = 0, on
   const next = getNextLeague(currentLeague);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end">
-      <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm animate-in-fade"
-        onClick={onClose}
-      />
-      <div className="relative max-w-lg w-full mx-auto bg-zinc-900 border-t border-zinc-800 rounded-t-2xl p-5 pb-8 animate-in-slide-up max-h-[80vh] overflow-y-auto">
-        <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-5" />
-
+    <Sheet open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <SheetContent side="bottom" className="max-w-lg mx-auto p-5 pb-8 max-h-[80vh] overflow-y-auto" showClose={false}>
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-sm font-black uppercase tracking-wide text-zinc-300">
+          <SheetTitle className="text-sm font-black uppercase tracking-wide text-zinc-300">
             Progressão de Liga
-          </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          </SheetTitle>
         </div>
 
         <div className="text-center mb-6 space-y-2">
@@ -102,7 +90,7 @@ export function LeagueProgressView({ currentLeague = 'bronze', currentXp = 0, on
             );
           })}
         </div>
-      </div>
-    </div>
+      </SheetContent>
+    </Sheet>
   );
 }

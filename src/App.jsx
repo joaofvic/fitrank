@@ -356,9 +356,10 @@ export default function App() {
               <button
                 type="button"
                 onClick={goBack}
+                aria-label="Voltar"
                 className="w-10 h-10 bg-zinc-900 border border-zinc-800 rounded-full flex items-center justify-center hover:bg-zinc-800 transition-colors active:scale-90"
               >
-                <ArrowLeft size={20} className="text-zinc-400" />
+                <ArrowLeft size={20} className="text-zinc-400" aria-hidden="true" />
               </button>
             )}
             <h1 className="text-3xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-green-600 uppercase">
@@ -368,9 +369,10 @@ export default function App() {
           <button
             type="button"
             onClick={() => navigate('notifications')}
+            aria-label="Notificações"
             className="relative w-10 h-10 bg-zinc-900 border border-zinc-800 rounded-full flex items-center justify-center hover:bg-zinc-800 transition-colors"
           >
-            <Bell size={20} className={view === 'notifications' ? 'text-white' : 'text-zinc-400'} />
+            <Bell size={20} className={view === 'notifications' ? 'text-white' : 'text-zinc-400'} aria-hidden="true" />
             {useCloud && cloud.notifications.length > 0 && (
               <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-red-500 rounded-full text-[10px] font-bold flex items-center justify-center text-white px-1">
                 {cloud.notifications.length > 9 ? '9+' : cloud.notifications.length}
@@ -696,7 +698,7 @@ export default function App() {
           <MiniTimer timerHook={workoutTimer} onClick={() => navigate('timer')} />
         )}
 
-        <div className="fixed bottom-0 left-0 right-0 bg-zinc-950/80 backdrop-blur-xl border-t border-zinc-800 px-6 flex items-center justify-between z-40 max-w-lg mx-auto safe-bottom" style={{ height: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}>
+        <nav aria-label="Menu principal" className="fixed bottom-0 left-0 right-0 bg-zinc-950/80 backdrop-blur-xl border-t border-zinc-800 px-6 flex items-center justify-between z-40 max-w-lg mx-auto safe-bottom" style={{ height: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}>
           <button
             type="button"
             onClick={() => navigate('home')}
@@ -720,10 +722,11 @@ export default function App() {
           <button
             type="button"
             onClick={() => navigate('checkin-modal')}
+            aria-label="Registrar treino"
             className="flex flex-col items-center -mt-10"
           >
             <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center shadow-lg shadow-green-500/40 active:scale-90 transition-transform">
-              <Plus size={32} className="text-black" />
+              <Plus size={32} className="text-black" aria-hidden="true" />
             </div>
           </button>
           <button
@@ -746,7 +749,7 @@ export default function App() {
             <User size={24} className={view === 'profile' ? 'fill-white/10' : ''} />
             <span className="text-[10px] font-bold uppercase">Perfil</span>
           </button>
-        </div>
+        </nav>
       </div>
 
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none -z-10 opacity-30">

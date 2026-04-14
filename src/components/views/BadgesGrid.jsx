@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import {
-  Flame, Dumbbell, Zap, Users, Trophy, Lock, X
+  Flame, Dumbbell, Zap, Users, Trophy, Lock
 } from 'lucide-react';
+import { Dialog, DialogContent, DialogTitle } from '../ui/dialog.jsx';
 
 const ICON_MAP = {
   flame: Flame,
@@ -100,65 +101,55 @@ export function BadgesGrid({ badges = [], loading = false, currentValues = {}, i
         })}
       </div>
 
-      {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setSelected(null)} />
-          <div className="relative bg-zinc-900 border border-zinc-800 rounded-2xl p-6 max-w-xs w-full text-center space-y-4 animate-in-fade">
-            <button
-              type="button"
-              onClick={() => setSelected(null)}
-              className="absolute top-3 right-3 w-7 h-7 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-            {(() => {
-              const colors = CATEGORY_COLORS[selected.category] ?? CATEGORY_COLORS.special;
-              const Icon = ICON_MAP[selected.icon] ?? Trophy;
-              const unlocked = Boolean(selected.unlocked_at);
-              return (
-                <>
-                  <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center ${
-                    unlocked ? `${colors.bg}/20 ring-2 ${colors.ring}` : 'bg-zinc-800'
-                  }`}>
-                    <Icon className={`w-8 h-8 ${unlocked ? colors.text : 'text-zinc-600'}`} />
+      <Dialog open={!!selected} onOpenChange={(v) => { if (!v) setSelected(null); }}>
+        <DialogContent className="max-w-xs text-center space-y-4">
+          <DialogTitle className="sr-only">{selected?.name ?? 'Conquista'}</DialogTitle>
+          {selected && (() => {
+            const colors = CATEGORY_COLORS[selected.category] ?? CATEGORY_COLORS.special;
+            const Icon = ICON_MAP[selected.icon] ?? Trophy;
+            const unlocked = Boolean(selected.unlocked_at);
+            return (
+              <>
+                <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center ${
+                  unlocked ? `${colors.bg}/20 ring-2 ${colors.ring}` : 'bg-zinc-800'
+                }`}>
+                  <Icon className={`w-8 h-8 ${unlocked ? colors.text : 'text-zinc-600'}`} />
+                </div>
+                <div>
+                  <h4 className="text-lg font-black">{selected.name}</h4>
+                  <span className={`inline-block mt-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${colors.bgLight} ${colors.text}`}>
+                    {CATEGORY_LABELS[selected.category] ?? selected.category}
+                  </span>
+                </div>
+                <p className="text-sm text-zinc-400">{selected.description}</p>
+                {unlocked ? (
+                  <p className="text-xs text-green-400 font-bold">
+                    Desbloqueado em {new Date(selected.unlocked_at).toLocaleDateString('pt-BR')}
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {(() => {
+                      const current = currentValues?.[selected.category] ?? 0;
+                      const pct = Math.min(100, Math.round((current / selected.threshold) * 100));
+                      return (
+                        <>
+                          <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
+                            <div className={`h-full ${colors.bg} rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                          </div>
+                          <p className="text-xs text-zinc-500 tabular-nums">{current} / {selected.threshold}</p>
+                        </>
+                      );
+                    })()}
+                    {selected.is_pro_only && !isPro && (
+                      <p className="text-[10px] text-yellow-500 font-bold">Exclusivo para membros PRO</p>
+                    )}
                   </div>
-                  <div>
-                    <h4 className="text-lg font-black">{selected.name}</h4>
-                    <span className={`inline-block mt-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${colors.bgLight} ${colors.text}`}>
-                      {CATEGORY_LABELS[selected.category] ?? selected.category}
-                    </span>
-                  </div>
-                  <p className="text-sm text-zinc-400">{selected.description}</p>
-                  {unlocked ? (
-                    <p className="text-xs text-green-400 font-bold">
-                      Desbloqueado em {new Date(selected.unlocked_at).toLocaleDateString('pt-BR')}
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {(() => {
-                        const current = currentValues?.[selected.category] ?? 0;
-                        const pct = Math.min(100, Math.round((current / selected.threshold) * 100));
-                        return (
-                          <>
-                            <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
-                              <div className={`h-full ${colors.bg} rounded-full transition-all`} style={{ width: `${pct}%` }} />
-                            </div>
-                            <p className="text-xs text-zinc-500 tabular-nums">{current} / {selected.threshold}</p>
-                          </>
-                        );
-                      })()}
-                      {selected.is_pro_only && !isPro && (
-                        <p className="text-[10px] text-yellow-500 font-bold">Exclusivo para membros PRO</p>
-                      )}
-                    </div>
-                  )}
-                </>
-              );
-            })()}
-          </div>
-        </div>
-      )}
+                )}
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

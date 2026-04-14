@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, Send, Trash2, X } from 'lucide-react';
+import { Loader2, Send, Trash2 } from 'lucide-react';
 import { formatTimeAgo } from '../../lib/dates.js';
 import { logger } from '../../lib/logger.js';
 import { UserAvatar } from '../ui/user-avatar.jsx';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../ui/sheet.jsx';
 
 export function CommentsDrawer({
   checkinId,
@@ -71,26 +72,13 @@ export function CommentsDrawer({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end">
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in-fade"
-        onClick={onClose}
-      />
-
-      <div className="relative max-w-lg w-full mx-auto bg-zinc-900 border-t border-zinc-800 rounded-t-2xl flex flex-col max-h-[70vh] animate-in-slide-up">
-        <div className="px-5 pt-4 pb-3 border-b border-zinc-800 flex items-center justify-between shrink-0">
-          <div className="w-10 h-1 bg-zinc-700 rounded-full absolute top-2 left-1/2 -translate-x-1/2" />
-          <h3 className="text-sm font-black uppercase tracking-wide text-zinc-300">
+    <Sheet open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <SheetContent side="bottom" className="max-w-lg mx-auto max-h-[70vh]" showClose={false}>
+        <SheetHeader className="flex items-center justify-between flex-row">
+          <SheetTitle className="text-sm font-black uppercase tracking-wide text-zinc-300">
             Comentários
-          </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+          </SheetTitle>
+        </SheetHeader>
 
         <div ref={listRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
           {loading ? (
@@ -117,7 +105,7 @@ export function CommentsDrawer({
                     type="button"
                     onClick={() => handleDelete(c.id)}
                     className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-1 text-zinc-600 hover:text-red-400"
-                    title="Excluir comentário"
+                    aria-label="Excluir comentário"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -142,6 +130,7 @@ export function CommentsDrawer({
               type="button"
               onClick={handleSend}
               disabled={!text.trim() || sending}
+              aria-label="Enviar comentário"
               className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-black shrink-0 disabled:opacity-40 disabled:cursor-not-allowed active:scale-90 transition-transform"
             >
               {sending ? (
@@ -158,7 +147,7 @@ export function CommentsDrawer({
             </p>
           </div>
         )}
-      </div>
-    </div>
+      </SheetContent>
+    </Sheet>
   );
 }

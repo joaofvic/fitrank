@@ -4,6 +4,7 @@ import { CheckCircle2, Camera, Plus, ChevronLeft, Globe, Clock, Weight, FileText
 import { Button } from '../ui/Button.jsx';
 import { MentionInput } from '../ui/MentionInput.jsx';
 import { CHECKIN_GRID_WORKOUT_TYPES } from '../../lib/workout-types.js';
+import { Dialog, DialogContent, DialogTitle } from '../ui/dialog.jsx';
 
 const CAPTION_MAX = 200;
 
@@ -15,7 +16,7 @@ function formatDuration(totalSeconds) {
   return `${m}min`;
 }
 
-export function CheckinModal({ onClose, onCheckin, friends = [], prefillDuration = null }) {
+export function CheckinModal({ open = true, onClose, onCheckin, friends = [], prefillDuration = null }) {
   const { supabase } = useAuth();
   const [foto, setFoto] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -123,8 +124,8 @@ export function CheckinModal({ onClose, onCheckin, friends = [], prefillDuration
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/90 flex flex-col justify-end p-4 animate-in-slide-modal">
-      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 w-full max-w-lg mx-auto space-y-6">
+    <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); }}>
+      <DialogContent className="rounded-3xl p-6 space-y-6" showClose={false}>
         <div className="flex justify-between items-center">
           {step !== 'select-type' ? (
             <button type="button" onClick={handleBack} className="flex items-center gap-1 text-zinc-400 hover:text-white transition-colors">
@@ -132,7 +133,7 @@ export function CheckinModal({ onClose, onCheckin, friends = [], prefillDuration
               <span className="text-sm font-semibold">Voltar</span>
             </button>
           ) : (
-            <h2 className="text-xl font-bold italic uppercase tracking-wider">Registrar Treino</h2>
+            <DialogTitle className="text-xl font-bold italic uppercase tracking-wider">Registrar Treino</DialogTitle>
           )}
           <Button variant="ghost" onClick={handleClose} className="p-1 px-2 h-auto">
             Fechar
@@ -375,7 +376,7 @@ export function CheckinModal({ onClose, onCheckin, friends = [], prefillDuration
             {error}
           </p>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

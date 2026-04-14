@@ -28,6 +28,23 @@ export function PhotoCompareSlider({ left, right }) {
 
   const handleEnd = useCallback(() => { dragging.current = false; }, []);
 
+  const handleKeyDown = useCallback((e) => {
+    const step = 2;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      setPosition((p) => Math.max(0, p - step));
+    } else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      setPosition((p) => Math.min(100, p + step));
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      setPosition(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      setPosition(100);
+    }
+  }, []);
+
   useEffect(() => {
     document.addEventListener('mousemove', handleMove);
     document.addEventListener('mouseup', handleEnd);
@@ -44,9 +61,16 @@ export function PhotoCompareSlider({ left, right }) {
   return (
     <div
       ref={containerRef}
-      className="relative w-full aspect-[3/4] rounded-xl overflow-hidden select-none cursor-col-resize bg-zinc-900"
+      role="slider"
+      tabIndex={0}
+      aria-label="Comparar antes e depois"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(position)}
+      className="relative w-full aspect-[3/4] rounded-xl overflow-hidden select-none cursor-col-resize bg-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500/50"
       onMouseDown={handleStart}
       onTouchStart={handleStart}
+      onKeyDown={handleKeyDown}
     >
       <img src={right} alt="Depois" className="absolute inset-0 w-full h-full object-cover" />
       <div

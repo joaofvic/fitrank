@@ -20,6 +20,7 @@ import { LeagueBadge } from '../ui/LeagueBadge.jsx';
 import { ConsistencyHeatmap } from '../ui/ConsistencyHeatmap.jsx';
 import { ProgressWidget } from '../ui/ProgressWidget.jsx';
 import { WorkoutPlanWidget } from '../ui/WorkoutPlanWidget.jsx';
+import { Sheet, SheetContent, SheetTitle } from '../ui/sheet.jsx';
 
 export function ProfileView({
   userData,
@@ -340,54 +341,40 @@ export function ProfileView({
         </Button>
       )}
 
-      {adminOpen && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end">
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in-fade"
-            onClick={() => setAdminOpen(false)}
-          />
-          <div className="relative max-w-lg w-full mx-auto bg-zinc-900 border-t border-zinc-800 rounded-t-2xl p-5 pb-8 animate-in-slide-up">
-            <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-5" />
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="text-sm font-black uppercase tracking-wide text-zinc-300">
-                Painel do Administrador
-              </h3>
-              <button
-                type="button"
-                onClick={() => setAdminOpen(false)}
-                className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { fn: onOpenAdmin, icon: Building2, label: 'Tenants' },
-                { fn: onOpenChallenges, icon: Trophy, label: 'Desafios' },
-                { fn: onOpenUsers, icon: Users, label: 'Usuários' },
-                { fn: onOpenModeration, icon: Shield, label: 'Moderação' },
-                { fn: onOpenModerationSettings, icon: SlidersHorizontal, label: 'Config moderação' },
-                { fn: onOpenEngagement, icon: BarChart3, label: 'Engajamento' },
-                { fn: onOpenObservability, icon: Activity, label: 'Observabilidade' },
-                { fn: onOpenAudit, icon: ScrollText, label: 'Auditoria' },
-                { fn: onOpenBilling, icon: CreditCard, label: 'Assinaturas' }
-              ]
-                .filter((item) => Boolean(item.fn))
-                .map(({ fn, icon: Icon, label }) => (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => { setAdminOpen(false); fn(); }}
-                    className="flex flex-col items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-800/40 p-4 text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
-                  >
-                    <Icon className="w-5 h-5 text-green-500" />
-                    <span className="text-xs font-bold uppercase tracking-wide">{label}</span>
-                  </button>
-                ))}
-            </div>
+      <Sheet open={adminOpen} onOpenChange={setAdminOpen}>
+        <SheetContent side="bottom" className="max-w-lg mx-auto p-5 pb-8" showClose={false}>
+          <div className="flex items-center justify-between mb-5">
+            <SheetTitle className="text-sm font-black uppercase tracking-wide text-zinc-300">
+              Painel do Administrador
+            </SheetTitle>
           </div>
-        </div>
-      )}
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { fn: onOpenAdmin, icon: Building2, label: 'Tenants' },
+              { fn: onOpenChallenges, icon: Trophy, label: 'Desafios' },
+              { fn: onOpenUsers, icon: Users, label: 'Usuários' },
+              { fn: onOpenModeration, icon: Shield, label: 'Moderação' },
+              { fn: onOpenModerationSettings, icon: SlidersHorizontal, label: 'Config moderação' },
+              { fn: onOpenEngagement, icon: BarChart3, label: 'Engajamento' },
+              { fn: onOpenObservability, icon: Activity, label: 'Observabilidade' },
+              { fn: onOpenAudit, icon: ScrollText, label: 'Auditoria' },
+              { fn: onOpenBilling, icon: CreditCard, label: 'Assinaturas' }
+            ]
+              .filter((item) => Boolean(item.fn))
+              .map(({ fn, icon: Icon, label }) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => { setAdminOpen(false); fn(); }}
+                  className="flex flex-col items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-800/40 p-4 text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                >
+                  <Icon className="w-5 h-5 text-green-500" />
+                  <span className="text-xs font-bold uppercase tracking-wide">{label}</span>
+                </button>
+              ))}
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {friendsDrawerOpen && (
         <FriendsListDrawer

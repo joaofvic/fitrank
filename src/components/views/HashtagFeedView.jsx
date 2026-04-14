@@ -98,8 +98,8 @@ export function HashtagFeedView({
   return (
     <div className="animate-in-fade -mx-4">
       <div className="flex items-center gap-3 px-4 mb-4">
-        <button type="button" onClick={onBack} className="text-zinc-400 hover:text-white transition-colors">
-          <ArrowLeft className="w-5 h-5" />
+        <button type="button" onClick={onBack} aria-label="Voltar" className="text-zinc-400 hover:text-white transition-colors">
+          <ArrowLeft className="w-5 h-5" aria-hidden="true" />
         </button>
         <div className="flex items-center gap-1.5">
           <Hash className="w-5 h-5 text-blue-400" />

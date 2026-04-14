@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { Camera, Image, Loader2, Type, Video, X } from 'lucide-react';
+import { Dialog, DialogContent, DialogTitle } from '../ui/dialog.jsx';
 
 const MAX_VIDEO_DURATION_S = 15;
 const CAPTION_MAX = 100;
@@ -66,10 +67,15 @@ export function StoryCreator({ onClose, onCreateStory }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col">
-      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent">
-        <button type="button" onClick={onClose} className="w-10 h-10 rounded-full bg-black/50 flex items-center justify-center">
-          <X className="w-5 h-5 text-white" />
+    <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent
+        className="fixed inset-0 left-0 top-0 w-full h-full max-w-none translate-x-0 translate-y-0 rounded-none border-0 bg-black p-0 flex flex-col"
+        showClose={false}
+      >
+        <DialogTitle className="sr-only">Novo Story</DialogTitle>
+        <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent">
+        <button type="button" onClick={onClose} aria-label="Fechar" className="w-10 h-10 rounded-full bg-black/50 flex items-center justify-center">
+          <X className="w-5 h-5 text-white" aria-hidden="true" />
         </button>
         {file && (
           <button
@@ -195,6 +201,7 @@ export function StoryCreator({ onClose, onCreateStory }) {
           </div>
         </>
       )}
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

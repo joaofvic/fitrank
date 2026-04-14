@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Flame, ShieldCheck, Loader2, X, Crown } from 'lucide-react';
+import { Flame, ShieldCheck, Loader2, Crown } from 'lucide-react';
 import { Button } from '../ui/Button.jsx';
 import { playSound } from '../../lib/sounds.js';
 import { haptic } from '../../lib/haptics.js';
+import { Dialog, DialogContent, DialogTitle } from '../ui/dialog.jsx';
 
-export function StreakRecoveryModal({ recoveryInfo, onRecover, onClose }) {
+export function StreakRecoveryModal({ open = true, recoveryInfo, onRecover, onClose }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
 
@@ -26,8 +27,9 @@ export function StreakRecoveryModal({ recoveryInfo, onRecover, onClose }) {
 
   if (result?.success) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-6" onClick={onClose}>
-        <div className="bg-zinc-900 border border-green-500/30 rounded-2xl p-6 w-full max-w-sm text-center space-y-4 animate-in-fade" onClick={(e) => e.stopPropagation()}>
+      <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+        <DialogContent className="max-w-sm text-center space-y-4">
+          <DialogTitle className="sr-only">Streak Recuperado</DialogTitle>
           <div className="w-16 h-16 mx-auto bg-green-500/20 rounded-full flex items-center justify-center">
             <Flame className="w-8 h-8 text-orange-500 fill-orange-500" />
           </div>
@@ -37,22 +39,19 @@ export function StreakRecoveryModal({ recoveryInfo, onRecover, onClose }) {
             <span className="text-green-500 font-bold">{result.streak_after} dias</span>.
           </p>
           <Button onClick={onClose} className="w-full">Fechar</Button>
-        </div>
-      </div>
+        </DialogContent>
+      </Dialog>
     );
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-6" onClick={onClose}>
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-sm space-y-5 animate-in-fade" onClick={(e) => e.stopPropagation()}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-sm space-y-5">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-white flex items-center gap-2">
+          <DialogTitle className="text-lg font-bold text-white flex items-center gap-2">
             <Flame className="w-5 h-5 text-orange-500 fill-orange-500" />
             Recuperar Streak
-          </h3>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors">
-            <X className="w-5 h-5" />
-          </button>
+          </DialogTitle>
         </div>
 
         <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-4 space-y-2">
@@ -77,7 +76,7 @@ export function StreakRecoveryModal({ recoveryInfo, onRecover, onClose }) {
         </div>
 
         {result?.error && (
-          <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-sm text-red-400">
+          <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-sm text-red-400" role="alert">
             {result.error}
           </div>
         )}
@@ -90,8 +89,8 @@ export function StreakRecoveryModal({ recoveryInfo, onRecover, onClose }) {
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Recuperar'}
           </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

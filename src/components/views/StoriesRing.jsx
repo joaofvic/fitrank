@@ -19,31 +19,39 @@ export function StoriesRing({ stories = [], currentUserId, onOpenStory, onCreate
     <div className="flex gap-3 px-4 pb-3 overflow-x-auto scrollbar-hide -mr-4 pr-4">
       {(onCreateStory || hasOwnStories) && (
         <div className="flex flex-col items-center gap-1 shrink-0">
-          <div className="relative cursor-pointer" onClick={handleSelfTap} role="button" tabIndex={0}>
-            <div
-              className={`w-16 h-16 rounded-full p-[3px] ${
-                hasOwnStories
-                  ? selfInRing.has_unseen
-                    ? 'bg-gradient-to-br from-green-400 to-green-600'
-                    : 'bg-zinc-700'
-                  : 'bg-zinc-800'
-              }`}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={handleSelfTap}
+              aria-label={hasOwnStories ? 'Ver seu story' : 'Criar story'}
+              className="block cursor-pointer"
             >
-              <div className="w-full h-full rounded-full bg-black p-[2px]">
-                <UserAvatar
-                  src={selfInRing?.avatar_url ?? selfAvatarUrl}
-                  size="lg"
-                  className="w-full h-full bg-zinc-900"
-                />
+              <div
+                className={`w-16 h-16 rounded-full p-[3px] ${
+                  hasOwnStories
+                    ? selfInRing.has_unseen
+                      ? 'bg-gradient-to-br from-green-400 to-green-600'
+                      : 'bg-zinc-700'
+                    : 'bg-zinc-800'
+                }`}
+              >
+                <div className="w-full h-full rounded-full bg-black p-[2px]">
+                  <UserAvatar
+                    src={selfInRing?.avatar_url ?? selfAvatarUrl}
+                    size="lg"
+                    className="w-full h-full bg-zinc-900"
+                  />
+                </div>
               </div>
-            </div>
+            </button>
             {onCreateStory && (
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); onCreateStory(); }}
+                onClick={onCreateStory}
+                aria-label="Criar story"
                 className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-green-500 border-2 border-black flex items-center justify-center"
               >
-                <Plus className="w-3 h-3 text-black" strokeWidth={3} />
+                <Plus className="w-3 h-3 text-black" strokeWidth={3} aria-hidden="true" />
               </button>
             )}
           </div>

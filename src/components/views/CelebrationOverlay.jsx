@@ -80,6 +80,9 @@ export function CelebrationOverlay({ celebration, onDismiss }) {
 
   return (
     <div
+      role="status"
+      aria-live="polite"
+      aria-label="Celebração de check-in"
       className={`fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity duration-300 ${
         visible ? 'opacity-100' : 'opacity-0 pointer-events-none'
       }`}

@@ -177,7 +177,7 @@ export function PublicProfileView({
     return (
       <div className="space-y-4 animate-in-fade">
         <button type="button" onClick={onBack} className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors">
-          <ArrowLeft size={20} />
+          <ArrowLeft size={20} aria-hidden="true" />
           <span className="text-sm font-semibold">Voltar</span>
         </button>
         <div className="text-center py-16 border-2 border-dashed border-zinc-800 rounded-2xl">
@@ -194,7 +194,7 @@ export function PublicProfileView({
   return (
     <div className="space-y-6 animate-in-fade">
       <button type="button" onClick={onBack} className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors">
-        <ArrowLeft size={20} />
+        <ArrowLeft size={20} aria-hidden="true" />
         <span className="text-sm font-semibold">Voltar</span>
       </button>
 

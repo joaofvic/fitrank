@@ -27,6 +27,7 @@ export function FriendsView({
   onBack
 }) {
   const [tab, setTab] = useState('friends');
+  const tablistRef = useRef(null);
 
   useEffect(() => {
     onLoadFriends?.();
@@ -34,23 +35,46 @@ export function FriendsView({
     onLoadSentRequests?.();
   }, [onLoadFriends, onLoadPendingRequests, onLoadSentRequests]);
 
+  const handleTabKeyDown = useCallback((e) => {
+    const tabIds = TABS.map((t) => t.id);
+    const currentIdx = tabIds.indexOf(tab);
+    let nextIdx = -1;
+
+    if (e.key === 'ArrowRight') {
+      nextIdx = (currentIdx + 1) % tabIds.length;
+    } else if (e.key === 'ArrowLeft') {
+      nextIdx = (currentIdx - 1 + tabIds.length) % tabIds.length;
+    } else if (e.key === 'Home') {
+      nextIdx = 0;
+    } else if (e.key === 'End') {
+      nextIdx = tabIds.length - 1;
+    }
+
+    if (nextIdx >= 0) {
+      e.preventDefault();
+      setTab(tabIds[nextIdx]);
+      tablistRef.current?.querySelector(`[id="tab-${tabIds[nextIdx]}"]`)?.focus();
+    }
+  }, [tab]);
+
   return (
     <div className="animate-in-fade -mx-4">
       <div className="flex items-center gap-3 px-4 pb-4">
         <button
           type="button"
           onClick={onBack}
+          aria-label="Voltar"
           className="p-1 text-white hover:text-zinc-400 transition-colors shrink-0"
         >
-          <ArrowLeft size={24} />
+          <ArrowLeft size={24} aria-hidden="true" />
         </button>
         <h2 className="text-base font-semibold flex-1">Amigos</h2>
-        <button type="button" className="p-1 text-white">
-          <UserPlus size={22} onClick={() => setTab('search')} />
+        <button type="button" onClick={() => setTab('search')} aria-label="Buscar pessoas" className="p-1 text-white">
+          <UserPlus size={22} aria-hidden="true" />
         </button>
       </div>
 
-      <div className="flex border-b border-zinc-800" role="tablist">
+      <div ref={tablistRef} className="flex border-b border-zinc-800" role="tablist" onKeyDown={handleTabKeyDown}>
         {TABS.map(({ id, label }) => {
           const badge =
             id === 'pending' && pendingRequests.length > 0
@@ -59,9 +83,12 @@ export function FriendsView({
           return (
             <button
               key={id}
+              id={`tab-${id}`}
               type="button"
               role="tab"
               aria-selected={tab === id}
+              aria-controls={`tabpanel-${id}`}
+              tabIndex={tab === id ? 0 : -1}
               onClick={() => setTab(id)}
               className={`flex-1 py-3 text-[13px] font-semibold transition-colors relative ${
                 tab === id
@@ -80,7 +107,12 @@ export function FriendsView({
         })}
       </div>
 
-      <div className="px-4 pt-4">
+      <div
+        id={`tabpanel-${tab}`}
+        role="tabpanel"
+        aria-labelledby={`tab-${tab}`}
+        className="px-4 pt-4"
+      >
         {tab === 'search' && (
           <SearchTab onSearch={onSearch} onSendRequest={onSendRequest} sentRequests={sentRequests} onOpenProfile={onOpenProfile} />
         )}
@@ -279,6 +311,16 @@ function PendingTab({ requests, onAccept, onDecline, onOpenProfile }) {
 
 function FriendsTab({ friends, loading, onRemove, onOpenProfile }) {
   const [menuOpen, setMenuOpen] = useState(null);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (menuOpen === null) return;
+    const close = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(null);
+    };
+    document.addEventListener('pointerdown', close);
+    return () => document.removeEventListener('pointerdown', close);
+  }, [menuOpen]);
 
   const handleRemove = async (id) => {
     setMenuOpen(null);
@@ -312,27 +354,28 @@ function FriendsTab({ friends, loading, onRemove, onOpenProfile }) {
       </p>
       {friends.map((f) => (
         <UserRow key={f.id} name={f.display_name} avatarUrl={f.avatar_url} onClick={onOpenProfile ? () => onOpenProfile(f.user_id) : undefined}>
-          <div className="relative">
+          <div className="relative" ref={menuOpen === f.id ? menuRef : undefined}>
             <button
               type="button"
               onClick={() => setMenuOpen(menuOpen === f.id ? null : f.id)}
+              aria-label={`Mais opções para ${f.display_name}`}
+              aria-expanded={menuOpen === f.id}
+              aria-haspopup="menu"
               className="p-2 text-zinc-500 hover:text-white transition-colors"
             >
-              <MoreHorizontal className="w-5 h-5" />
+              <MoreHorizontal className="w-5 h-5" aria-hidden="true" />
             </button>
             {menuOpen === f.id && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(null)} />
-                <div className="absolute right-0 top-full mt-1 z-20 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl py-1 min-w-[140px]">
-                  <button
-                    type="button"
-                    onClick={() => handleRemove(f.id)}
-                    className="w-full text-left px-4 py-2.5 text-[13px] text-red-400 hover:bg-zinc-700/50 transition-colors"
-                  >
-                    Remover amigo
-                  </button>
-                </div>
-              </>
+              <div role="menu" className="absolute right-0 top-full mt-1 z-20 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl py-1 min-w-[140px]">
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => handleRemove(f.id)}
+                  className="w-full text-left px-4 py-2.5 text-[13px] text-red-400 hover:bg-zinc-700/50 transition-colors"
+                >
+                  Remover amigo
+                </button>
+              </div>
             )}
           </div>
         </UserRow>

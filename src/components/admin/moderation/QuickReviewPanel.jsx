@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '../../ui/Button.jsx';
 import { RejectionPanel } from './RejectionModal.jsx';
+import { Dialog, DialogContent, DialogTitle } from '../../ui/dialog.jsx';
 
 function UserContextPanel({ userContext, userContextLoading, userContextError, pct, focused, copyText }) {
   return (
@@ -154,16 +155,21 @@ export function QuickReviewPanel({
   if (!focused) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/90 overflow-y-auto p-4">
-      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 w-full max-w-lg mx-auto space-y-4 my-4">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="text-xs text-zinc-500 font-mono truncate">{focusedTenant}</p>
-            <p className="text-lg font-black text-white truncate">{focusedName}</p>
-            <p className="text-xs text-zinc-500 mt-1">{focused.tipo_treino} · {focused.checkin_local_date} · +{focused.points_awarded} pts</p>
+    <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent
+        className="fixed inset-0 left-0 top-0 w-full h-full max-w-none translate-x-0 translate-y-0 rounded-none border-0 bg-black/90 p-0 overflow-y-auto"
+        showClose={false}
+      >
+        <DialogTitle className="sr-only">Revisão de check-in</DialogTitle>
+        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 w-full max-w-lg mx-auto space-y-4 my-4">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-xs text-zinc-500 font-mono truncate">{focusedTenant}</p>
+              <p className="text-lg font-black text-white truncate">{focusedName}</p>
+              <p className="text-xs text-zinc-500 mt-1">{focused.tipo_treino} · {focused.checkin_local_date} · +{focused.points_awarded} pts</p>
+            </div>
+            <button type="button" onClick={onClose} className="text-sm text-zinc-500 hover:text-green-400">Fechar</button>
           </div>
-          <button type="button" onClick={onClose} className="text-sm text-zinc-500 hover:text-green-400">Fechar</button>
-        </div>
 
         <div className="flex flex-wrap gap-2 text-[10px] text-zinc-500 uppercase">
           <span className="border border-zinc-800 rounded-full px-2 py-1">A aprovar</span>
@@ -228,7 +234,8 @@ export function QuickReviewPanel({
             onCancel={onCloseReject} onSubmit={onSubmitReject}
           />
         ) : null}
-      </div>
-    </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

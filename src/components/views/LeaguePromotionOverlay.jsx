@@ -30,6 +30,9 @@ export function LeaguePromotionOverlay({ league, onClose, onShare }) {
 
   return (
     <div
+      role="status"
+      aria-live="polite"
+      aria-label={`Promoção para Liga ${config.name}`}
       className={`fixed inset-0 z-[70] flex items-center justify-center bg-black/90 backdrop-blur-md transition-opacity duration-500 ${
         visible ? 'opacity-100' : 'opacity-0'
       }`}
@@ -37,6 +40,7 @@ export function LeaguePromotionOverlay({ league, onClose, onShare }) {
     >
       <button
         onClick={handleClose}
+        aria-label="Fechar"
         className="absolute top-6 right-6 text-zinc-500 hover:text-white transition-colors z-10"
       >
         <X className="w-6 h-6" />

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, ChevronUp, Eye, Loader2, Pause, Play, Share2, Trash2, X } from 'lucide-react';
 import { UserAvatar } from '../ui/user-avatar.jsx';
+import { Dialog, DialogContent, DialogTitle } from '../ui/dialog.jsx';
 
 function formatTimeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -194,9 +195,15 @@ export function StoryViewer({
 
   if (loading) {
     return (
-      <div className="fixed inset-0 z-[60] bg-black flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
-      </div>
+      <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
+        <DialogContent
+          className="fixed inset-0 left-0 top-0 w-full h-full max-w-none translate-x-0 translate-y-0 rounded-none border-0 bg-black p-0 flex items-center justify-center"
+          showClose={false}
+        >
+          <DialogTitle className="sr-only">Story</DialogTitle>
+          <div className="w-6 h-6 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+        </DialogContent>
+      </Dialog>
     );
   }
 
@@ -206,7 +213,12 @@ export function StoryViewer({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] bg-black flex flex-col select-none">
+    <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent
+        className="fixed inset-0 left-0 top-0 w-full h-full max-w-none translate-x-0 translate-y-0 rounded-none border-0 bg-black p-0 flex flex-col select-none"
+        showClose={false}
+      >
+        <DialogTitle className="sr-only">Story de {displayName}</DialogTitle>
       {/* Progress bars */}
       <div className="absolute top-0 left-0 right-0 z-20 flex gap-1 px-2 pt-2">
         {stories.map((s, i) => (
@@ -234,16 +246,16 @@ export function StoryViewer({
         </div>
         <div className="flex items-center gap-2">
           {paused && !viewersOpen ? (
-            <button type="button" onClick={resumeTimer} className="w-8 h-8 rounded-full bg-black/40 flex items-center justify-center">
-              <Play className="w-4 h-4 text-white" />
+            <button type="button" onClick={resumeTimer} aria-label="Reproduzir" className="w-8 h-8 rounded-full bg-black/40 flex items-center justify-center">
+              <Play className="w-4 h-4 text-white" aria-hidden="true" />
             </button>
           ) : !viewersOpen ? (
-            <button type="button" onClick={pauseTimer} className="w-8 h-8 rounded-full bg-black/40 flex items-center justify-center">
-              <Pause className="w-4 h-4 text-white" />
+            <button type="button" onClick={pauseTimer} aria-label="Pausar" className="w-8 h-8 rounded-full bg-black/40 flex items-center justify-center">
+              <Pause className="w-4 h-4 text-white" aria-hidden="true" />
             </button>
           ) : null}
-          <button type="button" onClick={onClose} className="w-8 h-8 rounded-full bg-black/40 flex items-center justify-center">
-            <X className="w-4 h-4 text-white" />
+          <button type="button" onClick={onClose} aria-label="Fechar" className="w-8 h-8 rounded-full bg-black/40 flex items-center justify-center">
+            <X className="w-4 h-4 text-white" aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -306,17 +318,19 @@ export function StoryViewer({
                   <button
                     type="button"
                     onClick={() => onShare(current)}
+                    aria-label="Compartilhar story"
                     className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center"
                   >
-                    <Share2 className="w-4 h-4 text-white" />
+                    <Share2 className="w-4 h-4 text-white" aria-hidden="true" />
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={handleDelete}
+                  aria-label="Excluir story"
                   className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center"
                 >
-                  <Trash2 className="w-4 h-4 text-red-400" />
+                  <Trash2 className="w-4 h-4 text-red-400" aria-hidden="true" />
                 </button>
               </>
             )}
@@ -326,9 +340,10 @@ export function StoryViewer({
                 <button
                   type="button"
                   onClick={() => onShare(current)}
+                  aria-label="Compartilhar story"
                   className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center"
                 >
-                  <Share2 className="w-4 h-4 text-white" />
+                  <Share2 className="w-4 h-4 text-white" aria-hidden="true" />
                 </button>
               </>
             )}
@@ -361,9 +376,10 @@ export function StoryViewer({
             <button
               type="button"
               onClick={closeViewers}
+              aria-label="Fechar visualizações"
               className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center"
             >
-              <X className="w-4 h-4 text-zinc-400" />
+              <X className="w-4 h-4 text-zinc-400" aria-hidden="true" />
             </button>
           </div>
 
@@ -409,6 +425,7 @@ export function StoryViewer({
           </div>
         </div>
       )}
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

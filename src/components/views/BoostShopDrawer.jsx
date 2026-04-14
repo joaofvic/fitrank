@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Zap, Crown, Loader2, X, Check } from 'lucide-react';
+import { Zap, Crown, Loader2, Check } from 'lucide-react';
 import { Button } from '../ui/Button.jsx';
 import { playSound } from '../../lib/sounds.js';
 import { haptic } from '../../lib/haptics.js';
+import { Sheet, SheetContent, SheetTitle } from '../ui/sheet.jsx';
 
 const BOOST_OPTIONS = [10, 25, 50, 100];
 
@@ -47,19 +48,13 @@ export function BoostShopDrawer({ onGetStatus, onPurchase, onClose }) {
   const canBoost = status?.is_pro && (status?.boosts_remaining ?? 0) > 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div
-        className="w-full max-w-lg bg-zinc-900 border-t border-zinc-800 rounded-t-2xl p-6 pb-8 space-y-5 animate-in-slide-up"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Sheet open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <SheetContent side="bottom" className="max-w-lg mx-auto p-6 pb-8 space-y-5" showClose={false}>
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-white flex items-center gap-2">
+          <SheetTitle className="text-lg font-bold text-white flex items-center gap-2">
             <Zap className="w-5 h-5 text-green-500 fill-green-500" />
             Boost de Pontos
-          </h3>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors">
-            <X className="w-5 h-5" />
-          </button>
+          </SheetTitle>
         </div>
 
         {loading ? (
@@ -152,7 +147,7 @@ export function BoostShopDrawer({ onGetStatus, onPurchase, onClose }) {
             </Button>
           </>
         )}
-      </div>
-    </div>
+      </SheetContent>
+    </Sheet>
   );
 }

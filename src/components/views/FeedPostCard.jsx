@@ -91,14 +91,18 @@ export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenLikes, 
               <button
                 type="button"
                 onClick={() => setMenuOpen((v) => !v)}
+                aria-label="Mais opções"
+                aria-expanded={menuOpen}
+                aria-haspopup="menu"
                 className="p-1 text-zinc-600 hover:text-white transition-colors"
               >
-                <MoreHorizontal className="w-5 h-5" />
+                <MoreHorizontal className="w-5 h-5" aria-hidden="true" />
               </button>
               {menuOpen && (
-                <div className="absolute right-0 top-full mt-1 w-56 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl z-50 py-1 animate-in-fade">
+                <div role="menu" className="absolute right-0 top-full mt-1 w-56 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl z-50 py-1 animate-in-fade">
                   <button
                     type="button"
+                    role="menuitem"
                     onClick={() => {
                       onUpdatePrivacy(post.id, { allow_comments: !post.allow_comments });
                       setMenuOpen(false);
@@ -106,14 +110,15 @@ export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenLikes, 
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-zinc-800 transition-colors"
                   >
                     {post.allow_comments !== false
-                      ? <MessageCircleOff size={16} className="text-zinc-400 shrink-0" />
-                      : <MessageCircle size={16} className="text-green-400 shrink-0" />}
+                      ? <MessageCircleOff size={16} className="text-zinc-400 shrink-0" aria-hidden="true" />
+                      : <MessageCircle size={16} className="text-green-400 shrink-0" aria-hidden="true" />}
                     <span className="text-xs text-zinc-300">
                       {post.allow_comments !== false ? 'Desativar comentários' : 'Ativar comentários'}
                     </span>
                   </button>
                   <button
                     type="button"
+                    role="menuitem"
                     onClick={() => {
                       onUpdatePrivacy(post.id, { hide_likes_count: !post.hide_likes_count });
                       setMenuOpen(false);
@@ -121,17 +126,18 @@ export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenLikes, 
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-zinc-800 transition-colors"
                   >
                     {post.hide_likes_count
-                      ? <Eye size={16} className="text-green-400 shrink-0" />
-                      : <EyeOff size={16} className="text-zinc-400 shrink-0" />}
+                      ? <Eye size={16} className="text-green-400 shrink-0" aria-hidden="true" />
+                      : <EyeOff size={16} className="text-zinc-400 shrink-0" aria-hidden="true" />}
                     <span className="text-xs text-zinc-300">
                       {post.hide_likes_count ? 'Mostrar curtidas' : 'Ocultar curtidas'}
                     </span>
                   </button>
                   {onDeletePost && (
                     <>
-                      <div className="border-t border-zinc-700/50 my-1" />
+                      <div className="border-t border-zinc-700/50 my-1" role="separator" />
                       <button
                         type="button"
+                        role="menuitem"
                         onClick={async () => {
                           setMenuOpen(false);
                           if (confirm('Tem certeza que deseja excluir este post? Esta ação não pode ser desfeita.')) {
@@ -141,7 +147,7 @@ export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenLikes, 
                         }}
                         className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-red-500/10 transition-colors"
                       >
-                        <Trash2 size={16} className="text-red-400 shrink-0" />
+                        <Trash2 size={16} className="text-red-400 shrink-0" aria-hidden="true" />
                         <span className="text-xs text-red-400">Excluir post</span>
                       </button>
                     </>
@@ -158,7 +164,7 @@ export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenLikes, 
           <div className="w-full aspect-square bg-zinc-900">
             <img
               src={post.foto_url}
-              alt=""
+              alt={`${post.display_name} — ${post.workout_type}`}
               className="w-full h-full object-cover"
               loading="lazy"
             />
@@ -182,8 +188,15 @@ export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenLikes, 
       <div className="px-4 pt-3 pb-1">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button type="button" onClick={handleLike} className="group -ml-1 p-1">
+            <button
+              type="button"
+              onClick={handleLike}
+              aria-label={post.has_liked ? 'Descurtir' : 'Curtir'}
+              aria-pressed={!!post.has_liked}
+              className="group -ml-1 p-1"
+            >
               <Heart
+                aria-hidden="true"
                 className={`w-6 h-6 transition-all ${
                   post.has_liked
                     ? 'text-red-500 fill-red-500 scale-110'
@@ -192,13 +205,13 @@ export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenLikes, 
               />
             </button>
             {post.allow_comments !== false && (
-              <button type="button" onClick={() => onOpenComments?.(post.id)} className="group p-1">
-                <MessageCircle className="w-6 h-6 text-white group-hover:text-zinc-400 transition-colors" />
+              <button type="button" onClick={() => onOpenComments?.(post.id)} aria-label="Comentários" className="group p-1">
+                <MessageCircle className="w-6 h-6 text-white group-hover:text-zinc-400 transition-colors" aria-hidden="true" />
               </button>
             )}
             {onShare && (
-              <button type="button" onClick={() => onShare(post)} className="group p-1">
-                <Share2 className="w-6 h-6 text-white group-hover:text-zinc-400 transition-colors" />
+              <button type="button" onClick={() => onShare(post)} aria-label="Compartilhar" className="group p-1">
+                <Share2 className="w-6 h-6 text-white group-hover:text-zinc-400 transition-colors" aria-hidden="true" />
               </button>
             )}
           </div>
@@ -219,14 +232,17 @@ export function FeedPostCard({ post, onToggleLike, onOpenComments, onOpenLikes, 
           </button>
         )}
         <p className="text-[13px] text-zinc-300">
-          <span
-            role={onOpenProfile ? 'button' : undefined}
-            tabIndex={onOpenProfile ? 0 : undefined}
-            onClick={onOpenProfile ? () => onOpenProfile(post.user_id) : undefined}
-            className={`font-semibold text-white ${onOpenProfile ? 'cursor-pointer hover:underline' : ''}`}
-          >
-            {post.display_name}
-          </span>
+          {onOpenProfile ? (
+            <button
+              type="button"
+              onClick={() => onOpenProfile(post.user_id)}
+              className="inline font-semibold text-white hover:underline"
+            >
+              {post.display_name}
+            </button>
+          ) : (
+            <span className="font-semibold text-white">{post.display_name}</span>
+          )}
           {' '}
           <span className="text-zinc-400">
             {post.caption ? renderCaption(post.caption, onMentionClick, onHashtagClick) : post.workout_type}

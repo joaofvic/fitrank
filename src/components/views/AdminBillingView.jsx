@@ -7,6 +7,7 @@ import { useAuth } from '../auth/AuthProvider.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Card } from '../ui/Card.jsx';
 import { invokeEdge } from '../../lib/supabase/invoke-edge.js';
+import { Dialog, DialogContent, DialogTitle } from '../ui/dialog.jsx';
 
 const SUB_STATUS_LABELS = {
   active: 'Ativo',
@@ -764,35 +765,36 @@ export function AdminBillingView({ onBack }) {
       {/* ================================================================= */}
       {/* CONFIRM MODAL */}
       {/* ================================================================= */}
-      {confirmAction && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setConfirmAction(null)} />
-          <Card className="relative z-10 max-w-sm w-full space-y-4">
-            <h4 className="font-bold text-white">Confirmar ação</h4>
-            <p className="text-sm text-zinc-400">
-              {confirmAction.actionType === 'cancel' && 'A assinatura será cancelada ao fim do período atual. O usuário mantém acesso até lá.'}
-              {confirmAction.actionType === 'cancel-now' && 'A assinatura será cancelada imediatamente. O acesso PRO será removido agora.'}
-              {confirmAction.actionType === 'refund' && 'O pagamento será reembolsado via Cakto. A assinatura será cancelada e o acesso PRO removido.'}
-            </p>
-            <p className="text-xs text-zinc-500">
-              Usuário: {confirmAction.sub.user_display_name || confirmAction.sub.user_email || '—'}
-            </p>
-            <div className="flex gap-3">
-              <Button
-                onClick={executeConfirmAction}
-                disabled={busy}
-                variant={confirmAction.actionType.includes('cancel') ? 'secondary' : 'primary'}
-                className="flex-1 py-2.5"
-              >
-                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Confirmar'}
-              </Button>
-              <Button variant="outline" onClick={() => setConfirmAction(null)} disabled={busy} className="py-2.5">
-                Voltar
-              </Button>
-            </div>
-          </Card>
-        </div>
-      )}
+      <Dialog open={!!confirmAction} onOpenChange={(v) => { if (!v) setConfirmAction(null); }}>
+        <DialogContent className="max-w-sm space-y-4">
+          <DialogTitle className="font-bold text-white">Confirmar ação</DialogTitle>
+          {confirmAction && (
+            <>
+              <p className="text-sm text-zinc-400">
+                {confirmAction.actionType === 'cancel' && 'A assinatura será cancelada ao fim do período atual. O usuário mantém acesso até lá.'}
+                {confirmAction.actionType === 'cancel-now' && 'A assinatura será cancelada imediatamente. O acesso PRO será removido agora.'}
+                {confirmAction.actionType === 'refund' && 'O pagamento será reembolsado via Cakto. A assinatura será cancelada e o acesso PRO removido.'}
+              </p>
+              <p className="text-xs text-zinc-500">
+                Usuário: {confirmAction.sub.user_display_name || confirmAction.sub.user_email || '—'}
+              </p>
+              <div className="flex gap-3">
+                <Button
+                  onClick={executeConfirmAction}
+                  disabled={busy}
+                  variant={confirmAction.actionType.includes('cancel') ? 'secondary' : 'primary'}
+                  className="flex-1 py-2.5"
+                >
+                  {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Confirmar'}
+                </Button>
+                <Button variant="outline" onClick={() => setConfirmAction(null)} disabled={busy} className="py-2.5">
+                  Voltar
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Toast */}
       {toast && (
