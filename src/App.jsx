@@ -169,7 +169,7 @@ export default function App() {
     }
   }, [useCloud, userData, checkins]);
 
-  const LEAGUE_ORDER = ['bronze', 'prata', 'ouro', 'platina', 'diamante'];
+  const LEAGUE_ORDER = ['bronze', 'silver', 'gold', 'platinum', 'diamond'];
   useEffect(() => {
     const currentLeague = profile?.league;
     if (!currentLeague) return;
