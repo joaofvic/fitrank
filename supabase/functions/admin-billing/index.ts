@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { z } from 'npm:zod@3.24.2';
-import { createCaktoClient, CaktoClient } from '../_shared/cakto-client.ts';
+import { createMpClient } from '../_shared/mp-client.ts';
+import type { MpClient } from '../_shared/mp-client.ts';
 
 // ============================================================
 // Schemas
@@ -17,7 +18,6 @@ const createPlanSchema = z.object({
   limits: z.record(z.unknown()).default({}),
   sort_order: z.number().int().default(0),
   metadata: z.record(z.unknown()).default({}),
-  cakto_product_id: z.string().min(1, 'cakto_product_id obrigatório')
 });
 
 const updatePlanSchema = z.object({
@@ -32,23 +32,23 @@ const updatePlanSchema = z.object({
   price_amount: z.number().int().min(100).optional(),
   currency: z.string().length(3).optional(),
   interval: z.enum(['month', 'year']).optional(),
-  interval_count: z.number().int().min(1).max(12).optional()
+  interval_count: z.number().int().min(1).max(12).optional(),
 });
 
 const listSubscriptionsSchema = z.object({
   status: z.string().optional(),
   tenant_id: z.string().uuid().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
-  offset: z.coerce.number().int().min(0).default(0)
+  offset: z.coerce.number().int().min(0).default(0),
 });
 
 const subscriptionActionSchema = z.object({
-  subscription_id: z.string().uuid()
+  subscription_id: z.string().uuid(),
 });
 
 const cancelSubscriptionSchema = z.object({
   subscription_id: z.string().uuid(),
-  immediate: z.boolean().default(false)
+  immediate: z.boolean().default(false),
 });
 
 // ============================================================
@@ -58,13 +58,13 @@ const cancelSubscriptionSchema = z.object({
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS'
+  'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
 };
 
 function jsonResponse(body: unknown, status: number) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 }
 
@@ -87,16 +87,9 @@ async function insertPlatformAudit(
     target_type: row.target_type,
     target_id: row.target_id,
     tenant_id: row.tenant_id,
-    payload: row.payload
+    payload: row.payload,
   });
   if (error) console.error('platform_admin_audit_log', error);
-}
-
-function mapInterval(interval: string, intervalCount: number): { intervalType: 'month' | 'year'; interval: number } {
-  if (interval === 'year') {
-    return { intervalType: 'year', interval: intervalCount };
-  }
-  return { intervalType: 'month', interval: intervalCount };
 }
 
 // ============================================================
@@ -122,12 +115,12 @@ Deno.serve(async (req) => {
   }
 
   const userClient = createClient(supabaseUrl, anonKey, {
-    global: { headers: { Authorization: authHeader } }
+    global: { headers: { Authorization: authHeader } },
   });
 
   const {
     data: { user },
-    error: userError
+    error: userError,
   } = await userClient.auth.getUser();
 
   if (userError || !user) {
@@ -145,16 +138,8 @@ Deno.serve(async (req) => {
   }
 
   const admin = createClient(supabaseUrl, serviceKey, {
-    auth: { persistSession: false, autoRefreshToken: false }
+    auth: { persistSession: false, autoRefreshToken: false },
   });
-
-  let cakto: CaktoClient;
-  try {
-    cakto = createCaktoClient();
-  } catch (e) {
-    console.error('admin-billing: Cakto não configurado', e);
-    return jsonResponse({ error: 'Provedor de pagamento não configurado' }, 500);
-  }
 
   const url = new URL(req.url);
   const action = url.searchParams.get('action');
@@ -167,15 +152,15 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'create-plan' && req.method === 'POST') {
-      return await createPlan(admin, cakto, req, user.id);
+      return await createPlan(admin, req, user.id);
     }
 
     if (action === 'update-plan' && req.method === 'PATCH') {
-      return await updatePlan(admin, cakto, req, user.id);
+      return await updatePlan(admin, req, user.id);
     }
 
     if (action === 'archive-plan' && req.method === 'DELETE') {
-      return await archivePlan(admin, cakto, req, user.id);
+      return await archivePlan(admin, req, user.id);
     }
 
     // ========== ASSINATURAS ==========
@@ -189,7 +174,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'refund-subscription' && req.method === 'POST') {
-      return await refundSubscription(admin, cakto, req, user.id);
+      return await refundSubscription(admin, req, user.id);
     }
 
     // ========== MÉTRICAS ==========
@@ -218,7 +203,6 @@ async function listPlans(admin: AdminClient) {
 
 async function createPlan(
   admin: AdminClient,
-  cakto: CaktoClient,
   req: Request,
   actorId: string
 ) {
@@ -229,26 +213,9 @@ async function createPlan(
   }
   const input = parsed.data;
 
-  const { intervalType, interval } = mapInterval(input.interval, input.interval_count);
-
-  const offer = await cakto.createOffer({
-    name: input.name,
-    price: CaktoClient.centsToReais(input.price_amount),
-    product: input.cakto_product_id,
-    type: 'subscription',
-    status: 'active',
-    intervalType,
-    interval
-  });
-
-  const checkoutUrl = CaktoClient.checkoutUrl(offer.id);
-
   const { data: plan, error } = await admin
     .from('subscription_plans')
     .insert({
-      cakto_product_id: input.cakto_product_id,
-      cakto_offer_id: offer.id,
-      cakto_checkout_url: checkoutUrl,
       name: input.name,
       description: input.description ?? null,
       price_amount: input.price_amount,
@@ -258,7 +225,7 @@ async function createPlan(
       features: input.features,
       limits: input.limits,
       sort_order: input.sort_order,
-      metadata: input.metadata
+      metadata: input.metadata,
     })
     .select('*')
     .single();
@@ -271,7 +238,7 @@ async function createPlan(
     target_type: 'plan',
     target_id: plan.id,
     tenant_id: null,
-    payload: { name: input.name, price_amount: input.price_amount, cakto_offer_id: offer.id }
+    payload: { name: input.name, price_amount: input.price_amount },
   });
 
   return jsonResponse({ plan }, 201);
@@ -279,7 +246,6 @@ async function createPlan(
 
 async function updatePlan(
   admin: AdminClient,
-  cakto: CaktoClient,
   req: Request,
   actorId: string
 ) {
@@ -288,7 +254,7 @@ async function updatePlan(
   if (!parsed.success) {
     return jsonResponse({ error: 'Payload inválido', details: parsed.error.flatten() }, 400);
   }
-  const { plan_id, price_amount, currency, interval, interval_count, ...fields } = parsed.data;
+  const { plan_id, ...fields } = parsed.data;
 
   const { data: existing, error: fetchErr } = await admin
     .from('subscription_plans')
@@ -307,43 +273,10 @@ async function updatePlan(
   if (fields.is_active !== undefined) dbUpdate.is_active = fields.is_active;
   if (fields.sort_order !== undefined) dbUpdate.sort_order = fields.sort_order;
   if (fields.metadata !== undefined) dbUpdate.metadata = fields.metadata;
-
-  const needsNewOffer = price_amount !== undefined || interval !== undefined || interval_count !== undefined;
-
-  if (needsNewOffer && existing.cakto_offer_id) {
-    await cakto.disableOffer(existing.cakto_offer_id);
-
-    const { intervalType: iType, interval: iVal } = mapInterval(
-      interval ?? existing.interval,
-      interval_count ?? existing.interval_count
-    );
-
-    const newOffer = await cakto.createOffer({
-      name: fields.name ?? existing.name,
-      price: CaktoClient.centsToReais(price_amount ?? existing.price_amount),
-      product: existing.cakto_product_id,
-      type: 'subscription',
-      status: 'active',
-      intervalType: iType,
-      interval: iVal
-    });
-
-    dbUpdate.cakto_offer_id = newOffer.id;
-    dbUpdate.cakto_checkout_url = CaktoClient.checkoutUrl(newOffer.id);
-    dbUpdate.price_amount = price_amount ?? existing.price_amount;
-    dbUpdate.currency = currency ?? existing.currency;
-    dbUpdate.interval = interval ?? existing.interval;
-    dbUpdate.interval_count = interval_count ?? existing.interval_count;
-  } else if (existing.cakto_offer_id) {
-    const offerUpdate: Record<string, unknown> = {};
-    if (fields.name !== undefined) offerUpdate.name = fields.name;
-    if (fields.is_active === false) offerUpdate.status = 'disabled';
-    else if (fields.is_active === true) offerUpdate.status = 'active';
-
-    if (Object.keys(offerUpdate).length > 0) {
-      await cakto.updateOffer(existing.cakto_offer_id, offerUpdate as Parameters<typeof cakto.updateOffer>[1]);
-    }
-  }
+  if (fields.price_amount !== undefined) dbUpdate.price_amount = fields.price_amount;
+  if (fields.currency !== undefined) dbUpdate.currency = fields.currency;
+  if (fields.interval !== undefined) dbUpdate.interval = fields.interval;
+  if (fields.interval_count !== undefined) dbUpdate.interval_count = fields.interval_count;
 
   if (Object.keys(dbUpdate).length === 0) {
     return jsonResponse({ plan: existing }, 200);
@@ -364,7 +297,7 @@ async function updatePlan(
     target_type: 'plan',
     target_id: plan_id,
     tenant_id: null,
-    payload: { changes: Object.keys(dbUpdate), new_offer: needsNewOffer }
+    payload: { changes: Object.keys(dbUpdate) },
   });
 
   return jsonResponse({ plan: updated }, 200);
@@ -372,7 +305,6 @@ async function updatePlan(
 
 async function archivePlan(
   admin: AdminClient,
-  cakto: CaktoClient,
   req: Request,
   actorId: string
 ) {
@@ -385,20 +317,12 @@ async function archivePlan(
 
   const { data: existing, error: fetchErr } = await admin
     .from('subscription_plans')
-    .select('id, cakto_product_id, cakto_offer_id, name')
+    .select('id, name')
     .eq('id', plan_id)
     .maybeSingle();
 
   if (fetchErr) throw fetchErr;
   if (!existing) return jsonResponse({ error: 'Plano não encontrado' }, 404);
-
-  if (existing.cakto_offer_id) {
-    try {
-      await cakto.disableOffer(existing.cakto_offer_id);
-    } catch (e) {
-      console.error('admin-billing: falha ao desabilitar oferta Cakto', e);
-    }
-  }
 
   const { error: updateErr } = await admin
     .from('subscription_plans')
@@ -413,7 +337,7 @@ async function archivePlan(
     target_type: 'plan',
     target_id: plan_id,
     tenant_id: null,
-    payload: { name: existing.name }
+    payload: { name: existing.name },
   });
 
   return jsonResponse({ success: true }, 200);
@@ -435,7 +359,7 @@ async function listSubscriptions(admin: AdminClient, url: URL) {
     p_status: status ?? null,
     p_tenant_id: tenant_id ?? null,
     p_limit: limit,
-    p_offset: offset
+    p_offset: offset,
   });
 
   if (error) throw error;
@@ -456,7 +380,7 @@ async function cancelSubscription(
 
   const { data: sub } = await admin
     .from('subscriptions')
-    .select('cakto_order_id, user_id, tenant_id')
+    .select('mp_payment_id, user_id, tenant_id')
     .eq('id', subscription_id)
     .maybeSingle();
 
@@ -469,16 +393,16 @@ async function cancelSubscription(
       .from('subscriptions')
       .update({
         status: 'canceled',
-        canceled_at: new Date().toISOString()
+        canceled_at: new Date().toISOString(),
       })
       .eq('id', subscription_id);
 
     if (sub.user_id) {
-      await admin.rpc('internal_update_profile_cakto', {
+      await admin.rpc('internal_update_profile_mp', {
         p_user_id: sub.user_id,
         p_is_pro: false,
-        p_cakto_customer_email: null,
-        p_cakto_order_id: sub.cakto_order_id
+        p_mp_payer_email: null,
+        p_mp_payment_id: sub.mp_payment_id,
       });
     }
   } else {
@@ -490,11 +414,13 @@ async function cancelSubscription(
 
   await insertPlatformAudit(admin, {
     actor_id: actorId,
-    action: immediate ? 'billing.subscription_canceled_immediate' : 'billing.subscription_canceled_end_of_period',
+    action: immediate
+      ? 'billing.subscription_canceled_immediate'
+      : 'billing.subscription_canceled_end_of_period',
     target_type: 'subscription',
     target_id: subscription_id,
     tenant_id: sub.tenant_id,
-    payload: { user_id: sub.user_id, cakto_order_id: sub.cakto_order_id }
+    payload: { user_id: sub.user_id, mp_payment_id: sub.mp_payment_id },
   });
 
   return jsonResponse({ success: true, immediate }, 200);
@@ -502,7 +428,6 @@ async function cancelSubscription(
 
 async function refundSubscription(
   admin: AdminClient,
-  cakto: CaktoClient,
   req: Request,
   actorId: string
 ) {
@@ -515,37 +440,44 @@ async function refundSubscription(
 
   const { data: sub } = await admin
     .from('subscriptions')
-    .select('cakto_order_id, user_id, tenant_id')
+    .select('mp_payment_id, user_id, tenant_id')
     .eq('id', subscription_id)
     .maybeSingle();
 
-  if (!sub?.cakto_order_id) {
-    return jsonResponse({ error: 'Assinatura não encontrada ou sem ID Cakto' }, 404);
+  if (!sub?.mp_payment_id) {
+    return jsonResponse({ error: 'Assinatura não encontrada ou sem ID de pagamento' }, 404);
   }
 
-  const result = await cakto.refundOrder(sub.cakto_order_id);
+  let mp: MpClient;
+  try {
+    mp = createMpClient();
+  } catch {
+    return jsonResponse({ error: 'Provedor de pagamento não configurado' }, 500);
+  }
+
+  const result = await mp.refundPayment(sub.mp_payment_id);
 
   await admin
     .from('subscriptions')
     .update({
       status: 'canceled',
-      canceled_at: new Date().toISOString()
+      canceled_at: new Date().toISOString(),
     })
     .eq('id', subscription_id);
 
   if (sub.user_id) {
-    await admin.rpc('internal_update_profile_cakto', {
+    await admin.rpc('internal_update_profile_mp', {
       p_user_id: sub.user_id,
       p_is_pro: false,
-      p_cakto_customer_email: null,
-      p_cakto_order_id: sub.cakto_order_id
+      p_mp_payer_email: null,
+      p_mp_payment_id: sub.mp_payment_id,
     });
   }
 
   await admin
     .from('pagamentos')
     .update({ status: 'refunded' })
-    .eq('id_externo', sub.cakto_order_id);
+    .eq('id_externo', sub.mp_payment_id);
 
   await insertPlatformAudit(admin, {
     actor_id: actorId,
@@ -553,10 +485,10 @@ async function refundSubscription(
     target_type: 'subscription',
     target_id: subscription_id,
     tenant_id: sub.tenant_id,
-    payload: { user_id: sub.user_id, cakto_order_id: sub.cakto_order_id, cakto_result: result }
+    payload: { user_id: sub.user_id, mp_payment_id: sub.mp_payment_id, mp_result: result },
   });
 
-  return jsonResponse({ success: true, detail: result.detail }, 200);
+  return jsonResponse({ success: true, detail: result.status }, 200);
 }
 
 // ============================================================

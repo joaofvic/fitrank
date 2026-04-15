@@ -17,11 +17,29 @@ verify_jwt = false
 [functions.admin-billing]
 verify_jwt = false
 
-[functions.cakto-checkout]
+[functions.mp-checkout]
 verify_jwt = false
 
-[functions.cakto-webhook]
+[functions.mp-webhook]
 verify_jwt = false
 
 [functions.challenge-enroll]
+verify_jwt = false
+
+[functions.admin-challenges]
+verify_jwt = false
+
+[functions.admin-observability]
+verify_jwt = false
+
+[functions.generate-workout-plan]
+verify_jwt = false
+
+[functions.training-reminder]
+verify_jwt = false
+
+[functions.send-push]
+verify_jwt = false
+
+[functions.mp-create-payment]
 verify_jwt = false

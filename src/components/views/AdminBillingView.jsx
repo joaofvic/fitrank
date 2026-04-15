@@ -94,7 +94,6 @@ export function AdminBillingView({ onBack }) {
     features: [''],
     limits: '{}',
     sort_order: 0,
-    cakto_product_id: ''
   };
   const [formData, setFormData] = useState(defaultForm);
 
@@ -184,7 +183,6 @@ export function AdminBillingView({ onBack }) {
       features: plan.features?.length ? plan.features : [''],
       limits: JSON.stringify(plan.limits || {}, null, 2),
       sort_order: plan.sort_order ?? 0,
-      cakto_product_id: plan.cakto_product_id || ''
     });
     setSubView('form');
     setError(null);
@@ -232,7 +230,6 @@ export function AdminBillingView({ onBack }) {
         features,
         limits,
         sort_order: Number(formData.sort_order),
-        cakto_product_id: formData.cakto_product_id.trim()
       };
       const { data, error: err } = await invokeEdge('admin-billing', supabase, {
         method: 'POST',
@@ -648,22 +645,6 @@ export function AdminBillingView({ onBack }) {
               />
             </div>
 
-            {!editingPlan && (
-              <div>
-                <label className="text-[10px] uppercase font-black text-zinc-500 block mb-1">Produto Cakto (ID)</label>
-                <input
-                  type="text"
-                  value={formData.cakto_product_id}
-                  onChange={e => setFormData(p => ({ ...p, cakto_product_id: e.target.value }))}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-green-500/50"
-                  placeholder="UUID do produto na Cakto"
-                />
-                <p className="text-[10px] text-zinc-600 mt-1">
-                  ID do produto de assinatura criado no painel Cakto.
-                </p>
-              </div>
-            )}
-
             <div>
               <label className="text-[10px] uppercase font-black text-zinc-500 block mb-1">Ordem de exibição</label>
               <input
@@ -678,7 +659,7 @@ export function AdminBillingView({ onBack }) {
           <div className="flex gap-3">
             <Button
               onClick={handleSavePlan}
-              disabled={busy || !formData.name.trim() || !formData.price_amount || (!editingPlan && !formData.cakto_product_id.trim())}
+              disabled={busy || !formData.name.trim() || !formData.price_amount}
               className="flex-1 py-3"
             >
               {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
@@ -773,7 +754,7 @@ export function AdminBillingView({ onBack }) {
               <p className="text-sm text-zinc-400">
                 {confirmAction.actionType === 'cancel' && 'A assinatura será cancelada ao fim do período atual. O usuário mantém acesso até lá.'}
                 {confirmAction.actionType === 'cancel-now' && 'A assinatura será cancelada imediatamente. O acesso PRO será removido agora.'}
-                {confirmAction.actionType === 'refund' && 'O pagamento será reembolsado via Cakto. A assinatura será cancelada e o acesso PRO removido.'}
+                {confirmAction.actionType === 'refund' && 'O pagamento será reembolsado via Mercado Pago. A assinatura será cancelada e o acesso PRO removido.'}
               </p>
               <p className="text-xs text-zinc-500">
                 Usuário: {confirmAction.sub.user_display_name || confirmAction.sub.user_email || '—'}

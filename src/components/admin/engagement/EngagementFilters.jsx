@@ -82,7 +82,7 @@ export function EngagementFilters({
           </select>
           <p className="text-[9px] text-zinc-600 leading-snug">
             Pago considera <span className="font-mono text-zinc-500">is_pro</span> ou{' '}
-            <span className="font-mono text-zinc-500">cakto_order_id</span> preenchido.
+            <span className="font-mono text-zinc-500">mp_payment_id</span> preenchido.
           </p>
         </div>
       </div>

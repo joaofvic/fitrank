@@ -7,6 +7,7 @@ import { Button } from '../ui/Button.jsx';
 import { invokeEdge } from '../../lib/supabase/invoke-edge.js';
 import { logger } from '../../lib/logger.js';
 import { ChallengesSkeleton } from '../ui/Skeleton.jsx';
+import { ChallengeCheckoutBricks } from '../payments/mp/ChallengeCheckoutBricks.jsx';
 
 function formatDateBR(iso) {
   if (!iso) return '—';
@@ -39,6 +40,7 @@ export function ChallengesView({ onRegisterRefresh }) {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState(null);
+  const [checkoutDesafioId, setCheckoutDesafioId] = useState(null);
 
   const tenantId = profile?.tenant_id;
   const userId = session?.user?.id;
@@ -131,6 +133,7 @@ export function ChallengesView({ onRegisterRefresh }) {
       if (data?.error) throw new Error(data.error);
 
       if (data?.url) {
+        // Fluxo legado (Checkout Pro). Mantido por compatibilidade, mas preferimos Bricks embutido.
         window.location.href = data.url;
         return;
       }
@@ -294,21 +297,33 @@ export function ChallengesView({ onRegisterRefresh }) {
 
                   {/* Enrollment action */}
                   {!isEnrolled ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={!!busyId || !!isFull}
-                      onClick={() => handleParticipar(d.id)}
-                      className="w-full py-2.5 text-sm"
-                    >
-                      {busyId === d.id
-                        ? 'Processando…'
-                        : isFull
-                          ? 'Vagas esgotadas'
-                          : d.entry_fee > 0
-                            ? `Inscrever-se — R$ ${(d.entry_fee / 100).toFixed(2).replace('.', ',')}`
-                            : 'Participar do desafio'}
-                    </Button>
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={!!busyId || !!isFull}
+                        onClick={() => {
+                          if (d.entry_fee > 0) {
+                            setCheckoutDesafioId((prev) => (prev === d.id ? null : d.id));
+                          } else {
+                            handleParticipar(d.id);
+                          }
+                        }}
+                        className="w-full py-2.5 text-sm"
+                      >
+                        {busyId === d.id
+                          ? 'Processando…'
+                          : isFull
+                            ? 'Vagas esgotadas'
+                            : d.entry_fee > 0
+                              ? `Pagar e inscrever-se — R$ ${(d.entry_fee / 100).toFixed(2).replace('.', ',')}`
+                              : 'Participar do desafio'}
+                      </Button>
+
+                      {d.entry_fee > 0 && checkoutDesafioId === d.id && (
+                        <ChallengeCheckoutBricks supabase={supabase} desafio={d} />
+                      )}
+                    </>
                   ) : (
                     <p className="text-green-400 text-sm font-bold">
                       Você está inscrito — seus check-ins somam pontos aqui.

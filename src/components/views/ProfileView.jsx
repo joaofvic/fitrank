@@ -21,6 +21,7 @@ import { ConsistencyHeatmap } from '../ui/ConsistencyHeatmap.jsx';
 import { ProgressWidget } from '../ui/ProgressWidget.jsx';
 import { WorkoutPlanWidget } from '../ui/WorkoutPlanWidget.jsx';
 import { Sheet, SheetContent, SheetTitle } from '../ui/sheet.jsx';
+import { ProCheckoutBricks } from '../payments/mp/ProCheckoutBricks.jsx';
 
 export function ProfileView({
   userData,
@@ -65,6 +66,7 @@ export function ProfileView({
   const [reasonLabelMap, setReasonLabelMap] = useState({});
   const [availablePlans, setAvailablePlans] = useState([]);
   const [proLoading, setProLoading] = useState(false);
+  const [checkoutPlanId, setCheckoutPlanId] = useState(null);
   const isPro = userData?.is_pro || authProfile?.is_pro;
 
   useEffect(() => {
@@ -91,7 +93,7 @@ export function ProfileView({
     (async () => {
       const { data } = await supabase
         .from('subscription_plans')
-        .select('id, name, cakto_offer_id, price_amount, currency, interval, interval_count, features')
+        .select('id, name, price_amount, currency, interval, interval_count, features')
         .eq('is_active', true)
         .order('sort_order');
       if (!cancelled && data) setAvailablePlans(data);
@@ -99,13 +101,13 @@ export function ProfileView({
     return () => { cancelled = true; };
   }, [supabase, isPro]);
 
-  const handleSubscribe = useCallback(async (caktoOfferId) => {
+  const handleSubscribe = useCallback(async (planId) => {
     if (!supabase || proLoading) return;
     setProLoading(true);
     try {
-      const { data, error } = await invokeEdge('cakto-checkout', supabase, {
+      const { data, error } = await invokeEdge('mp-checkout', supabase, {
         method: 'POST',
-        body: { offer_id: caktoOfferId }
+        body: { plan_id: planId }
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -634,28 +636,35 @@ export function ProfileView({
           {availablePlans.length > 0 ? (
             <div className="space-y-2">
               {availablePlans.map(plan => (
-                <button
-                  key={plan.id}
-                  type="button"
-                  onClick={() => handleSubscribe(plan.cakto_offer_id)}
-                  disabled={proLoading || !plan.cakto_offer_id}
-                  className="w-full flex items-center justify-between gap-3 bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/50 rounded-xl px-4 py-3 transition-colors disabled:opacity-50"
-                >
-                  <div className="text-left min-w-0">
-                    <p className="font-bold text-sm text-white">{plan.name}</p>
-                    {plan.features?.length > 0 && (
-                      <p className="text-[10px] text-zinc-500 truncate">{plan.features.slice(0, 2).join(' · ')}</p>
-                    )}
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <span className="text-sm font-black text-yellow-400 tabular-nums">
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: (plan.currency || 'brl').toUpperCase() }).format(plan.price_amount / 100)}
-                    </span>
-                    <span className="text-[10px] text-zinc-500 block">
-                      /{plan.interval === 'year' ? 'ano' : 'mês'}
-                    </span>
-                  </div>
-                </button>
+                <div key={plan.id} className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => setCheckoutPlanId((prev) => (prev === plan.id ? null : plan.id))}
+                    disabled={proLoading}
+                    className="w-full flex items-center justify-between gap-3 bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/50 rounded-xl px-4 py-3 transition-colors disabled:opacity-50"
+                  >
+                    <div className="text-left min-w-0">
+                      <p className="font-bold text-sm text-white">{plan.name}</p>
+                      {plan.features?.length > 0 && (
+                        <p className="text-[10px] text-zinc-500 truncate">
+                          {plan.features.slice(0, 2).join(' · ')}
+                        </p>
+                      )}
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <span className="text-sm font-black text-yellow-400 tabular-nums">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: (plan.currency || 'brl').toUpperCase() }).format(plan.price_amount / 100)}
+                      </span>
+                      <span className="text-[10px] text-zinc-500 block">
+                        /{plan.interval === 'year' ? 'ano' : 'mês'}
+                      </span>
+                    </div>
+                  </button>
+
+                  {checkoutPlanId === plan.id && (
+                    <ProCheckoutBricks supabase={supabase} plan={plan} />
+                  )}
+                </div>
               ))}
               {proLoading && (
                 <div className="flex justify-center py-2">

@@ -1,22 +1,22 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { z } from 'npm:zod@3.24.2';
-import { createCaktoClient, CaktoClient } from '../_shared/cakto-client.ts';
+import { createMpClient, MpClient } from '../_shared/mp-client.ts';
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS'
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 function jsonResponse(body: unknown, status: number) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 }
 
 const enrollSchema = z.object({
-  desafio_id: z.string().uuid()
+  desafio_id: z.string().uuid(),
 });
 
 Deno.serve(async (req) => {
@@ -31,6 +31,7 @@ Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const appUrl = Deno.env.get('PUBLIC_APP_URL') || Deno.env.get('VITE_PUBLIC_APP_URL') || '';
 
   if (!supabaseUrl || !anonKey || !serviceKey) {
     return jsonResponse({ error: 'Configuração do servidor incompleta' }, 500);
@@ -42,12 +43,12 @@ Deno.serve(async (req) => {
   }
 
   const userClient = createClient(supabaseUrl, anonKey, {
-    global: { headers: { Authorization: authHeader } }
+    global: { headers: { Authorization: authHeader } },
   });
 
   const {
     data: { user },
-    error: userError
+    error: userError,
   } = await userClient.auth.getUser();
 
   if (userError || !user) {
@@ -69,12 +70,12 @@ Deno.serve(async (req) => {
   const { desafio_id } = parsed.data;
 
   const admin = createClient(supabaseUrl, serviceKey, {
-    auth: { persistSession: false, autoRefreshToken: false }
+    auth: { persistSession: false, autoRefreshToken: false },
   });
 
   const { data: desafio, error: dErr } = await admin
     .from('desafios')
-    .select('id, nome, tenant_id, status, entry_fee, max_participantes, cakto_offer_id, cakto_checkout_url')
+    .select('id, nome, tenant_id, status, entry_fee, max_participantes')
     .eq('id', desafio_id)
     .maybeSingle();
 
@@ -127,11 +128,12 @@ Deno.serve(async (req) => {
     }
   }
 
+  // Desafio gratuito: inscrever direto
   if (!desafio.entry_fee || desafio.entry_fee <= 0) {
     const { error: insErr } = await admin.from('desafio_participantes').insert({
       desafio_id,
       user_id: user.id,
-      tenant_id: desafio.tenant_id
+      tenant_id: desafio.tenant_id,
     });
 
     if (insErr) {
@@ -145,54 +147,41 @@ Deno.serve(async (req) => {
     return jsonResponse({ enrolled: true }, 200);
   }
 
-  // Desafio pago: gerar URL de checkout Cakto
-  if (desafio.cakto_offer_id) {
-    const sck = `${user.id}:${desafio_id}`;
-    const url = CaktoClient.checkoutUrl(desafio.cakto_offer_id, {
-      email: user.email,
-      sck
-    });
-    return jsonResponse({ url }, 200);
-  }
-
-  // Sem oferta pré-criada: criar oferta dinâmica via API Cakto
-  let cakto: CaktoClient;
+  // Desafio pago: criar preferência Mercado Pago
+  let mp: ReturnType<typeof createMpClient>;
   try {
-    cakto = createCaktoClient();
+    mp = createMpClient();
   } catch {
     return jsonResponse({ error: 'Provedor de pagamento não configurado' }, 500);
   }
 
-  const caktoProductId = Deno.env.get('CAKTO_CHALLENGE_PRODUCT_ID') || Deno.env.get('CAKTO_PRO_PRODUCT_ID');
-  if (!caktoProductId) {
-    console.error('challenge-enroll: CAKTO_CHALLENGE_PRODUCT_ID ou CAKTO_PRO_PRODUCT_ID não configurado');
-    return jsonResponse({ error: 'Produto de desafio não configurado' }, 500);
-  }
+  const webhookUrl = `${supabaseUrl}/functions/v1/mp-webhook`;
 
   try {
-    const offer = await cakto.createOffer({
-      name: `Inscrição: ${desafio.nome}`,
-      price: CaktoClient.centsToReais(desafio.entry_fee),
-      product: caktoProductId,
-      type: 'unique',
-      status: 'active'
+    const preference = await mp.createPreference({
+      items: [
+        {
+          title: `Inscrição: ${desafio.nome}`,
+          quantity: 1,
+          unit_price: MpClient.centsToReais(desafio.entry_fee),
+          currency_id: 'BRL',
+        },
+      ],
+      payer: {
+        email: user.email ?? '',
+      },
+      back_urls: {
+        success: `${appUrl}/challenges?challenge_checkout=success`,
+        failure: `${appUrl}/challenges?challenge_checkout=failure`,
+        pending: `${appUrl}/challenges?challenge_checkout=pending`,
+      },
+      auto_return: 'approved',
+      external_reference: `challenge:${user.id}:${desafio_id}`,
+      notification_url: webhookUrl,
+      statement_descriptor: 'FITRANK',
     });
 
-    await admin
-      .from('desafios')
-      .update({
-        cakto_offer_id: offer.id,
-        cakto_checkout_url: CaktoClient.checkoutUrl(offer.id)
-      })
-      .eq('id', desafio_id);
-
-    const sck = `${user.id}:${desafio_id}`;
-    const url = CaktoClient.checkoutUrl(offer.id, {
-      email: user.email,
-      sck
-    });
-
-    return jsonResponse({ url }, 200);
+    return jsonResponse({ url: preference.init_point }, 200);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Erro ao criar oferta de pagamento';
     console.error('challenge-enroll:', message);
