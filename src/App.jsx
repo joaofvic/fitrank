@@ -529,6 +529,7 @@ export default function App() {
               supabase={supabase}
               userId={session?.user?.id}
               onBack={goBack}
+              push={push}
             />
           </Suspense>
         )}

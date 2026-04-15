@@ -23,15 +23,24 @@ export function usePushNotifications({ supabase, session, profile, navigate }) {
   const cleanupDone = useRef(false);
 
   useEffect(() => {
-    setPermissionStatus(getWebPushPermission());
+    const perm = getWebPushPermission();
+    setPermissionStatus(perm);
 
     if (!supabase || !session || !profile) {
       setIsRegistered(false);
       return;
     }
 
-    getExistingSubscription().then((sub) => {
-      setIsRegistered(Boolean(sub));
+    getExistingSubscription().then(async (sub) => {
+      if (sub) {
+        setIsRegistered(true);
+        return;
+      }
+      setIsRegistered(false);
+      if (perm === 'granted') {
+        const newSub = await registerWebPush(supabase, profile.id, profile.tenant_id);
+        if (newSub) setIsRegistered(true);
+      }
     });
   }, [supabase, session, profile]);
 

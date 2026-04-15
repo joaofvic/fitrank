@@ -3,14 +3,17 @@ import {
   ArrowLeft,
   Bell,
   BellOff,
-  Clock,
+  BellRing,
+  CheckCircle2,
   Dumbbell,
   Heart,
   Loader2,
   Moon,
   Shield,
+  Smartphone,
   Trophy,
   Users,
+  XCircle,
 } from 'lucide-react';
 
 function Toggle({ checked, onChange, disabled }) {
@@ -83,10 +86,11 @@ const DEFAULT_PREFS = {
   admin: true,
 };
 
-export function PushPreferencesView({ supabase, userId, onBack }) {
+export function PushPreferencesView({ supabase, userId, onBack, push }) {
   const [prefs, setPrefs] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [registering, setRegistering] = useState(false);
   const [toast, setToast] = useState(null);
   const [quietEnabled, setQuietEnabled] = useState(false);
 
@@ -177,9 +181,80 @@ export function PushPreferencesView({ supabase, userId, onBack }) {
         </button>
       </div>
 
+      {/* Device registration status */}
+      {push && (
+        <Section icon={Smartphone} title="Este Dispositivo">
+          <div className="px-4 py-3 space-y-3">
+            <div className="flex items-center gap-2">
+              {push.isRegistered ? (
+                <>
+                  <CheckCircle2 size={16} className="text-green-400 shrink-0" />
+                  <span className="text-sm text-green-400 font-medium">Push ativo neste dispositivo</span>
+                </>
+              ) : push.permissionStatus === 'denied' ? (
+                <>
+                  <XCircle size={16} className="text-red-400 shrink-0" />
+                  <span className="text-sm text-red-400 font-medium">Permissão bloqueada pelo navegador</span>
+                </>
+              ) : (
+                <>
+                  <BellOff size={16} className="text-zinc-500 shrink-0" />
+                  <span className="text-sm text-zinc-400">Push não registrado neste dispositivo</span>
+                </>
+              )}
+            </div>
+
+            {push.permissionStatus === 'denied' && (
+              <p className="text-[11px] text-zinc-500 leading-relaxed">
+                Para reativar, abra as configurações do navegador &gt; Notificações e permita para este site.
+              </p>
+            )}
+
+            {!push.isRegistered && push.permissionStatus !== 'denied' && (
+              <button
+                type="button"
+                disabled={registering}
+                onClick={async () => {
+                  setRegistering(true);
+                  const ok = await push.requestPermission();
+                  setRegistering(false);
+                  setToast({
+                    type: ok ? 'success' : 'error',
+                    message: ok ? 'Push ativado!' : 'Não foi possível ativar',
+                  });
+                  setTimeout(() => setToast(null), 2500);
+                }}
+                className="w-full py-2.5 rounded-xl bg-green-500 text-black font-bold text-sm hover:bg-green-400 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+              >
+                {registering ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <BellRing size={16} />
+                )}
+                {registering ? 'Ativando…' : 'Ativar push neste dispositivo'}
+              </button>
+            )}
+
+            {push.isRegistered && (
+              <button
+                type="button"
+                onClick={async () => {
+                  await push.removeToken();
+                  setToast({ type: 'success', message: 'Push desativado neste dispositivo' });
+                  setTimeout(() => setToast(null), 2500);
+                }}
+                className="w-full py-2 rounded-xl bg-zinc-800 text-zinc-400 font-semibold text-xs hover:bg-zinc-700 transition-colors"
+              >
+                Desativar push neste dispositivo
+              </button>
+            )}
+          </div>
+        </Section>
+      )}
+
       {/* Master switch */}
-      <Section icon={prefs?.enabled ? Bell : BellOff} title="Notificações Push">
-        <Row label="Ativar notificações" description="Receba alertas mesmo quando o app estiver fechado">
+      <Section icon={prefs?.enabled ? Bell : BellOff} title="Preferências do Servidor">
+        <Row label="Receber notificações" description="Controla o envio para todos os dispositivos">
           <Toggle checked={prefs?.enabled ?? true} onChange={(v) => update('enabled', v)} />
         </Row>
       </Section>
