@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Download, X, Share } from 'lucide-react';
 import { analytics } from '../../lib/analytics.js';
 import { ChevronDown, Download, Plus, Share, SquarePlus, X } from 'lucide-react';
 
@@ -127,18 +126,13 @@ export function InstallPrompt() {
     if (isStandalone() || isDismissed()) return;
 
     if (isIOSSafari()) {
-<<<<<<< HEAD
-      setShowIOSGuide(true);
-      setVisible(true);
-      analytics.pwaInstallPrompted();
-      return;
-=======
       const timer = setTimeout(() => {
         setShowIOSGuide(true);
         setVisible(true);
+        analytics.pwaInstallPrompted();
       }, IOS_DELAY_MS);
+      
       return () => clearTimeout(timer);
->>>>>>> cursor/ios-install-ux-upgrade-f219
     }
 
     const handler = (e) => {
