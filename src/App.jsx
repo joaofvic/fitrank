@@ -26,6 +26,7 @@ import { useWorkoutTimer } from './hooks/useWorkoutTimer.js';
 import { usePushNotifications } from './hooks/usePushNotifications.js';
 import { MiniTimer } from './components/ui/MiniTimer.jsx';
 import { PushPermissionPrompt } from './components/ui/PushPermissionPrompt.jsx';
+import { OnboardingWizard } from './components/onboarding/OnboardingWizard.jsx';
 
 const lazyNamed = (loader, name) => lazy(() => loader().then(m => ({ default: m[name] })));
 
@@ -373,6 +374,10 @@ export default function App() {
 
   if (configured && !session) {
     return <AuthScreen />;
+  }
+
+  if (configured && session && profile && !profile.onboarding_completed_at) {
+    return <OnboardingWizard />;
   }
 
   return (

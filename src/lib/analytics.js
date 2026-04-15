@@ -47,6 +47,12 @@ export const analytics = {
   authLogout: () => track('auth_logout'),
   authPasswordReset: () => track('auth_password_reset_requested'),
 
+  // -- Onboarding --
+  onboardingStarted: () => track('onboarding_started'),
+  onboardingStepCompleted: (props) => track('onboarding_step_completed', props),
+  onboardingStepSkipped: (props) => track('onboarding_step_skipped', props),
+  onboardingCompleted: () => track('onboarding_completed'),
+
   // -- PWA --
   pwaInstallPrompted: () => track('pwa_install_prompted'),
   pwaInstalled: () => track('pwa_installed'),
