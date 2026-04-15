@@ -5,6 +5,7 @@ import {
   Bell,
   BellOff,
   CheckCircle2,
+  Dumbbell,
   ImageOff,
   RefreshCw,
   User
@@ -18,7 +19,8 @@ const SYSTEM_ICONS = {
   checkin_approved: CheckCircle2,
   checkin_photo_rejected: ImageOff,
   photo_rejected: ImageOff,
-  admin_message: Bell
+  admin_message: Bell,
+  training_reminder: Dumbbell,
 };
 
 function groupByTimePeriod(items) {
@@ -51,17 +53,24 @@ function groupByTimePeriod(items) {
   return Object.entries(groups).filter(([, list]) => list.length > 0);
 }
 
-function NotificationItem({ notification, isNew }) {
+const CLICKABLE_TYPES = new Set(['training_reminder', 'friend_request', 'friend_accepted']);
+
+function NotificationItem({ notification, isNew, onItemClick }) {
   const isSocial = SOCIAL_TYPES.has(notification.type);
   const actorName = notification.data?.actor_name;
   const thumbUrl = notification.data?.foto_url ?? null;
   const SystemIcon = !isSocial ? (SYSTEM_ICONS[notification.type] || Bell) : null;
+  const clickable = CLICKABLE_TYPES.has(notification.type) && onItemClick;
 
   return (
     <div
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={clickable ? () => onItemClick(notification) : undefined}
+      onKeyDown={clickable ? (e) => { if (e.key === 'Enter') onItemClick(notification); } : undefined}
       className={`flex items-center gap-3 px-4 py-3 transition-colors ${
         isNew ? 'bg-zinc-800/30' : ''
-      }`}
+      } ${clickable ? 'cursor-pointer hover:bg-zinc-800/50 active:bg-zinc-700/40' : ''}`}
     >
       {isSocial ? (
         <div className="w-11 h-11 rounded-full bg-gradient-to-br from-zinc-600 to-zinc-800 p-[2px] shrink-0">
@@ -106,7 +115,8 @@ export function NotificationsView({
   notifications = [],
   readNotifications = [],
   onMarkAllRead,
-  onBack
+  onBack,
+  onItemClick,
 }) {
   useEffect(() => {
     if (notifications.length > 0 && onMarkAllRead) {
@@ -153,7 +163,7 @@ export function NotificationsView({
           </div>
           <div className="divide-y divide-zinc-800/60">
             {notifications.map((n) => (
-              <NotificationItem key={n.id} notification={n} isNew />
+              <NotificationItem key={n.id} notification={n} isNew onItemClick={onItemClick} />
             ))}
           </div>
         </div>
@@ -170,7 +180,7 @@ export function NotificationsView({
               </div>
               <div className="divide-y divide-zinc-800/60">
                 {items.map((n) => (
-                  <NotificationItem key={n.id} notification={n} isNew={false} />
+                  <NotificationItem key={n.id} notification={n} isNew={false} onItemClick={onItemClick} />
                 ))}
               </div>
             </div>

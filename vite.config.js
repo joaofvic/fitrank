@@ -19,6 +19,7 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         clientsClaim: true,
         skipWaiting: true,
+        importScripts: ['/push-sw.js'],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/pjlmemvwqhmpchiiqtol\.supabase\.co\/rest\/v1\/.*/i,

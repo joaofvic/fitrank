@@ -7,19 +7,19 @@ todos:
     status: completed
   - id: epic-4-dispatch
     content: "Epic 4: Backend de Despacho -- Edge Function send-push + trigger AFTER INSERT em notifications (3 US)"
-    status: pending
+    status: completed
   - id: epic-2-native
     content: "Epic 2: Push Nativo Android + iOS -- @capacitor/push-notifications, hook, config nativa (5 US)"
     status: pending
   - id: epic-3-web
     content: "Epic 3: Web Push PWA -- VAPID, PushManager, SW push handler (3 US)"
-    status: pending
+    status: completed
   - id: epic-5-reminders
     content: "Epic 5: Lembretes Diarios de Treino -- Edge Function training-reminder + pg_cron (3 US)"
-    status: pending
+    status: completed
   - id: epic-6-ui
     content: "Epic 6: UI Preferencias + Integracao no App -- PushPreferencesView, dialog permissao, deep link, badge (4 US)"
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -144,7 +144,9 @@ Criar `docs/firebase-setup.md` com passo a passo:
 
 ---
 
-## Epic 2 -- Push Nativo Android + iOS (Capacitor)
+## Epic 2 -- Push Nativo Android + iOS (Capacitor) ⏸️ SUSPENSA
+
+> **Motivo**: Requer conta de desenvolvedor Apple (Apple Developer Program). Retomar quando disponível.
 
 **Objetivo**: Registrar tokens de push nos dispositivos nativos e salva-los no banco.
 
@@ -306,9 +308,9 @@ Migration SQL:
 
 **Objetivo**: Permitir que o usuario controle suas preferencias de push e integrar o hook no fluxo do app.
 
-### US 6.1 -- Componente `PushPreferencesView.jsx`
+### US 6.1 -- Componente `PushPreferencesView.jsx` ✅ completed
 
-Criar `src/components/views/PushPreferencesView.jsx`:
+Criado `src/components/views/PushPreferencesView.jsx`:
 - Switch master "Notificacoes Push" (on/off)
 - Secao "Lembretes": toggle + seletor de horario (time picker)
 - Secao "Social": toggle para likes/comments/mencoes
@@ -317,32 +319,31 @@ Criar `src/components/views/PushPreferencesView.jsx`:
 - Secao "Administracao": toggle para moderacao
 - Horario silencioso: dois time pickers (inicio/fim) ou desativado
 - Salvar via upsert em `push_preferences`
-- Acessivel a partir do `ProfileView` ou `EditProfileView`
+- Acessivel a partir do `ProfileView` (botao de sino ao lado de "Editar perfil")
 
-### US 6.2 -- Integrar `usePushNotifications` no App.jsx
+### US 6.2 -- Integrar `usePushNotifications` no App.jsx ✅ completed
 
-- Chamar o hook no `App.jsx` apos autenticacao
-- Na primeira abertura apos login: solicitar permissao com UX amigavel (nao imediatamente -- esperar o usuario interagir com o app primeiro)
-- Mostrar dialog explicando o valor: "Ative notificacoes para lembrar de treinar e nao perder seu streak!"
-- Respeitar recusa: salvar em `localStorage`, nao pedir novamente por 7 dias
-- No logout: remover token do dispositivo
+- Hook `usePushNotifications` integrado no `App.jsx` apos autenticacao
+- Dialog `PushPermissionPrompt` com delay de 8s apos login para UX amigavel
+- Texto explicando o valor: "Receba lembretes para treinar e nao perca seu streak!"
+- Respeita recusa via `localStorage` (cooldown de 7 dias via `dismissPrompt`)
+- No logout: remove token do dispositivo (via cleanup no hook)
 
-### US 6.3 -- Navegacao ao Tocar na Push
+### US 6.3 -- Navegacao ao Tocar na Push ✅ completed
 
-- No handler de `pushNotificationActionPerformed` (nativo) e `notificationclick` (web):
-  - Extrair `data.type` e `data.target_id` do payload
-  - Mapear para a view correta:
-    - `like`, `comment`, `mention` -> `feed` ou `public-profile` do autor
-    - `friend_request` -> `friends`
-    - `badge_unlocked` -> `profile` (badges section)
-    - `training_reminder` -> `checkin-modal`
-  - Usar `navigate()` do `useNavigationStack`
+- Service Worker (`push-sw.js`) mapeia `data.type` para views corretas:
+  - `like`, `comment`, `mention` -> `/feed`
+  - `friend_request` -> `/friends`
+  - `badge_unlocked` -> `/profile`
+  - `training_reminder` -> `/checkin-modal`
+- Hook `usePushNotifications` escuta `PUSH_NOTIFICATION_CLICK` do SW e usa `navigate()`
+- `NotificationsView` suporta click em `training_reminder` e friend-related notifications
 
-### US 6.4 -- Badge Count
+### US 6.4 -- Badge Count ✅ completed
 
-- Usar `navigator.setAppBadge(unreadCount)` na PWA
-- Usar `PushNotifications.setBadgeCount(unreadCount)` no Capacitor nativo (via `@capacitor/badge` se necessario)
-- Atualizar quando `notifications.length` muda
+- `navigator.setAppBadge(count)` chamado via `useEffect` no App.jsx quando `cloud.notifications.length` muda
+- `navigator.clearAppBadge()` chamado quando count volta a zero
+- Capacitor nativo (setBadgeCount) sera adicionado na Epic 2 quando Firebase estiver configurado
 
 **Arquivos**: `src/components/views/PushPreferencesView.jsx`, `src/hooks/usePushNotifications.js`, `src/App.jsx`, `NotificationsView.jsx`
 

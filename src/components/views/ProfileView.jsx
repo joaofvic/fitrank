@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Camera, Flame, Zap, Calendar, CheckCircle2, Crown, RefreshCw,
+  Bell, Camera, Flame, Zap, Calendar, CheckCircle2, Crown, RefreshCw,
   Settings, X, Building2, Trophy, Users, Shield, SlidersHorizontal, BarChart3, ScrollText, LogOut,
   Clock, Check, ChevronLeft, ChevronRight, Loader2, CreditCard, Activity
 } from 'lucide-react';
@@ -58,7 +58,8 @@ export function ProfileView({
   onOpenProgress,
   onOpenStats,
   onOpenPlan,
-  onGeneratePlan
+  onGeneratePlan,
+  onOpenPushSettings
 }) {
   const { supabase, session, profile: authProfile } = useAuth();
   const [reasonLabelMap, setReasonLabelMap] = useState({});
@@ -227,15 +228,27 @@ export function ProfileView({
             </span>
           )}
         </div>
-        {onEditProfile && (
-          <button
-            type="button"
-            onClick={onEditProfile}
-            className="mt-2 px-6 py-1.5 rounded-lg text-sm font-bold bg-zinc-800 border border-zinc-700 text-white hover:bg-zinc-700 transition-colors"
-          >
-            Editar perfil
-          </button>
-        )}
+        <div className="flex items-center gap-2 mt-2">
+          {onEditProfile && (
+            <button
+              type="button"
+              onClick={onEditProfile}
+              className="px-6 py-1.5 rounded-lg text-sm font-bold bg-zinc-800 border border-zinc-700 text-white hover:bg-zinc-700 transition-colors"
+            >
+              Editar perfil
+            </button>
+          )}
+          {onOpenPushSettings && (
+            <button
+              type="button"
+              onClick={onOpenPushSettings}
+              aria-label="Configurações de notificações"
+              className="w-9 h-9 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center hover:bg-zinc-700 transition-colors"
+            >
+              <Bell size={16} className="text-zinc-400" aria-hidden="true" />
+            </button>
+          )}
+        </div>
       </div>
 
       {userData?.levelInfo && (

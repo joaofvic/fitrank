@@ -23,7 +23,9 @@ import { useSwipeNavigation } from './hooks/useSwipeNavigation.js';
 import { usePullToRefresh } from './hooks/usePullToRefresh.js';
 import { useNavigationStack } from './hooks/useNavigationStack.js';
 import { useWorkoutTimer } from './hooks/useWorkoutTimer.js';
+import { usePushNotifications } from './hooks/usePushNotifications.js';
 import { MiniTimer } from './components/ui/MiniTimer.jsx';
+import { PushPermissionPrompt } from './components/ui/PushPermissionPrompt.jsx';
 
 const lazyNamed = (loader, name) => lazy(() => loader().then(m => ({ default: m[name] })));
 
@@ -41,6 +43,7 @@ const ProgressView = lazyNamed(() => import('./components/views/ProgressView.jsx
 const StatsView = lazyNamed(() => import('./components/views/StatsView.jsx'), 'StatsView');
 const WorkoutPlanView = lazyNamed(() => import('./components/views/WorkoutPlanView.jsx'), 'WorkoutPlanView');
 const WorkoutPlanGeneratorView = lazyNamed(() => import('./components/views/WorkoutPlanGeneratorView.jsx'), 'WorkoutPlanGeneratorView');
+const PushPreferencesView = lazyNamed(() => import('./components/views/PushPreferencesView.jsx'), 'PushPreferencesView');
 
 const AdminTenantsView = lazyNamed(() => import('./components/views/AdminTenantsView.jsx'), 'AdminTenantsView');
 const AdminModerationView = lazyNamed(() => import('./components/views/AdminModerationView.jsx'), 'AdminModerationView');
@@ -90,6 +93,15 @@ export default function App() {
   const [timerDuration, setTimerDuration] = useState(null);
   const workoutTimer = useWorkoutTimer();
 
+  const push = usePushNotifications({
+    supabase: useCloud ? supabase : null,
+    session: useCloud ? session : null,
+    profile: useCloud ? profile : null,
+    navigate,
+  });
+
+  const [showPushPrompt, setShowPushPrompt] = useState(false);
+
   const [publicProfileUserId, setPublicProfileUserId] = useState(() => {
     if (view === 'public-profile' && routeParam) return routeParam;
     return null;
@@ -111,6 +123,22 @@ export default function App() {
   }, [view, routeParam]);
 
   useSwipeNavigation(view, navigate, mainContentRef);
+
+  useEffect(() => {
+    if (!push.shouldPrompt || !useCloud) return;
+    const timer = setTimeout(() => setShowPushPrompt(true), 8000);
+    return () => clearTimeout(timer);
+  }, [push.shouldPrompt, useCloud]);
+
+  useEffect(() => {
+    if (!('setAppBadge' in navigator)) return;
+    const count = useCloud ? (cloud.notifications?.length ?? 0) : 0;
+    if (count > 0) {
+      navigator.setAppBadge(count).catch(() => {});
+    } else {
+      navigator.clearAppBadge?.().catch(() => {});
+    }
+  }, [useCloud, cloud.notifications?.length]);
 
   const handlePullRefresh = useCallback(async () => {
     if (view === 'home' && useCloud) {
@@ -482,6 +510,7 @@ export default function App() {
             onOpenStats={() => navigate('stats')}
             onOpenPlan={() => navigate('workout-plan')}
             onGeneratePlan={() => navigate('workout-plan-generator')}
+            onOpenPushSettings={useCloud ? () => navigate('push-settings') : undefined}
           />
         )}
         {view === 'edit-profile' && useCloud && (
@@ -493,6 +522,15 @@ export default function App() {
             onCheckUsername={cloud.checkUsernameAvailable}
             onUpdatePassword={cloud.updatePassword}
           />
+        )}
+        {view === 'push-settings' && useCloud && (
+          <Suspense fallback={<ViewSkeleton />}>
+            <PushPreferencesView
+              supabase={supabase}
+              userId={session?.user?.id}
+              onBack={goBack}
+            />
+          </Suspense>
         )}
         {view === 'progress' && useCloud && (
           <Suspense fallback={<ViewSkeleton />}>
@@ -613,6 +651,10 @@ export default function App() {
             readNotifications={cloud.readNotifications}
             onMarkAllRead={cloud.markAllNotificationsRead}
             onBack={goBack}
+            onItemClick={(n) => {
+              if (n.type === 'training_reminder') navigate('checkin-modal');
+              else if (n.type === 'friend_request' || n.type === 'friend_accepted') navigate('friends');
+            }}
           />
         )}
 
@@ -686,6 +728,18 @@ export default function App() {
 
         <SwUpdateToast />
         <InstallPrompt />
+
+        <PushPermissionPrompt
+          open={showPushPrompt}
+          onAccept={async () => {
+            setShowPushPrompt(false);
+            await push.requestPermission();
+          }}
+          onDismiss={() => {
+            setShowPushPrompt(false);
+            push.dismissPrompt();
+          }}
+        />
 
         {message && (
           <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-green-500 text-black px-6 py-3 rounded-full font-bold shadow-xl shadow-green-500/20 flex items-center gap-2 animate-in-toast">
