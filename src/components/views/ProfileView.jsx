@@ -228,7 +228,7 @@ export function ProfileView({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2 mt-2">
+        <div className="flex items-center justify-center gap-2 mt-2">
           {onEditProfile && (
             <button
               type="button"
