@@ -248,7 +248,9 @@ export default function App() {
   }, [useCloud, profile, session?.user?.id, userData]);
 
   const displayCheckins = useCloud ? cloud.checkins : checkins;
-  const displayLeaderboard = useCloud ? cloud.leaderboard : localLeaderboard;
+  const displayLeaderboard = useCloud ? cloud.leaderboardTop : localLeaderboard;
+  const myRankUser = useCloud ? cloud.myLeaderboardEntry : null;
+  const myLeagueRankUser = useCloud ? cloud.myLeagueLeaderboardEntry : null;
 
   const localUser = useMemo(() => ({ uid: displayUserData.uid }), [displayUserData.uid]);
 
@@ -422,13 +424,15 @@ export default function App() {
           <HomeView
             user={localUser}
             userData={displayUserData}
-            allUsers={displayLeaderboard}
+            topUsers={displayLeaderboard}
+            myRankUser={myRankUser}
             rankingLoading={useCloud && (cloud.leaderboardLoading || cloud.loading)}
             rankingFilterEnabled={useCloud}
             rankingPeriod={cloud.rankingPeriod}
             onRankingPeriodChange={cloud.setRankingPeriod}
             rankingPeriodLabel={cloud.rankingPeriodLabel}
-            leagueUsers={useCloud ? cloud.leagueLeaderboard : []}
+            leagueTopUsers={useCloud ? cloud.leagueLeaderboardTop : []}
+            myLeagueRankUser={myLeagueRankUser}
             leagueLoading={useCloud ? cloud.leagueLoading : false}
             onLoadLeagueRanking={useCloud ? cloud.refreshLeagueRanking : undefined}
             onOpenCheckin={() => navigate('checkin-modal')}

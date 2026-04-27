@@ -15,6 +15,19 @@ import { analytics } from '../lib/analytics.js';
 export function useFitCloudData({ supabase, session, profile, refreshProfile }) {
   const userId = session?.user?.id ?? null;
   const tenantId = profile?.tenant_id ?? null;
+  const LEADERBOARD_TOP_LIMIT = 10;
+  const LEADERBOARD_CACHE_TTL_MS = 12_000;
+
+  /** US-1.4: `compact` (Top 10 + “Sua posição”) | `full` (RPCs legadas, lista completa). Build-time (Vite). */
+  const rankingListMode = useMemo(() => {
+    const v = String(import.meta.env.VITE_RANKING_LIST_MODE || 'compact').trim().toLowerCase();
+    return v === 'full' ? 'full' : 'compact';
+  }, []);
+
+  const leaderboardCacheRef = useRef({
+    general: { key: null, ts: 0, top: [], me: null },
+    league: { key: null, ts: 0, top: [], me: null }
+  });
 
   const [rankingPeriod, setRankingPeriod] = useState('month');
   const { start: rankingStart, end: rankingEnd } = useMemo(
@@ -26,7 +39,8 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
     [rankingPeriod, rankingStart, rankingEnd]
   );
 
-  const [leaderboard, setLeaderboard] = useState([]);
+  const [leaderboardTop, setLeaderboardTop] = useState([]);
+  const [myLeaderboardEntry, setMyLeaderboardEntry] = useState(null);
   const [checkins, setCheckins] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [readNotifications, setReadNotifications] = useState([]);
@@ -45,25 +59,111 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
     if (!supabase || !userId) return;
     setLeaderboardLoading(true);
     try {
-      const { data, error: rpcError } = await supabase.rpc('get_tenant_leaderboard_period', {
-        p_start: rankingStart,
-        p_end: rankingEnd,
-        p_period: rankingPeriod
-      });
-      if (rpcError) {
-        logger.error('ranking', rpcError);
+      const listKey = rankingListMode === 'full' ? 'list:full' : `top:${LEADERBOARD_TOP_LIMIT}`;
+      const cacheKey = `${tenantId || ''}|${rankingPeriod}|${String(rankingStart)}|${String(rankingEnd)}|${listKey}`;
+      const cache = leaderboardCacheRef.current.general;
+      if (cache.key === cacheKey && Date.now() - cache.ts < LEADERBOARD_CACHE_TTL_MS) {
+        setLeaderboardTop(cache.top || []);
+        setMyLeaderboardEntry(cache.me || null);
         return;
       }
-      const rows = Array.isArray(data) ? data : [];
+
+      if (rankingListMode === 'full') {
+        const { data, error: rpcError } = await supabase.rpc('get_tenant_leaderboard_period', {
+          p_start: rankingStart,
+          p_end: rankingEnd,
+          p_period: rankingPeriod
+        });
+        if (rpcError) {
+          logger.error('ranking.full', rpcError, {
+            tab: 'general',
+            period: rankingPeriod,
+            start: String(rankingStart),
+            end: String(rankingEnd),
+            tenantId: tenantId || null,
+            mode: 'full'
+          });
+          return;
+        }
+        const rows = Array.isArray(data) ? data : [];
+        const prevMap = previousRankRef.current;
+        const mapped = rows.map((r, i) => {
+          const rank = i + 1;
+          const prevRank = prevMap[r.id] ?? null;
+          return {
+            uid: r.id,
+            nome: r.nome_exibicao,
+            pontos: r.pontos,
+            is_pro: r.is_pro,
+            academia: r.academia || '',
+            avatar_url: r.avatar_url || null,
+            xp: r.xp ?? 0,
+            league: r.league ?? 'bronze',
+            rank,
+            prevRank
+          };
+        });
+        const newMap = {};
+        mapped.forEach((u) => { newMap[u.uid] = u.rank; });
+        previousRankRef.current = newMap;
+        setLeaderboardTop(mapped);
+        setMyLeaderboardEntry(null);
+
+        leaderboardCacheRef.current.general = {
+          key: cacheKey,
+          ts: Date.now(),
+          top: mapped,
+          me: null
+        };
+        return;
+      }
+
+      const [topRes, meRes] = await Promise.all([
+        supabase.rpc('get_tenant_leaderboard_top_period', {
+          p_start: rankingStart,
+          p_end: rankingEnd,
+          p_period: rankingPeriod,
+          p_limit: LEADERBOARD_TOP_LIMIT
+        }),
+        supabase.rpc('get_my_tenant_rank_period', {
+          p_start: rankingStart,
+          p_end: rankingEnd,
+          p_period: rankingPeriod
+        })
+      ]);
+
+      if (topRes.error) {
+        logger.error('ranking.top', topRes.error, {
+          tab: 'general',
+          period: rankingPeriod,
+          start: String(rankingStart),
+          end: String(rankingEnd),
+          tenantId: tenantId || null,
+          mode: 'compact'
+        });
+        return;
+      }
+      if (meRes.error) {
+        logger.error('ranking.me', meRes.error, {
+          tab: 'general',
+          period: rankingPeriod,
+          start: String(rankingStart),
+          end: String(rankingEnd),
+          tenantId: tenantId || null,
+          mode: 'compact'
+        });
+      }
+
+      const rows = Array.isArray(topRes.data) ? topRes.data : [];
+      const meRow = Array.isArray(meRes.data) ? meRes.data[0] : meRes.data;
       const prevMap = previousRankRef.current;
       const mapped = rows.map((r, i) => {
-        const rank = i + 1;
+        const rank = typeof r.rank === 'number' ? r.rank : i + 1;
         const prevRank = prevMap[r.id] ?? null;
         return {
           uid: r.id,
           nome: r.nome_exibicao,
           pontos: r.pontos,
-          streak: r.streak,
           is_pro: r.is_pro,
           academia: r.academia || '',
           avatar_url: r.avatar_url || null,
@@ -76,47 +176,175 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
       const newMap = {};
       mapped.forEach((u) => { newMap[u.uid] = u.rank; });
       previousRankRef.current = newMap;
-      setLeaderboard(mapped);
+      setLeaderboardTop(mapped);
+
+      let meEntry = null;
+      if (meRow && meRow.id) {
+        const rank = typeof meRow.rank === 'number' ? meRow.rank : null;
+        const prevRank = prevMap[meRow.id] ?? null;
+        meEntry = {
+          uid: meRow.id,
+          nome: meRow.nome_exibicao,
+          pontos: meRow.pontos,
+          is_pro: meRow.is_pro,
+          academia: meRow.academia || '',
+          avatar_url: meRow.avatar_url || null,
+          xp: meRow.xp ?? 0,
+          league: meRow.league ?? 'bronze',
+          rank,
+          prevRank
+        };
+      }
+      setMyLeaderboardEntry(meEntry);
+
+      leaderboardCacheRef.current.general = {
+        key: cacheKey,
+        ts: Date.now(),
+        top: mapped,
+        me: meEntry
+      };
     } finally {
       setLeaderboardLoading(false);
     }
-  }, [supabase, userId, rankingStart, rankingEnd, rankingPeriod]);
+  }, [supabase, userId, tenantId, rankingStart, rankingEnd, rankingPeriod, rankingListMode]);
 
   // --- League Ranking ---
-  const [leagueLeaderboard, setLeagueLeaderboard] = useState([]);
+  const [leagueLeaderboardTop, setLeagueLeaderboardTop] = useState([]);
+  const [myLeagueLeaderboardEntry, setMyLeagueLeaderboardEntry] = useState(null);
   const [leagueLoading, setLeagueLoading] = useState(false);
 
   const refreshLeagueRanking = useCallback(async () => {
     if (!supabase || !userId) return;
     setLeagueLoading(true);
     try {
-      const { data, error: rpcError } = await supabase.rpc('get_league_leaderboard', {
-        p_start: rankingStart,
-        p_end: rankingEnd,
-        p_period: rankingPeriod
-      });
-      if (rpcError) {
-        logger.error('league ranking', rpcError);
+      const listKey = rankingListMode === 'full' ? 'list:full' : `top:${LEADERBOARD_TOP_LIMIT}`;
+      const cacheKey = `${tenantId || ''}|${rankingPeriod}|${String(rankingStart)}|${String(rankingEnd)}|${listKey}`;
+      const cache = leaderboardCacheRef.current.league;
+      if (cache.key === cacheKey && Date.now() - cache.ts < LEADERBOARD_CACHE_TTL_MS) {
+        setLeagueLeaderboardTop(cache.top || []);
+        setMyLeagueLeaderboardEntry(cache.me || null);
         return;
       }
-      const rows = Array.isArray(data) ? data : [];
-      setLeagueLeaderboard(
-        rows.map((r) => ({
+
+      if (rankingListMode === 'full') {
+        const { data, error: rpcError } = await supabase.rpc('get_league_leaderboard', {
+          p_start: rankingStart,
+          p_end: rankingEnd,
+          p_period: rankingPeriod
+        });
+        if (rpcError) {
+          logger.error('league ranking.full', rpcError, {
+            tab: 'league',
+            period: rankingPeriod,
+            start: String(rankingStart),
+            end: String(rankingEnd),
+            tenantId: tenantId || null,
+            mode: 'full'
+          });
+          return;
+        }
+        const rows = Array.isArray(data) ? data : [];
+        const topMapped = rows.map((r, i) => ({
           uid: r.id,
           nome: r.nome_exibicao,
           pontos: r.pontos,
-          streak: r.streak,
           is_pro: r.is_pro,
           academia: r.academia || '',
           avatar_url: r.avatar_url || null,
           xp: r.xp ?? 0,
-          league: r.league ?? 'bronze'
-        }))
-      );
+          league: r.league ?? 'bronze',
+          rank: i + 1
+        }));
+        setLeagueLeaderboardTop(topMapped);
+        setMyLeagueLeaderboardEntry(null);
+
+        leaderboardCacheRef.current.league = {
+          key: cacheKey,
+          ts: Date.now(),
+          top: topMapped,
+          me: null
+        };
+        return;
+      }
+
+      const [topRes, meRes] = await Promise.all([
+        supabase.rpc('get_league_leaderboard_top', {
+          p_start: rankingStart,
+          p_end: rankingEnd,
+          p_period: rankingPeriod,
+          p_limit: LEADERBOARD_TOP_LIMIT
+        }),
+        supabase.rpc('get_my_league_rank_period', {
+          p_start: rankingStart,
+          p_end: rankingEnd,
+          p_period: rankingPeriod
+        })
+      ]);
+
+      if (topRes.error) {
+        logger.error('league ranking.top', topRes.error, {
+          tab: 'league',
+          period: rankingPeriod,
+          start: String(rankingStart),
+          end: String(rankingEnd),
+          tenantId: tenantId || null,
+          mode: 'compact'
+        });
+        return;
+      }
+      if (meRes.error) {
+        logger.error('league ranking.me', meRes.error, {
+          tab: 'league',
+          period: rankingPeriod,
+          start: String(rankingStart),
+          end: String(rankingEnd),
+          tenantId: tenantId || null,
+          mode: 'compact'
+        });
+      }
+
+      const rows = Array.isArray(topRes.data) ? topRes.data : [];
+      const meRow = Array.isArray(meRes.data) ? meRes.data[0] : meRes.data;
+
+      const topMapped = rows.map((r, i) => ({
+          uid: r.id,
+          nome: r.nome_exibicao,
+          pontos: r.pontos,
+          is_pro: r.is_pro,
+          academia: r.academia || '',
+          avatar_url: r.avatar_url || null,
+          xp: r.xp ?? 0,
+          league: r.league ?? 'bronze',
+          rank: typeof r.rank === 'number' ? r.rank : i + 1
+      }));
+      setLeagueLeaderboardTop(topMapped);
+
+      let meEntry = null;
+      if (meRow && meRow.id) {
+        meEntry = {
+          uid: meRow.id,
+          nome: meRow.nome_exibicao,
+          pontos: meRow.pontos,
+          is_pro: meRow.is_pro,
+          academia: meRow.academia || '',
+          avatar_url: meRow.avatar_url || null,
+          xp: meRow.xp ?? 0,
+          league: meRow.league ?? 'bronze',
+          rank: typeof meRow.rank === 'number' ? meRow.rank : null
+        };
+      }
+      setMyLeagueLeaderboardEntry(meEntry);
+
+      leaderboardCacheRef.current.league = {
+        key: cacheKey,
+        ts: Date.now(),
+        top: topMapped,
+        me: meEntry
+      };
     } finally {
       setLeagueLoading(false);
     }
-  }, [supabase, userId, rankingStart, rankingEnd, rankingPeriod]);
+  }, [supabase, userId, tenantId, rankingStart, rankingEnd, rankingPeriod, rankingListMode]);
 
   const refreshCheckins = useCallback(async () => {
     if (!supabase || !userId) return;
@@ -232,7 +460,10 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
 
   useEffect(() => {
     if (!supabase || !userId || !tenantId) {
-      setLeaderboard([]);
+      setLeaderboardTop([]);
+      setMyLeaderboardEntry(null);
+      setLeagueLeaderboardTop([]);
+      setMyLeagueLeaderboardEntry(null);
       setCheckins([]);
       setLoading(false);
       return;
@@ -583,7 +814,9 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
   );
 
   return {
-    leaderboard,
+    rankingListMode,
+    leaderboardTop,
+    myLeaderboardEntry,
     checkins,
     notifications,
     readNotifications,
@@ -593,7 +826,8 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
     setError,
     refreshAll,
     refreshLeaderboard,
-    leagueLeaderboard,
+    leagueLeaderboardTop,
+    myLeagueLeaderboardEntry,
     leagueLoading,
     refreshLeagueRanking,
     refreshCheckins,

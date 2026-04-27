@@ -18,6 +18,7 @@ const VIRTUALIZE_THRESHOLD = 50;
 const RANKING_ROW_HEIGHT = 76;
 
 function RankingRow({ u, idx, currentUid, onOpenProfile, rankingFilterEnabled }) {
+  const effectiveRank = typeof u?.rank === 'number' ? u.rank : idx + 1;
   return (
     <div
       role={onOpenProfile ? 'button' : undefined}
@@ -33,7 +34,7 @@ function RankingRow({ u, idx, currentUid, onOpenProfile, rankingFilterEnabled })
       <div className="flex items-center gap-4">
         <div className="w-8 flex flex-col items-center">
           <span className="font-black text-zinc-600 italic">
-            {idx + 1 === 1 ? '🥇' : idx + 1 === 2 ? '🥈' : idx + 1 === 3 ? '🥉' : `#${idx + 1}`}
+            {effectiveRank === 1 ? '🥇' : effectiveRank === 2 ? '🥈' : effectiveRank === 3 ? '🥉' : `#${effectiveRank}`}
           </span>
           {u.prevRank != null && u.prevRank !== u.rank && (
             u.rank < u.prevRank ? (
@@ -177,8 +178,10 @@ const RANKING_TABS = [
 export function HomeView({
   user,
   userData,
-  allUsers,
-  leagueUsers = [],
+  topUsers,
+  myRankUser,
+  leagueTopUsers = [],
+  myLeagueRankUser,
   onOpenCheckin,
   onOpenTimer,
   rankingLoading = false,
@@ -209,12 +212,12 @@ export function HomeView({
   }, [onCheckStreakRecovery]);
 
   useEffect(() => {
-    if (!user?.uid || !allUsers?.length) return;
-    const me = allUsers.find((u) => u.uid === user.uid);
+    if (!user?.uid || !topUsers?.length) return;
+    const me = topUsers.find((u) => u.uid === user.uid);
     if (me?.rank <= 3 && me?.prevRank != null && me.prevRank > 3) {
       fireConfetti({ preset: 'gold', particleCount: 100 });
     }
-  }, [allUsers, user?.uid]);
+  }, [topUsers, user?.uid]);
 
   const handleTabChange = (tab) => {
     setRankingTab(tab);
@@ -223,8 +226,16 @@ export function HomeView({
     }
   };
 
-  const displayUsers = rankingTab === 'league' ? leagueUsers : allUsers;
+  const displayUsers = rankingTab === 'league' ? leagueTopUsers : topUsers;
+  const myUserEntry = rankingTab === 'league' ? myLeagueRankUser : myRankUser;
   const isRankingLoading = rankingTab === 'league' ? leagueLoading : rankingLoading;
+
+  const shouldShowMyRankCard = Boolean(
+    myUserEntry &&
+    myUserEntry.uid &&
+    myUserEntry.rank != null &&
+    !displayUsers?.some((u) => u?.uid === myUserEntry.uid)
+  );
   return (
     <div className="space-y-6 animate-in-fade">
       <div className="space-y-3">
@@ -367,7 +378,7 @@ export function HomeView({
               ) : null}
             </div>
             <span className="text-xs text-zinc-500 shrink-0 pt-0.5">
-              {isRankingLoading ? '…' : `${displayUsers.length} atletas`}
+              {isRankingLoading ? '…' : `Top ${displayUsers.length}`}
             </span>
           </div>
           {rankingFilterEnabled && (
@@ -430,6 +441,22 @@ export function HomeView({
           onOpenProfile={onOpenProfile}
           rankingFilterEnabled={rankingFilterEnabled}
         />
+
+        {shouldShowMyRankCard && (
+          <div className="space-y-2 pt-2">
+            <div className="px-1 flex items-center justify-between">
+              <p className="text-xs font-bold uppercase tracking-wide text-zinc-500">Sua posição</p>
+              <p className="text-xs text-zinc-600">#{myUserEntry.rank}</p>
+            </div>
+            <RankingRow
+              u={myUserEntry}
+              idx={Math.max(0, (myUserEntry.rank ?? 1) - 1)}
+              currentUid={user?.uid}
+              onOpenProfile={onOpenProfile}
+              rankingFilterEnabled={rankingFilterEnabled}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
