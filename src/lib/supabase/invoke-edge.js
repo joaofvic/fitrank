@@ -1,4 +1,6 @@
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+import { normalizeSupabaseUrl } from './normalize-url';
+
+const supabaseUrl = normalizeSupabaseUrl(import.meta.env.VITE_SUPABASE_URL);
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 let refreshInFlight = null;
