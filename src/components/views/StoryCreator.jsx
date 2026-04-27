@@ -69,7 +69,8 @@ export function StoryCreator({ onClose, onCreateStory }) {
   return (
     <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogContent
-        className="fixed inset-0 left-0 top-0 w-full h-full max-w-none translate-x-0 translate-y-0 rounded-none border-0 bg-black p-0 flex flex-col"
+        variant="fullscreen"
+        className="flex flex-col bg-black"
         showClose={false}
       >
         <DialogTitle className="sr-only">Novo Story</DialogTitle>

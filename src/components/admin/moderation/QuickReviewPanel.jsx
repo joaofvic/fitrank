@@ -156,12 +156,9 @@ export function QuickReviewPanel({
 
   return (
     <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent
-        className="fixed inset-0 left-0 top-0 w-full h-full max-w-none translate-x-0 translate-y-0 rounded-none border-0 bg-black/90 p-0 overflow-y-auto"
-        showClose={false}
-      >
+      <DialogContent variant="fullscreenFloating" showClose={false}>
         <DialogTitle className="sr-only">Revisão de check-in</DialogTitle>
-        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 w-full max-w-lg mx-auto space-y-4 my-4">
+        <div className="w-full max-w-lg shrink-0 rounded-3xl border border-zinc-800 bg-zinc-900 p-5 shadow-2xl shadow-black/50 ring-1 ring-white/[0.06] space-y-4 mb-10 mt-[max(0.25rem,env(safe-area-inset-top,0px))]">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="text-xs text-zinc-500 font-mono truncate">{focusedTenant}</p>
