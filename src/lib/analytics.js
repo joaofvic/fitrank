@@ -31,6 +31,7 @@ export const analytics = {
   socialStoryCreated: () => track('social_story_created'),
   socialStoryViewed: (authorId) => track('social_story_viewed', { author_id: authorId }),
   socialFriendRequestSent: () => track('social_friend_request_sent'),
+  socialFriendRequestCancelled: () => track('social_friend_request_cancelled'),
   socialFriendAccepted: () => track('social_friend_accepted'),
   socialMentionUsed: () => track('social_mention_used'),
 

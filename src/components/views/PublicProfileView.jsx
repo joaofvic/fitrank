@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  ArrowLeft, Building2, CheckCircle2, Crown, Flame, Loader2, UserCheck, UserMinus, UserPlus, Zap
+  ArrowLeft, Building2, CheckCircle2, Clock, Crown, Flame, Loader2, UserCheck, UserMinus, UserPlus, Zap
 } from 'lucide-react';
 import { UserAvatar } from '../ui/user-avatar.jsx';
 import { Card } from '../ui/Card.jsx';
@@ -14,11 +14,13 @@ import { LeagueBadge } from '../ui/LeagueBadge.jsx';
 import { getLevelInfo } from '../../lib/profile-map.js';
 import { ConsistencyHeatmap } from '../ui/ConsistencyHeatmap.jsx';
 
+/** Perfil alheio — Epic C: `onCancelSentFriendRequest` só para pedido pending enviado pelo visitante (≠ `onRemoveFriend`). */
 export function PublicProfileView({
   userId,
   onBack,
   onSendFriendRequest,
   onRemoveFriend,
+  onCancelSentFriendRequest,
   onToggleLike,
   onAddComment,
   onLoadComments,
@@ -37,6 +39,9 @@ export function PublicProfileView({
   const [removingFriend, setRemovingFriend] = useState(false);
   const [localFriendshipStatus, setLocalFriendshipStatus] = useState(null);
   const [friendshipId, setFriendshipId] = useState(null);
+  /** true = eu enviei o pedido pending; false = recebi pedido do dono do perfil (C.3). */
+  const [friendshipIsOutgoing, setFriendshipIsOutgoing] = useState(false);
+  const [cancelingSent, setCancelingSent] = useState(false);
   const [posts, setPosts] = useState([]);
   const [commentsOpen, setCommentsOpen] = useState(null);
   const [likesOpen, setLikesOpen] = useState(null);
@@ -63,8 +68,9 @@ export function PublicProfileView({
       setLocalFriendshipStatus(data.friendship_status ?? null);
 
       // Unificação das duas lógicas (HEAD e dev) para pegar o ID da amizade
+      let resolvedFriendshipId = null;
       if (data.friendship_id) {
-        setFriendshipId(data.friendship_id);
+        resolvedFriendshipId = data.friendship_id;
       } else if (data.friendship_status === 'accepted' && currentUserId) {
         const { data: fRow } = await supabase
           .from('friendships')
@@ -73,7 +79,22 @@ export function PublicProfileView({
           .or(`and(requester_id.eq.${userId},addressee_id.eq.${currentUserId}),and(requester_id.eq.${currentUserId},addressee_id.eq.${userId})`)
           .limit(1)
           .maybeSingle();
-        setFriendshipId(fRow?.id ?? null);
+        resolvedFriendshipId = fRow?.id ?? null;
+      }
+      setFriendshipId(resolvedFriendshipId);
+
+      if (typeof data.friendship_is_outgoing === 'boolean') {
+        setFriendshipIsOutgoing(data.friendship_is_outgoing);
+      } else if (data.friendship_status === 'pending' && currentUserId && (data.friendship_id || resolvedFriendshipId)) {
+        const fid = data.friendship_id || resolvedFriendshipId;
+        const { data: pendRow } = await supabase
+          .from('friendships')
+          .select('requester_id')
+          .eq('id', fid)
+          .maybeSingle();
+        setFriendshipIsOutgoing(pendRow?.requester_id === currentUserId);
+      } else {
+        setFriendshipIsOutgoing(false);
       }
     } catch (err) {
       setError(err.message ?? 'Erro ao carregar perfil');
@@ -144,8 +165,23 @@ export function PublicProfileView({
     if (!onSendFriendRequest || sendingRequest) return;
     setSendingRequest(true);
     try {
-      const ok = await onSendFriendRequest(userId);
-      if (ok) setLocalFriendshipStatus('pending');
+      const res = await onSendFriendRequest(userId);
+      if (res?.ok) {
+        setLocalFriendshipStatus('pending');
+        setFriendshipIsOutgoing(true);
+        if (res.friendshipId) {
+          setFriendshipId(res.friendshipId);
+        } else if (currentUserId && supabase) {
+          const { data: row } = await supabase
+            .from('friendships')
+            .select('id')
+            .eq('requester_id', currentUserId)
+            .eq('addressee_id', userId)
+            .eq('status', 'pending')
+            .maybeSingle();
+          if (row?.id) setFriendshipId(row.id);
+        }
+      }
     } finally {
       setSendingRequest(false);
     }
@@ -159,9 +195,27 @@ export function PublicProfileView({
       if (ok) {
         setLocalFriendshipStatus(null);
         setFriendshipId(null);
+        setFriendshipIsOutgoing(false);
       }
     } finally {
       setRemovingFriend(false);
+    }
+  };
+
+  const handleCancelSentRequestAction = async () => {
+    if (!onCancelSentFriendRequest || !friendshipId || cancelingSent) return;
+    setCancelingSent(true);
+    try {
+      const ok = await onCancelSentFriendRequest(friendshipId);
+      if (ok) {
+        setLocalFriendshipStatus(null);
+        setFriendshipId(null);
+        setFriendshipIsOutgoing(false);
+      } else {
+        void loadProfile();
+      }
+    } finally {
+      setCancelingSent(false);
     }
   };
 
@@ -268,8 +322,12 @@ export function PublicProfileView({
         status={localFriendshipStatus}
         sending={sendingRequest}
         removing={removingFriend}
+        cancelingSent={cancelingSent}
+        friendshipIsOutgoing={friendshipIsOutgoing}
+        canCancelOutgoing={Boolean(friendshipId)}
         onSend={handleSendRequest}
         onRemove={handleRemoveFriendAction}
+        onCancelSentRequest={handleCancelSentRequestAction}
       />
 
       {posts.length > 0 && (
@@ -322,7 +380,17 @@ export function PublicProfileView({
   );
 }
 
-function FriendshipButton({ status, sending, removing, onSend, onRemove }) {
+function FriendshipButton({
+  status,
+  sending,
+  removing,
+  cancelingSent,
+  friendshipIsOutgoing,
+  canCancelOutgoing = false,
+  onSend,
+  onRemove,
+  onCancelSentRequest
+}) {
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   if (status === 'accepted') {
@@ -366,10 +434,63 @@ function FriendshipButton({ status, sending, removing, onSend, onRemove }) {
   }
 
   if (status === 'pending') {
+    const showOutgoingCancel =
+      friendshipIsOutgoing && onCancelSentRequest && canCancelOutgoing;
+    const showOutgoingAwaitingId =
+      friendshipIsOutgoing && onCancelSentRequest && !canCancelOutgoing;
+
+    if (showOutgoingCancel) {
+      return (
+        <button
+          type="button"
+          onClick={() => onCancelSentRequest()}
+          disabled={cancelingSent}
+          aria-busy={cancelingSent || undefined}
+          aria-label="Solicitação de amizade enviada. Toque para cancelar."
+          className="w-full flex flex-col items-center justify-center gap-0.5 py-3 rounded-2xl bg-zinc-800/40 border border-zinc-700/50 text-zinc-400 hover:bg-zinc-800/70 hover:border-zinc-600 hover:text-zinc-300 transition-colors disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400/90"
+        >
+          <div className="flex items-center justify-center gap-2">
+            {cancelingSent ? (
+              <Loader2 className="w-4 h-4 animate-spin shrink-0" aria-hidden="true" />
+            ) : (
+              <Clock className="w-4 h-4 shrink-0 text-zinc-500" aria-hidden="true" />
+            )}
+            <span className="text-sm font-bold">
+              {cancelingSent ? 'Cancelando...' : 'Solicitação enviada'}
+            </span>
+          </div>
+          {!cancelingSent ? (
+            <span className="text-[10px] text-zinc-600 font-medium">Toque para cancelar</span>
+          ) : null}
+        </button>
+      );
+    }
+
+    if (showOutgoingAwaitingId) {
+      return (
+        <div
+          className="w-full flex flex-col items-center justify-center gap-0.5 py-3 rounded-2xl bg-zinc-800/40 border border-zinc-700/50 text-zinc-400"
+          role="status"
+          aria-busy="true"
+          aria-label="A sincronizar pedido enviado"
+        >
+          <div className="flex items-center justify-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin shrink-0 text-zinc-500" aria-hidden="true" />
+            <span className="text-sm font-bold text-zinc-400">Solicitação enviada</span>
+          </div>
+          <span className="text-[10px] text-zinc-600 font-medium">A sincronizar…</span>
+        </div>
+      );
+    }
     return (
-      <div className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-zinc-800/40 border border-zinc-700/50 text-zinc-500">
-        <Loader2 className="w-4 h-4" />
-        <span className="text-sm font-bold">Solicitação enviada</span>
+      <div
+        className="rounded-2xl border border-zinc-700/50 bg-zinc-800/40 px-3 py-3 text-center space-y-1"
+        role="status"
+      >
+        <p className="text-sm font-semibold text-zinc-400">Pedido de amizade recebido</p>
+        <p className="text-[11px] text-zinc-600 leading-snug">
+          Responda em <span className="font-semibold text-zinc-500">Amigos</span> › Solicitações.
+        </p>
       </div>
     );
   }

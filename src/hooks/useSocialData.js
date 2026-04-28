@@ -408,25 +408,60 @@ export function useSocialData({ supabase, session, profile }) {
     }));
   }, [supabase, userId]);
 
+  /**
+   * @returns {Promise<{ ok: boolean, friendshipId?: string }>}
+   */
   const sendFriendRequest = useCallback(async (addresseeId) => {
-    if (!supabase || !userId || !tenantId) return false;
-    const { error } = await supabase
+    if (!supabase || !userId || !tenantId) return { ok: false };
+    const { data, error } = await supabase
       .from('friendships')
       .insert({
         requester_id: userId,
         addressee_id: addresseeId,
         tenant_id: tenantId,
         status: 'pending'
-      });
+      })
+      .select('id')
+      .maybeSingle();
 
     if (error) {
       logger.error('sendFriendRequest', error);
-      return false;
+      return { ok: false };
     }
     analytics.socialFriendRequestSent();
     await loadSentRequests();
-    return true;
+    const friendshipId = data?.id != null ? String(data.id) : undefined;
+    return { ok: true, friendshipId };
   }, [supabase, userId, tenantId, loadSentRequests]);
+
+  /**
+   * Cancela pedido **enviado** por mim ainda pendente (delete; distinto de removeFriend em amizade aceite).
+   * @returns {Promise<boolean>}
+   */
+  const cancelSentFriendRequest = useCallback(async (friendshipId) => {
+    if (!supabase || !userId || !friendshipId) return false;
+    const { data, error } = await supabase
+      .from('friendships')
+      .delete()
+      .eq('id', friendshipId)
+      .eq('requester_id', userId)
+      .eq('status', 'pending')
+      .select('id');
+
+    if (error) {
+      logger.error('cancelSentFriendRequest', error);
+      return false;
+    }
+    if (!data?.length) {
+      /* Epic E corrida: o outro lado pode ter aceito/recusado — delete pendente não remove linhas. */
+      logger.warn('cancelSentFriendRequest — nenhuma linha removida', { friendshipId, userId });
+      await loadSentRequests();
+      return false;
+    }
+    analytics.socialFriendRequestCancelled();
+    await loadSentRequests();
+    return true;
+  }, [supabase, userId, loadSentRequests]);
 
   const acceptFriendRequest = useCallback(async (friendshipId) => {
     if (!supabase || !userId) return false;
@@ -744,6 +779,7 @@ export function useSocialData({ supabase, session, profile }) {
     loadSentRequests,
     searchUsers,
     sendFriendRequest,
+    cancelSentFriendRequest,
     acceptFriendRequest,
     declineFriendRequest,
     removeFriend,

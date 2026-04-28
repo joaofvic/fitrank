@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthProvider.jsx';
+import { useSocialData } from '../../hooks/useSocialData.js';
 import { analytics } from '../../lib/analytics.js';
 import { WelcomeStep } from './steps/WelcomeStep.jsx';
 import { GoalStep } from './steps/GoalStep.jsx';
@@ -11,6 +12,7 @@ const STEP_NAMES = ['welcome', 'goal', 'workout_types', 'friends'];
 
 export function OnboardingWizard() {
   const { supabase, profile, session, refreshProfile } = useAuth();
+  const social = useSocialData({ supabase, session, profile });
   const [step, setStep] = useState(0);
   const [goal, setGoal] = useState(null);
   const [workoutTypes, setWorkoutTypes] = useState([]);
@@ -119,6 +121,10 @@ export function OnboardingWizard() {
           <FriendsStep
             supabase={supabase}
             currentUserId={session?.user?.id}
+            sendFriendRequest={social.sendFriendRequest}
+            cancelSentFriendRequest={social.cancelSentFriendRequest}
+            sentRequests={social.sentRequests}
+            onLoadSentRequests={social.loadSentRequests}
             onFinish={handleFriendsFinish}
           />
         )}

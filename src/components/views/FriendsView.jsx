@@ -20,6 +20,7 @@ export function FriendsView({
   onLoadSentRequests,
   onSearch,
   onSendRequest,
+  onCancelSentRequest,
   onAccept,
   onDecline,
   onRemove,
@@ -77,8 +78,8 @@ export function FriendsView({
       <div ref={tablistRef} className="flex border-b border-zinc-800" role="tablist" onKeyDown={handleTabKeyDown}>
         {TABS.map(({ id, label }) => {
           const badge =
-            id === 'pending' && pendingRequests.length > 0
-              ? pendingRequests.length
+            id === 'pending' && pendingRequests.length + sentRequests.length > 0
+              ? pendingRequests.length + sentRequests.length
               : null;
           return (
             <button
@@ -114,10 +115,24 @@ export function FriendsView({
         className="px-4 pt-4"
       >
         {tab === 'search' && (
-          <SearchTab onSearch={onSearch} onSendRequest={onSendRequest} sentRequests={sentRequests} onOpenProfile={onOpenProfile} />
+          <SearchTab
+            onSearch={onSearch}
+            onSendRequest={onSendRequest}
+            onCancelSentRequest={onCancelSentRequest}
+            sentRequests={sentRequests}
+            onLoadSentRequests={onLoadSentRequests}
+            onOpenProfile={onOpenProfile}
+          />
         )}
         {tab === 'pending' && (
-          <PendingTab requests={pendingRequests} onAccept={onAccept} onDecline={onDecline} onOpenProfile={onOpenProfile} />
+          <PendingTab
+            requests={pendingRequests}
+            sentRequests={sentRequests}
+            onAccept={onAccept}
+            onDecline={onDecline}
+            onCancelSentRequest={onCancelSentRequest}
+            onOpenProfile={onOpenProfile}
+          />
         )}
         {tab === 'friends' && (
           <FriendsTab friends={friends} loading={friendsLoading} onRemove={onRemove} onOpenProfile={onOpenProfile} />
@@ -149,14 +164,31 @@ function UserRow({ children, name, subtitle, avatarUrl, onClick }) {
   );
 }
 
-function SearchTab({ onSearch, onSendRequest, sentRequests, onOpenProfile }) {
+function SearchTab({
+  onSearch,
+  onSendRequest,
+  onCancelSentRequest,
+  sentRequests,
+  onLoadSentRequests,
+  onOpenProfile
+}) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [sendingTo, setSendingTo] = useState(null);
+  /** IDs de friendship recém-enviados nesta sessão (antes do parent atualizar sentRequests). */
+  const [friendshipIdAfterSend, setFriendshipIdAfterSend] = useState({});
+  const [cancelingTo, setCancelingTo] = useState(null);
+  const [cancelError, setCancelError] = useState(null);
   const debounceRef = useRef(null);
 
   const sentIds = new Set(sentRequests.map((r) => r.addressee_id));
+
+  const friendshipIdForUser = useCallback(
+    (userId) =>
+      sentRequests.find((r) => r.addressee_id === userId)?.id ?? friendshipIdAfterSend[userId],
+    [sentRequests, friendshipIdAfterSend]
+  );
 
   const doSearch = useCallback(
     async (q) => {
@@ -184,19 +216,59 @@ function SearchTab({ onSearch, onSendRequest, sentRequests, onOpenProfile }) {
 
   const handleSend = async (userId) => {
     if (!onSendRequest) return;
+    setCancelError(null);
     setSendingTo(userId);
     try {
-      await onSendRequest(userId);
-      setResults((prev) =>
-        prev.map((u) => (u.id === userId ? { ...u, friendship_status: 'pending' } : u))
-      );
+      const res = await onSendRequest(userId);
+      if (res?.ok) {
+        setResults((prev) =>
+          prev.map((u) => (u.id === userId ? { ...u, friendship_status: 'pending' } : u))
+        );
+        if (res.friendshipId) {
+          setFriendshipIdAfterSend((prev) => ({ ...prev, [userId]: res.friendshipId }));
+        }
+      }
     } finally {
       setSendingTo(null);
     }
   };
 
+  const handleCancelOutgoing = async (userId) => {
+    const fid = friendshipIdForUser(userId);
+    if (!fid || !onCancelSentRequest) return;
+    setCancelError(null);
+    setCancelingTo(userId);
+    try {
+      const ok = await onCancelSentRequest(fid);
+      if (ok) {
+        setFriendshipIdAfterSend((prev) => {
+          const next = { ...prev };
+          delete next[userId];
+          return next;
+        });
+        setResults((prev) =>
+          prev.map((u) =>
+            u.id === userId ? { ...u, friendship_status: null } : u
+          )
+        );
+        onLoadSentRequests?.();
+      } else {
+        setCancelError(
+          'Não cancelamos esse pedido. Talvez já tenha sido aceite — verifique Solicitações e Amigos, ou tente de novo.'
+        );
+      }
+    } finally {
+      setCancelingTo(null);
+    }
+  };
+
   return (
     <div className="space-y-2">
+      {cancelError ? (
+        <p className="text-[12px] text-amber-400/95 bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-2" role="alert">
+          {cancelError}
+        </p>
+      ) : null}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
         <input
@@ -219,12 +291,33 @@ function SearchTab({ onSearch, onSendRequest, sentRequests, onOpenProfile }) {
           {results.map((u) => {
             const alreadySent = sentIds.has(u.id) || u.friendship_status === 'pending';
             const alreadyFriend = u.friendship_status === 'accepted';
+            const canCancelOutgoing =
+              alreadySent &&
+              !alreadyFriend &&
+              Boolean(onCancelSentRequest && friendshipIdForUser(u.id));
+            const canceling = cancelingTo === u.id;
             return (
               <UserRow key={u.id} name={u.display_name} avatarUrl={u.avatar_url} onClick={onOpenProfile ? () => onOpenProfile(u.id) : undefined}>
                 {alreadyFriend ? (
                   <span className="text-[12px] font-semibold text-zinc-500 px-3 py-1.5">
                     Amigos
                   </span>
+                ) : canCancelOutgoing ? (
+                  <button
+                    type="button"
+                    disabled={canceling}
+                    aria-label={`Cancelar solicitação enviada para ${u.display_name}`}
+                    aria-busy={canceling || undefined}
+                    onClick={() => handleCancelOutgoing(u.id)}
+                    className="flex items-center gap-1.5 text-[12px] font-bold text-white bg-zinc-700 hover:bg-zinc-600 rounded-lg px-4 py-1.5 transition-colors disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400/90"
+                  >
+                    {canceling ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <X className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                    )}
+                    Cancelar
+                  </button>
                 ) : alreadySent ? (
                   <span className="text-[12px] font-semibold text-zinc-500 bg-zinc-800 rounded-lg px-4 py-1.5">
                     Solicitado
@@ -234,10 +327,11 @@ function SearchTab({ onSearch, onSendRequest, sentRequests, onOpenProfile }) {
                     type="button"
                     disabled={sendingTo === u.id}
                     onClick={() => handleSend(u.id)}
-                    className="text-[12px] font-bold text-white bg-blue-500 hover:bg-blue-600 rounded-lg px-4 py-1.5 transition-colors disabled:opacity-50"
+                    aria-busy={sendingTo === u.id || undefined}
+                    className="text-[12px] font-bold text-white bg-blue-500 hover:bg-blue-600 rounded-lg px-4 py-1.5 transition-colors disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400/90"
                   >
                     {sendingTo === u.id ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin mx-2" />
+                      <Loader2 className="w-3.5 h-3.5 animate-spin mx-2" aria-hidden="true" />
                     ) : (
                       'Seguir'
                     )}
@@ -252,8 +346,17 @@ function SearchTab({ onSearch, onSendRequest, sentRequests, onOpenProfile }) {
   );
 }
 
-function PendingTab({ requests, onAccept, onDecline, onOpenProfile }) {
+function PendingTab({
+  requests,
+  sentRequests,
+  onAccept,
+  onDecline,
+  onCancelSentRequest,
+  onOpenProfile
+}) {
   const [processingId, setProcessingId] = useState(null);
+  const [cancelingSentId, setCancelingSentId] = useState(null);
+  const [sentCancelError, setSentCancelError] = useState(null);
 
   const handleAction = async (id, action) => {
     setProcessingId(id);
@@ -265,46 +368,120 @@ function PendingTab({ requests, onAccept, onDecline, onOpenProfile }) {
     }
   };
 
-  if (requests.length === 0) {
+  const handleCancelSent = async (friendshipId) => {
+    if (!onCancelSentRequest) return;
+    setSentCancelError(null);
+    setCancelingSentId(friendshipId);
+    try {
+      const ok = await onCancelSentRequest(friendshipId);
+      if (!ok) {
+        setSentCancelError(
+          'Não cancelamos esse pedido. Talvez já tenha sido aceite — confira a lista ou tente de novo.'
+        );
+      }
+    } finally {
+      setCancelingSentId(null);
+    }
+  };
+
+  if (requests.length === 0 && sentRequests.length === 0) {
     return (
       <div className="text-center py-12 space-y-2">
         <p className="text-[13px] text-zinc-500">Nenhuma solicitação pendente</p>
-        <p className="text-[11px] text-zinc-600">Quando alguém te enviar uma solicitação, ela aparecerá aqui.</p>
+        <p className="text-[11px] text-zinc-600">
+          Quando alguém te enviar uma solicitação ou quando enviares uma, aparecerá aqui.
+        </p>
       </div>
     );
   }
 
   return (
-    <div>
-      <p className="text-[12px] text-zinc-500 font-semibold uppercase tracking-wider mb-2">
-        Solicitações de amizade
-      </p>
-      {requests.map((r) => (
-        <UserRow key={r.id} name={r.display_name} avatarUrl={r.avatar_url} subtitle="Quer ser seu amigo" onClick={onOpenProfile ? () => onOpenProfile(r.user_id) : undefined}>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              disabled={processingId === r.id}
-              onClick={() => handleAction(r.id, 'accept')}
-              className="text-[12px] font-bold text-white bg-blue-500 hover:bg-blue-600 rounded-lg px-4 py-1.5 transition-colors disabled:opacity-50"
-            >
-              {processingId === r.id ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin mx-2" />
-              ) : (
-                'Confirmar'
-              )}
-            </button>
-            <button
-              type="button"
-              disabled={processingId === r.id}
-              onClick={() => handleAction(r.id, 'decline')}
-              className="text-[12px] font-bold text-white bg-zinc-700 hover:bg-zinc-600 rounded-lg px-4 py-1.5 transition-colors disabled:opacity-50"
-            >
-              Excluir
-            </button>
-          </div>
-        </UserRow>
-      ))}
+    <div className="space-y-8">
+      {sentCancelError ? (
+        <p className="text-[12px] text-amber-400/95 bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-2" role="alert">
+          {sentCancelError}
+        </p>
+      ) : null}
+      {requests.length > 0 ? (
+        <div>
+          <p className="text-[12px] text-zinc-500 font-semibold uppercase tracking-wider mb-2">
+            Solicitações de amizade
+          </p>
+          {requests.map((r) => (
+            <UserRow key={r.id} name={r.display_name} avatarUrl={r.avatar_url} subtitle="Quer ser seu amigo" onClick={onOpenProfile ? () => onOpenProfile(r.user_id) : undefined}>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  disabled={processingId === r.id}
+                  onClick={() => handleAction(r.id, 'accept')}
+                  aria-busy={processingId === r.id || undefined}
+                  className="text-[12px] font-bold text-white bg-blue-500 hover:bg-blue-600 rounded-lg px-4 py-1.5 transition-colors disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400/90"
+                >
+                  {processingId === r.id ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin mx-2" aria-hidden="true" />
+                  ) : (
+                    'Confirmar'
+                  )}
+                </button>
+                <button
+                  type="button"
+                  disabled={processingId === r.id}
+                  onClick={() => handleAction(r.id, 'decline')}
+                  aria-busy={processingId === r.id || undefined}
+                  className="text-[12px] font-bold text-white bg-zinc-700 hover:bg-zinc-600 rounded-lg px-4 py-1.5 transition-colors disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400/90"
+                >
+                  Excluir
+                </button>
+              </div>
+            </UserRow>
+          ))}
+        </div>
+      ) : (
+        sentRequests.length > 0 ? (
+          <p className="text-[11px] text-zinc-600 text-center pb-1">
+            Nenhuma solicitação recebida neste momento.
+          </p>
+        ) : null
+      )}
+
+      {sentRequests.length > 0 ? (
+        <div>
+          <p className="text-[12px] text-zinc-500 font-semibold uppercase tracking-wider mb-2">
+            Aguardando resposta
+          </p>
+          <p className="text-[11px] text-zinc-600 mb-3">
+            Pedidos que enviaste e ainda não foram aceites.
+          </p>
+          {sentRequests.map((r) => {
+            const canceling = cancelingSentId === r.id;
+            return (
+              <UserRow
+                key={r.id}
+                name={r.display_name}
+                avatarUrl={r.avatar_url}
+                subtitle="Solicitação enviada"
+                onClick={onOpenProfile ? () => onOpenProfile(r.addressee_id) : undefined}
+              >
+                <button
+                  type="button"
+                  disabled={canceling || !onCancelSentRequest}
+                  aria-label={`Cancelar solicitação enviada para ${r.display_name}`}
+                  aria-busy={canceling || undefined}
+                  onClick={() => handleCancelSent(r.id)}
+                  className="flex items-center gap-1.5 text-[12px] font-bold text-white bg-zinc-700 hover:bg-zinc-600 rounded-lg px-4 py-1.5 transition-colors disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400/90"
+                >
+                  {canceling ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" aria-hidden="true" />
+                  ) : (
+                    <X className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                  )}
+                  Cancelar solicitação
+                </button>
+              </UserRow>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }

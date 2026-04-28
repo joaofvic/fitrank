@@ -583,6 +583,7 @@ export default function App() {
             onLoadSentRequests={social.loadSentRequests}
             onSearch={social.searchUsers}
             onSendRequest={social.sendFriendRequest}
+            onCancelSentRequest={social.cancelSentFriendRequest}
             onAccept={social.acceptFriendRequest}
             onDecline={social.declineFriendRequest}
             onRemove={social.removeFriend}
@@ -614,6 +615,7 @@ export default function App() {
             onBack={goBack}
             onSendFriendRequest={social.sendFriendRequest}
             onRemoveFriend={social.removeFriend}
+            onCancelSentFriendRequest={social.cancelSentFriendRequest}
             onToggleLike={social.toggleLike}
             onAddComment={social.addComment}
             onLoadComments={social.loadComments}
