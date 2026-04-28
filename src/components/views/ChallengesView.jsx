@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Trophy, ChevronDown, ChevronUp, Calendar, Dumbbell, Users, DollarSign } from 'lucide-react';
+import { Trophy, ChevronDown, ChevronUp, Calendar, Dumbbell, DollarSign } from 'lucide-react';
 import { UserAvatar } from '../ui/user-avatar.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { Card } from '../ui/Card.jsx';
@@ -32,10 +32,20 @@ function durationLabel(dataInicio, dataFim) {
   return days === 1 ? '1 dia' : `${days} dias`;
 }
 
+function isChallengeActive(dataInicio, dataFim) {
+  if (!dataInicio || !dataFim) return false;
+  const start = new Date(dataInicio + 'T00:00:00');
+  const end = new Date(dataFim + 'T23:59:59');
+  const now = new Date();
+  return now >= start && now <= end;
+}
+
 export function ChallengesView({ onRegisterRefresh }) {
   const { supabase, session, profile, refreshProfile } = useAuth();
   const [desafios, setDesafios] = useState([]);
   const [rankings, setRankings] = useState({});
+  const [rankingInfo, setRankingInfo] = useState({});
+  const [rankingMode, setRankingMode] = useState({});
   const [expandedId, setExpandedId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
@@ -79,16 +89,32 @@ export function ChallengesView({ onRegisterRefresh }) {
   }, [onRegisterRefresh, loadDesafios]);
 
   const loadRanking = useCallback(
-    async (desafioId) => {
+    async (desafioId, opts = {}) => {
       if (!supabase) return;
-      const { data, error: rErr } = await supabase.rpc('get_desafio_ranking', {
-        p_desafio_id: desafioId
-      });
+      const mode = opts.mode ?? 'default';
+      const rpcName = opts.isEnrolled
+        ? mode === 'full'
+          ? 'get_desafio_ranking_full_active'
+          : 'get_my_desafio_ranking_window'
+        : 'get_desafio_ranking_public';
+
+      const args = opts.isEnrolled
+        ? mode === 'full'
+          ? { p_desafio_id: desafioId }
+          : { p_desafio_id: desafioId, p_window: 1 }
+        : { p_desafio_id: desafioId };
+
+      const { data, error: rErr } = await supabase.rpc(rpcName, args);
       if (rErr) {
         logger.error('ranking desafios', rErr);
         setRankings((prev) => ({ ...prev, [desafioId]: [] }));
+        setRankingInfo((prev) => ({ ...prev, [desafioId]: { message: null, myRank: null } }));
       } else {
-        setRankings((prev) => ({ ...prev, [desafioId]: Array.isArray(data) ? data : [] }));
+        const rows = Array.isArray(data) ? data : [];
+        const myRank =
+          rows.find((r) => r?.is_me)?.my_rank ?? rows.find((r) => r?.is_me)?.rank ?? null;
+        setRankings((prev) => ({ ...prev, [desafioId]: rows }));
+        setRankingInfo((prev) => ({ ...prev, [desafioId]: { message: null, myRank } }));
       }
     },
     [supabase]
@@ -101,11 +127,52 @@ export function ChallengesView({ onRegisterRefresh }) {
         return;
       }
       setExpandedId(desafioId);
+      const d = desafios.find((x) => x.id === desafioId);
+      const enrolled = Boolean(d?.is_enrolled);
+      const active = isChallengeActive(d?.data_inicio, d?.data_fim);
+      setRankingMode((prev) => ({ ...prev, [desafioId]: enrolled ? 'window' : 'top3' }));
+
+      if (!enrolled && !active) {
+        setRankings((prev) => ({ ...prev, [desafioId]: [] }));
+        setRankingInfo((prev) => ({
+          ...prev,
+          [desafioId]: { message: 'Ranking disponível apenas durante o desafio.' },
+        }));
+        return;
+      }
+
       if (!rankings[desafioId]) {
-        await loadRanking(desafioId);
+        await loadRanking(desafioId, { isEnrolled: enrolled, mode: enrolled ? 'window' : 'top3' });
       }
     },
-    [expandedId, rankings, loadRanking]
+    [expandedId, rankings, loadRanking, desafios]
+  );
+
+  const handleShowFullRanking = useCallback(
+    async (desafio) => {
+      if (!desafio?.id) return;
+      const active = isChallengeActive(desafio?.data_inicio, desafio?.data_fim);
+      if (!active) {
+        setRankingMode((prev) => ({ ...prev, [desafio.id]: 'window' }));
+        setRankingInfo((prev) => ({
+          ...prev,
+          [desafio.id]: { ...(prev[desafio.id] || {}), message: 'Ranking completo disponível apenas durante o desafio.' },
+        }));
+        return;
+      }
+      setRankingMode((prev) => ({ ...prev, [desafio.id]: 'full' }));
+      await loadRanking(desafio.id, { isEnrolled: true, mode: 'full' });
+    },
+    [loadRanking]
+  );
+
+  const handleShowWindowRanking = useCallback(
+    async (desafio) => {
+      if (!desafio?.id) return;
+      setRankingMode((prev) => ({ ...prev, [desafio.id]: 'window' }));
+      await loadRanking(desafio.id, { isEnrolled: true, mode: 'window' });
+    },
+    [loadRanking]
   );
 
   useEffect(() => {
@@ -139,13 +206,7 @@ export function ChallengesView({ onRegisterRefresh }) {
       }
 
       if (data?.enrolled) {
-        setDesafios((prev) =>
-          prev.map((d) =>
-            d.id === desafioId
-              ? { ...d, is_enrolled: true, participant_count: d.participant_count + (data.already ? 0 : 1) }
-              : d
-          )
-        );
+        await loadDesafios();
         await loadRanking(desafioId);
         if (!expandedId) setExpandedId(desafioId);
         if (refreshProfile) await refreshProfile();
@@ -192,10 +253,9 @@ export function ChallengesView({ onRegisterRefresh }) {
             const isEnrolled = d.is_enrolled;
             const isExpanded = expandedId === d.id;
             const ranking = rankings[d.id] || [];
-            const count = Number(d.participant_count) || 0;
             const remaining = daysRemaining(d.data_fim);
             const duration = durationLabel(d.data_inicio, d.data_fim);
-            const isFull = d.max_participantes && count >= d.max_participantes;
+            const isFull = Boolean(d.is_full);
             const tipos = Array.isArray(d.tipo_treino) ? d.tipo_treino : [];
 
             return (
@@ -247,11 +307,6 @@ export function ChallengesView({ onRegisterRefresh }) {
                     <span className="flex items-center gap-1">
                       <Calendar size={12} />
                       {formatDateBR(d.data_inicio)} — {formatDateBR(d.data_fim)}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Users size={12} />
-                      {count} participante{count !== 1 ? 's' : ''}
-                      {d.max_participantes ? ` / ${d.max_participantes}` : ''}
                     </span>
                   </div>
 
@@ -353,7 +408,37 @@ export function ChallengesView({ onRegisterRefresh }) {
                       <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wide">
                         Ranking do desafio
                       </h4>
-                      {ranking.length === 0 ? (
+                      {Boolean(d.is_enrolled) && isChallengeActive(d.data_inicio, d.data_fim) && (
+                        <div className="flex items-center gap-2">
+                          {rankingMode?.[d.id] === 'full' ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="h-8 px-3 text-xs"
+                              onClick={() => handleShowWindowRanking(d)}
+                            >
+                              Ver apenas minha posição
+                            </Button>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="h-8 px-3 text-xs"
+                              onClick={() => handleShowFullRanking(d)}
+                            >
+                              Ver ranking completo
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                      {rankingInfo?.[d.id]?.myRank ? (
+                        <p className="text-zinc-600 text-xs">
+                          Sua posição: <span className="text-zinc-400 font-bold">#{rankingInfo[d.id].myRank}</span>
+                        </p>
+                      ) : null}
+                      {rankingInfo?.[d.id]?.message ? (
+                        <p className="text-zinc-600 text-xs">{rankingInfo[d.id].message}</p>
+                      ) : ranking.length === 0 ? (
                         <p className="text-zinc-600 text-xs">Ainda sem participantes no ranking.</p>
                       ) : (
                         <ul className="space-y-1.5">
@@ -368,7 +453,7 @@ export function ChallengesView({ onRegisterRefresh }) {
                             >
                               <div className="flex items-center gap-2.5 min-w-0">
                                 <span className="text-zinc-600 font-black w-5 text-xs shrink-0">
-                                  #{idx + 1}
+                                  #{row.rank ?? idx + 1}
                                 </span>
                                 <UserAvatar src={row.avatar_url} size="sm" className="w-7 h-7 bg-zinc-800 border border-zinc-700" />
                                 <span
