@@ -717,6 +717,7 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
       const allowed = {};
       if (fields.display_name !== undefined) allowed.display_name = fields.display_name;
       if (fields.username !== undefined) allowed.username = fields.username || null;
+      if (fields.academia !== undefined) allowed.academia = fields.academia;
       if (fields.avatar_url !== undefined) allowed.avatar_url = fields.avatar_url;
       if (Object.keys(allowed).length === 0) return { error: 'Nenhum campo para atualizar' };
 
@@ -745,6 +746,58 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
       return data === true;
     },
     [supabase]
+  );
+
+  const checkEmailAvailable = useCallback(
+    async (email) => {
+      if (!supabase) return false;
+      const { data, error: rpcErr } = await supabase.rpc('check_email_available', {
+        p_email: email
+      });
+      if (rpcErr) {
+        logger.error('checkEmail', rpcErr);
+        return false;
+      }
+      return data === true;
+    },
+    [supabase]
+  );
+
+  const checkPhoneAvailable = useCallback(
+    async (phone) => {
+      if (!supabase) return false;
+      const { data, error: rpcErr } = await supabase.rpc('check_phone_available', {
+        p_phone: phone
+      });
+      if (rpcErr) {
+        logger.error('checkPhone', rpcErr);
+        return false;
+      }
+      return data === true;
+    },
+    [supabase]
+  );
+
+  const updateAuthEmail = useCallback(
+    async (email) => {
+      if (!supabase) return { error: 'Não autenticado' };
+      const { error: authErr } = await supabase.auth.updateUser({ email });
+      if (authErr) return { error: authErr.message };
+      await refreshProfile?.();
+      return { error: null };
+    },
+    [supabase, refreshProfile]
+  );
+
+  const updateAuthPhone = useCallback(
+    async (phone) => {
+      if (!supabase) return { error: 'Não autenticado' };
+      const { error: authErr } = await supabase.auth.updateUser({ phone });
+      if (authErr) return { error: authErr.message };
+      await refreshProfile?.();
+      return { error: null };
+    },
+    [supabase, refreshProfile]
   );
 
   const updatePassword = useCallback(
@@ -849,6 +902,10 @@ export function useFitCloudData({ supabase, session, profile, refreshProfile }) 
     uploadAvatar,
     updateProfile,
     checkUsernameAvailable,
+    checkEmailAvailable,
+    checkPhoneAvailable,
+    updateAuthEmail,
+    updateAuthPhone,
     updatePassword,
     checkStreakRecovery,
     recoverStreak,

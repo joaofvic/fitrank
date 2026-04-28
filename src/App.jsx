@@ -529,6 +529,10 @@ export default function App() {
             onUploadAvatar={cloud.uploadAvatar}
             onUpdateProfile={cloud.updateProfile}
             onCheckUsername={cloud.checkUsernameAvailable}
+            onCheckEmail={cloud.checkEmailAvailable}
+            onCheckPhone={cloud.checkPhoneAvailable}
+            onUpdateEmail={cloud.updateAuthEmail}
+            onUpdatePhone={cloud.updateAuthPhone}
             onUpdatePassword={cloud.updatePassword}
           />
         )}
