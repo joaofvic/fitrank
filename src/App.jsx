@@ -557,9 +557,7 @@ export default function App() {
             <WorkoutPlanView
               onBack={goBack}
               onOpenTimer={(restSec) => {
-                workoutTimer.ref.current.mode = 'countdown';
-                workoutTimer.ref.current.countdownTarget = restSec;
-                workoutTimer.ref.current.countdownPausedRemaining = restSec;
+                workoutTimer.prepareRestFromPlan(restSec);
                 navigate('timer');
               }}
               onGenerateNew={() => navigate('workout-plan-generator')}

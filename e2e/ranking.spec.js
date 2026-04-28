@@ -1,60 +1,7 @@
 import { test, expect } from '@playwright/test';
+import { setupE2EAuthAndMocks, E2E_BASE_URL } from './helpers/supabase-e2e-setup.js';
 
-const BASE_URL = 'http://localhost:3000/';
-const PROJECT_REF = 'pjlmemvwqhmpchiiqtol';
-const AUTH_STORAGE_KEY = `sb-${PROJECT_REF}-auth-token`;
-
-function buildSession(userId) {
-  const nowSec = Math.floor(Date.now() / 1000);
-  return {
-    access_token: 'e2e-access-token',
-    refresh_token: 'e2e-refresh-token',
-    token_type: 'bearer',
-    expires_in: 60 * 60 * 24 * 30,
-    expires_at: nowSec + 60 * 60 * 24 * 30,
-    user: {
-      id: userId,
-      aud: 'authenticated',
-      role: 'authenticated',
-      email: 'e2e@example.com',
-      app_metadata: { provider: 'email', providers: ['email'] },
-      user_metadata: {},
-      created_at: new Date().toISOString()
-    }
-  };
-}
-
-async function setupE2EAuthAndMocks(page, { userId, profile, rankingHandlers }) {
-  // 1) “Login” via storage (supabase-js lê do localStorage)
-  await page.addInitScript(({ key, value }) => {
-    window.localStorage.setItem(key, value);
-  }, { key: AUTH_STORAGE_KEY, value: JSON.stringify(buildSession(userId)) });
-
-  // 2) Mock do profile (AuthProvider -> supabase.from('profiles').select(...).eq('id', userId).maybeSingle())
-  await page.route('**/rest/v1/profiles**', async (route) => {
-    const url = new URL(route.request().url());
-    const select = url.searchParams.get('select') || '';
-    // PostgREST filter style: `id=eq.<uuid>`
-    const isProfileRow = select.includes('tenant_id') && url.searchParams.get('id') === `eq.${userId}`;
-    if (!isProfileRow) {
-      return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
-    }
-    return route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        ...profile,
-        id: userId,
-        tenants: { slug: 'e2e', name: 'E2E', status: 'active' }
-      })
-    });
-  });
-
-  // 3) Mocks das RPCs (useFitCloudData)
-  for (const [pattern, handler] of Object.entries(rankingHandlers)) {
-    await page.route(pattern, handler);
-  }
-}
+const BASE_URL = E2E_BASE_URL;
 
 test.describe('Ranking (Top 10 + Sua posição)', () => {
   test('usuário fora do Top 10 vê Top 10 + “Sua posição” (Geral)', async ({ page }) => {
